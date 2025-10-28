@@ -4,6 +4,10 @@ import { paths } from "../lib/tmdb-api.js";
 
 const app = new Hono();
 
+if (!process.env.TMDB_API_TOKEN) {
+  throw new Error("TMDB_API_TOKEN is not set");
+}
+
 const tmdb = createClient<paths>({
   baseUrl: process.env.PUBLIC_TMDB_API_BASE_URL || "https://api.themoviedb.org",
   headers: {
