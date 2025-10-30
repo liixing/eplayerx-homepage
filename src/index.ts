@@ -44,4 +44,33 @@ app.get("/tmdb/search/keyword", async (c) => {
   return c.json(result.data?.results || []);
 });
 
+app.get("/tmdb/genre/tv/list", async (c) => {
+  const language = c.req.query("language") || "en";
+  const result = await tmdb.GET("/3/genre/tv/list", {
+    params: {
+      query: {
+        language,
+      },
+    },
+  });
+  if (result.response.status !== 200) {
+    return c.json({ error: result.error }, 500);
+  }
+  return c.json(result.data?.genres || []);
+});
+
+app.get("/tmdb/genre/movie/list", async (c) => {
+  const result = await tmdb.GET("/3/genre/movie/list", {
+    params: {
+      query: {
+        language: "en-US",
+      },
+    },
+  });
+  if (result.response.status !== 200) {
+    return c.json({ error: result.error }, 500);
+  }
+  return c.json(result.data?.genres || []);
+});
+
 export default app;
