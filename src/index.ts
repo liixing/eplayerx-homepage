@@ -60,10 +60,11 @@ app.get("/tmdb/genre/tv/list", async (c) => {
 });
 
 app.get("/tmdb/genre/movie/list", async (c) => {
+  const language = c.req.query("language") || "en";
   const result = await tmdb.GET("/3/genre/movie/list", {
     params: {
       query: {
-        language: "en-US",
+        language,
       },
     },
   });
@@ -71,6 +72,68 @@ app.get("/tmdb/genre/movie/list", async (c) => {
     return c.json({ error: result.error }, 500);
   }
   return c.json(result.data?.genres || []);
+});
+
+app.get("/tmdb/movie/details", async (c) => {
+  const id = c.req.query("id") || "";
+  const language = c.req.query("language") || "en";
+  const result = await tmdb.GET(`/3/movie/${Number(id)}`, {
+    params: {
+      query: {
+        language,
+      },
+      path: {
+        movie_id: Number(id),
+      },
+    },
+  });
+  if (result.response.status !== 200) {
+    return c.json({ error: result.error }, 500);
+  }
+  return c.json(result.data);
+});
+
+app.get("/tmdb/tv/details", async (c) => {
+  const id = c.req.query("id") || "";
+  const language = c.req.query("language") || "en";
+  const result = await tmdb.GET(`/3/tv/${Number(id)}`, {
+    params: {
+      query: {
+        language,
+      },
+      path: {
+        series_id: Number(id),
+      },
+    },
+  });
+  if (result.response.status !== 200) {
+    return c.json({ error: result.error }, 500);
+  }
+  return c.json(result.data);
+});
+
+app.get("/tmdb/tv/season/details", async (c) => {
+  const id = c.req.query("id") || "";
+  const seasonNumber = c.req.query("seasonNumber") || "";
+  const language = c.req.query("language") || "en";
+  const result = await tmdb.GET(
+    `/3/tv/${Number(id)}/season/${Number(seasonNumber)}`,
+    {
+      params: {
+        query: {
+          language,
+        },
+        path: {
+          series_id: Number(id),
+          season_number: Number(seasonNumber),
+        },
+      },
+    }
+  );
+  if (result.response.status !== 200) {
+    return c.json({ error: result.error }, 500);
+  }
+  return c.json(result.data);
 });
 
 export default app;
