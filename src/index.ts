@@ -41,7 +41,7 @@ app.get("/tmdb/search/keyword", async (c) => {
   if (result.response.status !== 200) {
     return c.json({ error: result.error }, 500);
   }
-  return c.json(result.data?.results || []);
+  return c.json(result.data?.results);
 });
 
 app.get("/tmdb/genre/tv/list", async (c) => {
