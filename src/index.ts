@@ -110,8 +110,12 @@ app.get("/tmdb/movie/images", async (c) => {
 
 app.get("/tmdb/movie/credits", async (c) => {
   const id = c.req.query("id") || "";
+  const language = c.req.query("language") || "en";
   const result = await tmdb.GET(`/3/movie/${Number(id)}/credits`, {
     params: {
+      query: {
+        language,
+      },
       path: {
         movie_id: Number(id),
       },
@@ -125,8 +129,12 @@ app.get("/tmdb/movie/credits", async (c) => {
 
 app.get("/tmdb/movie/videos", async (c) => {
   const id = c.req.query("id") || "";
+  const language = c.req.query("language") || "en";
   const result = await tmdb.GET(`/3/movie/${Number(id)}/videos`, {
     params: {
+      query: {
+        language,
+      },
       path: {
         movie_id: Number(id),
       },
@@ -198,8 +206,12 @@ app.get("/tmdb/tv/season/details", async (c) => {
 
 app.get("/tmdb/tv/credits", async (c) => {
   const id = c.req.query("id") || "";
+  const language = c.req.query("language") || "en";
   const result = await tmdb.GET(`/3/tv/${Number(id)}/credits`, {
     params: {
+      query: {
+        language,
+      },
       path: {
         series_id: Number(id),
       },
@@ -213,8 +225,12 @@ app.get("/tmdb/tv/credits", async (c) => {
 
 app.get("/tmdb/tv/videos", async (c) => {
   const id = c.req.query("id") || "";
+  const language = c.req.query("language") || "en";
   const result = await tmdb.GET(`/3/tv/${Number(id)}/videos`, {
     params: {
+      query: {
+        language,
+      },
       path: {
         series_id: Number(id),
       },
