@@ -108,6 +108,21 @@ app.get("/tmdb/movie/images", async (c) => {
   return c.json(result.data);
 });
 
+app.get("/tmdb/movie/external_ids", async (c) => {
+  const id = c.req.query("id") || "";
+  const result = await tmdb.GET(`/3/movie/${Number(id)}/external_ids`, {
+    params: {
+      path: {
+        movie_id: Number(id),
+      },
+    },
+  });
+  if (result.response.status !== 200) {
+    return c.json({ error: result.error }, 500);
+  }
+  return c.json(result.data);
+});
+
 app.get("/tmdb/movie/credits", async (c) => {
   const id = c.req.query("id") || "";
   const language = c.req.query("language") || "en";
@@ -137,6 +152,21 @@ app.get("/tmdb/movie/videos", async (c) => {
       },
       path: {
         movie_id: Number(id),
+      },
+    },
+  });
+  if (result.response.status !== 200) {
+    return c.json({ error: result.error }, 500);
+  }
+  return c.json(result.data);
+});
+
+app.get("/tmdb/tv/external_ids", async (c) => {
+  const id = c.req.query("id") || "";
+  const result = await tmdb.GET(`/3/tv/${Number(id)}/external_ids`, {
+    params: {
+      path: {
+        series_id: Number(id),
       },
     },
   });
@@ -236,6 +266,22 @@ app.get("/tmdb/tv/videos", async (c) => {
       },
     },
   });
+  if (result.response.status !== 200) {
+    return c.json({ error: result.error }, 500);
+  }
+  return c.json(result.data);
+});
+
+app.get("/tmdb/tv/external_ids", async (c) => {
+  const id = c.req.query("id") || "";
+  const result = await tmdb.GET(`/3/tv/${Number(id)}/external_ids`, {
+    params: {
+      path: {
+        series_id: Number(id),
+      },
+    },
+  });
+
   if (result.response.status !== 200) {
     return c.json({ error: result.error }, 500);
   }
