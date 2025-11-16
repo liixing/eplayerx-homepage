@@ -108,6 +108,36 @@ app.get("/tmdb/movie/images", async (c) => {
   return c.json(result.data);
 });
 
+app.get("/tmdb/movie/credits", async (c) => {
+  const id = c.req.query("id") || "";
+  const result = await tmdb.GET(`/3/movie/${Number(id)}/credits`, {
+    params: {
+      path: {
+        movie_id: Number(id),
+      },
+    },
+  });
+  if (result.response.status !== 200) {
+    return c.json({ error: result.error }, 500);
+  }
+  return c.json(result.data);
+});
+
+app.get("/tmdb/movie/videos", async (c) => {
+  const id = c.req.query("id") || "";
+  const result = await tmdb.GET(`/3/movie/${Number(id)}/videos`, {
+    params: {
+      path: {
+        movie_id: Number(id),
+      },
+    },
+  });
+  if (result.response.status !== 200) {
+    return c.json({ error: result.error }, 500);
+  }
+  return c.json(result.data);
+});
+
 app.get("/tmdb/tv/details", async (c) => {
   const id = c.req.query("id") || "";
   const language = c.req.query("language") || "en";
@@ -160,6 +190,36 @@ app.get("/tmdb/tv/season/details", async (c) => {
       },
     }
   );
+  if (result.response.status !== 200) {
+    return c.json({ error: result.error }, 500);
+  }
+  return c.json(result.data);
+});
+
+app.get("/tmdb/tv/credits", async (c) => {
+  const id = c.req.query("id") || "";
+  const result = await tmdb.GET(`/3/tv/${Number(id)}/credits`, {
+    params: {
+      path: {
+        series_id: Number(id),
+      },
+    },
+  });
+  if (result.response.status !== 200) {
+    return c.json({ error: result.error }, 500);
+  }
+  return c.json(result.data);
+});
+
+app.get("/tmdb/tv/videos", async (c) => {
+  const id = c.req.query("id") || "";
+  const result = await tmdb.GET(`/3/tv/${Number(id)}/videos`, {
+    params: {
+      path: {
+        series_id: Number(id),
+      },
+    },
+  });
   if (result.response.status !== 200) {
     return c.json({ error: result.error }, 500);
   }
