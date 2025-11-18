@@ -142,6 +142,25 @@ app.get("/tmdb/movie/credits", async (c) => {
   return c.json(result.data);
 });
 
+app.get("/tmdb/movie/similar", async (c) => {
+  const id = c.req.query("id") || "";
+  const language = c.req.query("language") || "en";
+  const result = await tmdb.GET(`/3/movie/${Number(id)}/similar`, {
+    params: {
+      query: {
+        language,
+      },
+      path: {
+        movie_id: Number(id),
+      },
+    },
+  });
+  if (result.response.status !== 200) {
+    return c.json({ error: result.error }, 500);
+  }
+  return c.json(result.data);
+});
+
 app.get("/tmdb/movie/videos", async (c) => {
   const id = c.req.query("id") || "";
   const language = c.req.query("language") || "en";
@@ -244,6 +263,25 @@ app.get("/tmdb/tv/credits", async (c) => {
       },
       path: {
         series_id: Number(id),
+      },
+    },
+  });
+  if (result.response.status !== 200) {
+    return c.json({ error: result.error }, 500);
+  }
+  return c.json(result.data);
+});
+
+app.get("/tmdb/tv/similar", async (c) => {
+  const id = c.req.query("id") || "";
+  const language = c.req.query("language") || "en";
+  const result = await tmdb.GET(`/3/tv/${Number(id)}/similar`, {
+    params: {
+      query: {
+        language,
+      },
+      path: {
+        series_id: id,
       },
     },
   });
