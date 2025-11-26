@@ -145,7 +145,7 @@ app.get("/tmdb/movie/credits", async (c) => {
 app.get("/tmdb/movie/similar", async (c) => {
   const id = c.req.query("id") || "";
   const language = c.req.query("language") || "en";
-  const result = await tmdb.GET(`/3/movie/${Number(id)}/similar`, {
+  const result = await tmdb.GET(`/3/movie/${Number(id)}/recommendations`, {
     params: {
       query: {
         language,
@@ -275,13 +275,13 @@ app.get("/tmdb/tv/credits", async (c) => {
 app.get("/tmdb/tv/similar", async (c) => {
   const id = c.req.query("id") || "";
   const language = c.req.query("language") || "en";
-  const result = await tmdb.GET(`/3/tv/${Number(id)}/similar`, {
+  const result = await tmdb.GET(`/3/tv/${Number(id)}/recommendations`, {
     params: {
       query: {
         language,
       },
       path: {
-        series_id: id,
+        series_id: Number(id),
       },
     },
   });
