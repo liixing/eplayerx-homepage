@@ -158,6 +158,54 @@ tmdbApp.get("/movie/videos", async (c) => {
   return c.json(result.data);
 });
 
+tmdbApp.get("/movie/popular", async (c) => {
+  const language = c.req.query("language") || "en";
+  const result = await tmdb.GET("/3/movie/popular", {
+    params: {
+      query: {
+        language,
+      },
+    },
+  });
+  if (result.response.status !== 200) {
+    return c.json({ error: result.error }, 500);
+  }
+  return c.json(result.data);
+});
+
+tmdbApp.get("/movie/top_rated", async (c) => {
+  const language = c.req.query("language") || "en";
+  const result = await tmdb.GET("/3/movie/top_rated", {
+    params: {
+      query: {
+        language,
+      },
+    },
+  });
+  if (result.response.status !== 200) {
+    return c.json({ error: result.error }, 500);
+  }
+  return c.json(result.data);
+});
+
+tmdbApp.get("/movie/upcoming", async (c) => {
+  const language = c.req.query("language") || "en";
+  const region = c.req.query("region") || "US";
+  const result = await tmdb.GET("/3/movie/upcoming", {
+    params: {
+      query: {
+        language,
+        region,
+      },
+    },
+  });
+
+  if (result.response.status !== 200) {
+    return c.json({ error: result.error }, 500);
+  }
+  return c.json(result.data);
+});
+
 tmdbApp.get("/tv/external_ids", async (c) => {
   const id = c.req.query("id") || "";
   const result = await tmdb.GET(`/3/tv/${Number(id)}/external_ids`, {
@@ -288,4 +336,50 @@ tmdbApp.get("/tv/videos", async (c) => {
   return c.json(result.data);
 });
 
+tmdbApp.get("/tv/Popular", async (c) => {
+  const language = c.req.query("language") || "en";
+  const result = await tmdb.GET("/3/tv/popular", {
+    params: {
+      query: {
+        language,
+      },
+    },
+  });
+  if (result.response.status !== 200) {
+    return c.json({ error: result.error }, 500);
+  }
+  return c.json(result.data);
+});
+
+tmdbApp.get("/tv/top_rated", async (c) => {
+  const language = c.req.query("language") || "en";
+  const result = await tmdb.GET("/3/tv/top_rated", {
+    params: {
+      query: {
+        language,
+      },
+    },
+  });
+  if (result.response.status !== 200) {
+    return c.json({ error: result.error }, 500);
+  }
+  return c.json(result.data);
+});
+
+tmdbApp.get("/tv/on_the_air", async (c) => {
+  const language = c.req.query("language") || "en";
+  const timezone = c.req.query("timezone") || "America/New_York";
+  const result = await tmdb.GET("/3/tv/on_the_air", {
+    params: {
+      query: {
+        language,
+        timezone,
+      },
+    },
+  });
+  if (result.response.status !== 200) {
+    return c.json({ error: result.error }, 500);
+  }
+  return c.json(result.data);
+});
 export default tmdbApp;
