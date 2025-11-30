@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/crawler/cron/crawl-all",
+      "schedule": "0 */12 * * *"
+    }
+  ]
+}
