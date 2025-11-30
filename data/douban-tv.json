@@ -2,7 +2,7 @@
   "platform": "douban",
   "type": "tv_series",
   "count": 10,
-  "lastUpdated": "2025-11-30T12:29:55.894Z",
+  "lastUpdated": "2025-11-30T13:49:39.901Z",
   "data": [
     {
       "title": "怪奇物语",
@@ -18,7 +18,7 @@
       ],
       "media_type": "tv",
       "first_air_date": "",
-      "crawledAt": "2025-11-30T12:29:50.017Z"
+      "crawledAt": "2025-11-30T13:49:34.629Z"
     },
     {
       "title": "大生意人",
@@ -31,7 +31,7 @@
       ],
       "media_type": "tv",
       "first_air_date": "2025-11-25",
-      "crawledAt": "2025-11-30T12:29:50.610Z"
+      "crawledAt": "2025-11-30T13:49:35.179Z"
     },
     {
       "title": "枭起青壤",
@@ -45,7 +45,7 @@
       ],
       "media_type": "tv",
       "first_air_date": "2025-11-22",
-      "crawledAt": "2025-11-30T12:29:51.480Z"
+      "crawledAt": "2025-11-30T13:49:35.728Z"
     },
     {
       "title": "唐朝诡事录之长安",
@@ -61,7 +61,7 @@
       ],
       "media_type": "tv",
       "first_air_date": "2022-09-27",
-      "crawledAt": "2025-11-30T12:29:52.087Z"
+      "crawledAt": "2025-11-30T13:49:36.279Z"
     },
     {
       "title": "都是她的错",
@@ -76,7 +76,7 @@
       ],
       "media_type": "tv",
       "first_air_date": "2025-11-07",
-      "crawledAt": "2025-11-30T12:29:52.677Z"
+      "crawledAt": "2025-11-30T13:49:36.831Z"
     },
     {
       "title": "暗河传",
@@ -90,46 +90,7 @@
       ],
       "media_type": "tv",
       "first_air_date": "2025-10-20",
-      "crawledAt": "2025-11-30T12:29:53.259Z"
-    },
-    {
-      "title": "新闻女王2",
-      "tmdbId": 226197,
-      "vote_average": 8.133,
-      "poster_path": "/9nrVW6P44OPw2pxkAgEI5fMfjl.jpg",
-      "backdrop_path": "/VHiGsZVvdwoTY4QUozztsVsLVJ.jpg",
-      "genre_ids": [
-        18
-      ],
-      "media_type": "tv",
-      "first_air_date": "2023-11-17",
-      "crawledAt": "2025-11-30T12:29:53.839Z"
-    },
-    {
-      "title": "天书黎明",
-      "tmdbId": 252322,
-      "vote_average": 10,
-      "poster_path": "/ikG4BhHNf7JwveVC7HbdVYTkmYw.jpg",
-      "backdrop_path": "/tMHyxA6v9fU8ELulaXAS84xrVHA.jpg",
-      "genre_ids": [
-        18
-      ],
-      "media_type": "tv",
-      "first_air_date": "2025-11-30",
-      "crawledAt": "2025-11-30T12:29:54.427Z"
-    },
-    {
-      "title": "亦舞之城",
-      "tmdbId": 263218,
-      "vote_average": 0,
-      "poster_path": "/eQhBiO0ELLjOsUPW47ZEwEs62KU.jpg",
-      "backdrop_path": "/jJZu4XF1pK9atWc2FMcnFVuyt5i.jpg",
-      "genre_ids": [
-        18
-      ],
-      "media_type": "tv",
-      "first_air_date": "2025-11-27",
-      "crawledAt": "2025-11-30T12:29:55.011Z"
+      "crawledAt": "2025-11-30T13:49:37.385Z"
     },
     {
       "title": "即刻上场",
@@ -142,7 +103,46 @@
       ],
       "media_type": "tv",
       "first_air_date": "2025-11-29",
-      "crawledAt": "2025-11-30T12:29:55.593Z"
+      "crawledAt": "2025-11-30T13:49:37.936Z"
+    },
+    {
+      "title": "亦舞之城",
+      "tmdbId": 263218,
+      "vote_average": 0,
+      "poster_path": "/eQhBiO0ELLjOsUPW47ZEwEs62KU.jpg",
+      "backdrop_path": "/yB0WlkEWHk8MKVptutO5awGUM23.jpg",
+      "genre_ids": [
+        18
+      ],
+      "media_type": "tv",
+      "first_air_date": "2025-11-27",
+      "crawledAt": "2025-11-30T13:49:38.487Z"
+    },
+    {
+      "title": "新闻女王2",
+      "tmdbId": 226197,
+      "vote_average": 8.133,
+      "poster_path": "/9nrVW6P44OPw2pxkAgEI5fMfjl.jpg",
+      "backdrop_path": "/VHiGsZVvdwoTY4QUozztsVsLVJ.jpg",
+      "genre_ids": [
+        18
+      ],
+      "media_type": "tv",
+      "first_air_date": "2023-11-17",
+      "crawledAt": "2025-11-30T13:49:39.041Z"
+    },
+    {
+      "title": "天书黎明",
+      "tmdbId": 252322,
+      "vote_average": 10,
+      "poster_path": "/ikG4BhHNf7JwveVC7HbdVYTkmYw.jpg",
+      "backdrop_path": "/tMHyxA6v9fU8ELulaXAS84xrVHA.jpg",
+      "genre_ids": [
+        18
+      ],
+      "media_type": "tv",
+      "first_air_date": "2025-11-30",
+      "crawledAt": "2025-11-30T13:49:39.600Z"
     }
   ]
 }

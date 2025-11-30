@@ -1,0 +1,172 @@
+{
+  "platform": "bilibili",
+  "type": "guochuang",
+  "count": 11,
+  "lastUpdated": "2025-11-30T13:49:58.000Z",
+  "data": [
+    {
+      "title": "凡人修仙传",
+      "tmdbId": 106449,
+      "vote_average": 8.5,
+      "poster_path": "/i6SYuRHPtODpZ8VX9ql21nj0tDq.jpg",
+      "backdrop_path": "/8NIvQY34tNPc4txNeym2zEYk9ek.jpg",
+      "genre_ids": [
+        16,
+        10759,
+        10765
+      ],
+      "media_type": "tv",
+      "first_air_date": "2020-07-25",
+      "crawledAt": "2025-11-30T13:49:51.300Z"
+    },
+    {
+      "title": "牧神记",
+      "tmdbId": 236534,
+      "vote_average": 9,
+      "poster_path": "/jPHitNQ1fuKK6aPZ6eCPiFq9XhG.jpg",
+      "backdrop_path": "/jZAhIxadDSl2IOlpU9jmFQhkofk.jpg",
+      "genre_ids": [
+        16,
+        10765,
+        10759
+      ],
+      "media_type": "tv",
+      "first_air_date": "2024-10-27",
+      "crawledAt": "2025-11-30T13:49:51.916Z"
+    },
+    {
+      "title": "罗小黑战记",
+      "tmdbId": 88319,
+      "vote_average": 9.5,
+      "poster_path": "/bDhBjhFknuPx3mcCInuTa3XaQmw.jpg",
+      "backdrop_path": "/zAozwV3l9bvcGzDUsDYvbOryBKY.jpg",
+      "genre_ids": [
+        16,
+        10765
+      ],
+      "media_type": "tv",
+      "first_air_date": "2011-03-17",
+      "crawledAt": "2025-11-30T13:49:52.534Z"
+    },
+    {
+      "title": "宗门里除了我都是卧底",
+      "tmdbId": 274149,
+      "vote_average": 8,
+      "poster_path": "/yBbaD4w3bEmYvYSwlYfCfFfb5Si.jpg",
+      "backdrop_path": "/dumx8XgyaXarErdX1OUi8cwymu5.jpg",
+      "genre_ids": [
+        16,
+        10765,
+        18
+      ],
+      "media_type": "tv",
+      "first_air_date": "2024-10-14",
+      "crawledAt": "2025-11-30T13:49:53.155Z"
+    },
+    {
+      "title": "玄界之门",
+      "tmdbId": 301429,
+      "vote_average": 0,
+      "poster_path": "/6EUsJf8g3owVtGZl5FsOb0UKDCZ.jpg",
+      "backdrop_path": "/ceLPlZ7ogsYzNES9CaImnaZfKsC.jpg",
+      "genre_ids": [
+        16,
+        10765
+      ],
+      "media_type": "tv",
+      "first_air_date": "2025-11-26",
+      "crawledAt": "2025-11-30T13:49:53.776Z"
+    },
+    {
+      "title": "灵笼",
+      "tmdbId": 91097,
+      "vote_average": 8.3,
+      "poster_path": "/b6Jan7ExeqARsuCfpdThyG5l44k.jpg",
+      "backdrop_path": "/k6Yg53yBdsfZeRLJh0WgrG2P11f.jpg",
+      "genre_ids": [
+        16,
+        10765,
+        10759,
+        18,
+        9648
+      ],
+      "media_type": "tv",
+      "first_air_date": "2019-07-13",
+      "crawledAt": "2025-11-30T13:49:54.589Z"
+    },
+    {
+      "title": "永生",
+      "tmdbId": 156571,
+      "vote_average": 6.9,
+      "poster_path": "/bhVKGrB59C2IXNimEPtfXCVgqQ3.jpg",
+      "backdrop_path": "/rdN2CW2SuTEPZ7i6RqpZUpRQQ5X.jpg",
+      "genre_ids": [
+        16,
+        10759,
+        18,
+        10765
+      ],
+      "media_type": "tv",
+      "first_air_date": "2022-01-29",
+      "crawledAt": "2025-11-30T13:49:55.216Z"
+    },
+    {
+      "title": "伍六七之记忆碎片",
+      "tmdbId": 79141,
+      "vote_average": 8.579,
+      "poster_path": "/jz9ii5sft8l6zP3lzu51xNWmgiO.jpg",
+      "backdrop_path": "/80AhZSbY4eYe7HZnmkqX18ZcAFj.jpg",
+      "genre_ids": [
+        16,
+        35,
+        10759,
+        10765
+      ],
+      "media_type": "tv",
+      "first_air_date": "2018-04-25",
+      "crawledAt": "2025-11-30T13:49:55.835Z"
+    },
+    {
+      "title": "熊出没",
+      "tmdbId": 202329,
+      "vote_average": 0,
+      "poster_path": "/cHwv5dy9I7GVqpiGtbKAYc8ytKy.jpg",
+      "backdrop_path": "/93aFRaTimtc2vUYl2oHRkyxZFT6.jpg",
+      "genre_ids": [
+        10762,
+        16,
+        35
+      ],
+      "media_type": "tv",
+      "first_air_date": "2012-01-22",
+      "crawledAt": "2025-11-30T13:49:56.464Z"
+    },
+    {
+      "title": "王者？别闹！",
+      "tmdbId": 240193,
+      "vote_average": 0,
+      "poster_path": "/eVBI21lOENuo2CnaiajxoCRj2Xc.jpg",
+      "backdrop_path": null,
+      "genre_ids": [
+        16
+      ],
+      "media_type": "tv",
+      "first_air_date": "2017-06-03",
+      "crawledAt": "2025-11-30T13:49:57.081Z"
+    },
+    {
+      "title": "天官赐福",
+      "tmdbId": 112398,
+      "vote_average": 8.152,
+      "poster_path": "/nDPmgOKGLvZ5ibXeXCr3fPVpiav.jpg",
+      "backdrop_path": "/xPzeiPXPpdUJNHAnCZMeFmbxDPc.jpg",
+      "genre_ids": [
+        16,
+        10765
+      ],
+      "media_type": "tv",
+      "first_air_date": "2020-10-31",
+      "crawledAt": "2025-11-30T13:49:57.699Z"
+    }
+  ]
+}
