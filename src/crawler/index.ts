@@ -94,7 +94,7 @@ app.get("/popular/douban/tv", async (c) => {
   return c.json({
     success: true,
     platform: "douban",
-    type: "tv_series",
+    type: "tv",
     count: tvSeries.length,
     lastUpdated: lastUpdate,
     data: tvSeries,
@@ -107,7 +107,7 @@ app.get("/popular/bilibili/anime", async (c) => {
   return c.json({
     success: true,
     platform: "bilibili",
-    type: "anime",
+    type: "tv",
     count: anime.length,
     lastUpdated: lastUpdate,
     data: anime,
@@ -120,7 +120,7 @@ app.get("/popular/bilibili/guochuang", async (c) => {
   return c.json({
     success: true,
     platform: "bilibili",
-    type: "guochuang",
+    type: "tv",
     count: guochuang.length,
     lastUpdated: lastUpdate,
     data: guochuang,
