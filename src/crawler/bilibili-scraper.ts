@@ -89,10 +89,10 @@ export async function fetchBilibiliHotGuochuang(): Promise<BilibiliItem[]> {
 
     // Launch browser with chromium for Vercel compatibility
     browser = await puppeteer.launch({
-      args: chromium.args,
+      args: puppeteer.defaultArgs({ args: chromium.args, headless: "shell" }),
       defaultViewport: { width: 1920, height: 1080 },
       executablePath: await chromium.executablePath(),
-      headless: true,
+      headless: "shell",
     });
 
     const page = await browser.newPage();
