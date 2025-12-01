@@ -21,6 +21,22 @@ import {
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+/**
+ * Deduplicate content items by tmdbId, keeping the latest one
+ */
+function deduplicateByTmdbId(items: ContentItem[]): ContentItem[] {
+  const map = new Map<number, ContentItem>();
+
+  for (const item of items) {
+    const existing = map.get(item.tmdbId);
+    if (!existing || item.crawledAt > existing.crawledAt) {
+      map.set(item.tmdbId, item);
+    }
+  }
+
+  return Array.from(map.values());
+}
+
 async function searchTMDB(
   title: string,
   type: "movie" | "tv",
@@ -85,8 +101,13 @@ export async function crawlDoubanMovies() {
   }
 
   if (results.length > 0) {
-    await saveMovies(results);
-    console.log(`💾 Saved ${results.length} movies to JSON\n`);
+    const deduplicated = deduplicateByTmdbId(results);
+    await saveMovies(deduplicated);
+    console.log(
+      `💾 Saved ${deduplicated.length} movies to JSON (${
+        results.length - deduplicated.length
+      } duplicates removed)\n`
+    );
   }
 
   return results;
@@ -130,8 +151,13 @@ export async function crawlDoubanTVSeries() {
   }
 
   if (results.length > 0) {
-    await saveTVSeries(results);
-    console.log(`💾 Saved ${results.length} TV series to JSON\n`);
+    const deduplicated = deduplicateByTmdbId(results);
+    await saveTVSeries(deduplicated);
+    console.log(
+      `💾 Saved ${deduplicated.length} TV series to JSON (${
+        results.length - deduplicated.length
+      } duplicates removed)\n`
+    );
   }
 
   return results;
@@ -175,8 +201,13 @@ export async function crawlBilibiliAnime() {
   }
 
   if (results.length > 0) {
-    await saveBilibiliAnime(results);
-    console.log(`💾 Saved ${results.length} anime to JSON\n`);
+    const deduplicated = deduplicateByTmdbId(results);
+    await saveBilibiliAnime(deduplicated);
+    console.log(
+      `💾 Saved ${deduplicated.length} anime to JSON (${
+        results.length - deduplicated.length
+      } duplicates removed)\n`
+    );
   }
 
   return results;
@@ -220,8 +251,13 @@ export async function crawlBilibiliGuochuang() {
   }
 
   if (results.length > 0) {
-    await saveBilibiliGuochuang(results);
-    console.log(`💾 Saved ${results.length} guochuang to JSON\n`);
+    const deduplicated = deduplicateByTmdbId(results);
+    await saveBilibiliGuochuang(deduplicated);
+    console.log(
+      `💾 Saved ${deduplicated.length} guochuang to JSON (${
+        results.length - deduplicated.length
+      } duplicates removed)\n`
+    );
   }
 
   return results;
