@@ -72,7 +72,8 @@ export async function crawlDoubanMovies() {
         backdrop_path: tmdbData.backdrop_path,
         genre_ids: tmdbData.genre_ids || [],
         media_type: "movie",
-        release_date: (tmdbData as any).release_date || null,
+        release_date: (tmdbData as any)?.release_date || null,
+        overview: tmdbData?.overview,
         crawledAt: new Date().toISOString(),
       });
       console.log(`✅ ${tmdbData.id}`);
@@ -117,6 +118,7 @@ export async function crawlDoubanTVSeries() {
         genre_ids: tmdbData.genre_ids || [],
         media_type: "tv",
         first_air_date: (tmdbData as any).first_air_date,
+        overview: tmdbData?.overview,
         crawledAt: new Date().toISOString(),
       });
       console.log(`✅ ${tmdbData.id}`);
@@ -161,6 +163,7 @@ export async function crawlBilibiliAnime() {
         genre_ids: tmdbData.genre_ids || [],
         media_type: "tv",
         first_air_date: (tmdbData as any).first_air_date,
+        overview: tmdbData?.overview,
         crawledAt: new Date().toISOString(),
       });
       console.log(`✅ ${tmdbData.id}`);
@@ -205,6 +208,7 @@ export async function crawlBilibiliGuochuang() {
         genre_ids: tmdbData.genre_ids || [],
         media_type: "tv",
         first_air_date: (tmdbData as any).first_air_date,
+        overview: tmdbData?.overview,
         crawledAt: new Date().toISOString(),
       });
       console.log(`✅ ${tmdbData.id}`);

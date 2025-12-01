@@ -19,6 +19,7 @@ export interface ContentItem {
   media_type: "movie" | "tv";
   release_date?: string | null;
   first_air_date?: string | null;
+  overview?: string | null;
   crawledAt: string;
 }
 
