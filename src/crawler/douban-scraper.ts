@@ -20,7 +20,7 @@ async function fetchDoubanCollection(url: string): Promise<DoubanItem[]> {
 
     // Launch browser with chromium for Vercel compatibility
     browser = await puppeteer.launch({
-      args: chromium.args,
+      args: puppeteer.defaultArgs({ args: chromium.args, headless: "shell" }),
       defaultViewport: { width: 1920, height: 1080 },
       executablePath: await chromium.executablePath(),
       headless: "shell",
