@@ -1,177 +1,129 @@
 {
-  "platform": "bilibili",
-  "type": "anime",
-  "count": 11,
-  "lastUpdated": "2025-11-30T13:49:49.057Z",
-  "data": [
-    {
-      "title": "超常技能开启奇幻世界美食之旅",
-      "tmdbId": 213402,
-      "vote_average": 8.3,
-      "poster_path": "/eF4kURBplv75PtKR3gXy3N9E8k5.jpg",
-      "backdrop_path": "/47cdJm6WGJqCsdE6QvPh6fLKwuo.jpg",
-      "genre_ids": [
-        16,
-        10759,
-        10765
-      ],
-      "media_type": "tv",
-      "first_air_date": "2023-01-11",
-      "crawledAt": "2025-11-30T13:49:42.254Z"
-    },
-    {
-      "title": "最后可以再拜托您一件事吗？",
-      "tmdbId": 271605,
-      "vote_average": 8,
-      "poster_path": "/uWkrICKx3qW9qeR9BgkSyn2x95o.jpg",
-      "backdrop_path": "/cSAVRsNxzpuf51wpwbju1udVgsz.jpg",
-      "genre_ids": [
-        16,
-        35,
-        18,
-        10759,
-        10765
-      ],
-      "media_type": "tv",
-      "first_air_date": "2025-10-04",
-      "crawledAt": "2025-11-30T13:49:42.803Z"
-    },
-    {
-      "title": "间谍过家家",
-      "tmdbId": 120089,
-      "vote_average": 8.5,
-      "poster_path": "/lxxWe2u4NHMqzooIe1czHDvzjXl.jpg",
-      "backdrop_path": "/lysUnU6V0VfcthDbviuVlIqgHOR.jpg",
-      "genre_ids": [
-        16,
-        35,
-        10759
-      ],
-      "media_type": "tv",
-      "first_air_date": "2022-04-09",
-      "crawledAt": "2025-11-30T13:49:43.351Z"
-    },
-    {
-      "title": "咔嗒咔嗒",
-      "tmdbId": 256721,
-      "vote_average": 8.672,
-      "poster_path": "/66S7aHihelhdzUqArxpoFJKgLMT.jpg",
-      "backdrop_path": "/mrapJp0qb6Fvo3IW9IrjCK9IgSo.jpg",
-      "genre_ids": [
-        16,
-        10759,
-        18,
-        10765
-      ],
-      "media_type": "tv",
-      "first_air_date": "2025-07-06",
-      "crawledAt": "2025-11-30T13:49:43.902Z"
-    },
-    {
-      "title": "东岛丹三郎想成为假面骑士",
-      "tmdbId": 285788,
-      "vote_average": 8.2,
-      "poster_path": "/rpZIWYIFv1crMfZgS3ieDuEAqki.jpg",
-      "backdrop_path": "/qFODG6ZkEnpyDGCMuELo9Jgv086.jpg",
-      "genre_ids": [
-        16,
-        35,
-        9648,
-        10765,
-        18
-      ],
-      "media_type": "tv",
-      "first_air_date": "2025-10-05",
-      "crawledAt": "2025-11-30T13:49:44.890Z"
-    },
-    {
-      "title": "明明只是暗杀者，我的面板数值却比勇者还要强",
-      "tmdbId": 284644,
-      "vote_average": 8.4,
-      "poster_path": "/tw6Dgceec86fUO70BS7KkhXEHsA.jpg",
-      "backdrop_path": "/k0aoy0vcLxpI8d6USLMM2qzhwsb.jpg",
-      "genre_ids": [
-        16,
-        10759,
-        10765
-      ],
-      "media_type": "tv",
-      "first_air_date": "2025-10-07",
-      "crawledAt": "2025-11-30T13:49:45.993Z"
-    },
-    {
-      "title": "黑执事",
-      "tmdbId": 50712,
-      "vote_average": 7.7,
-      "poster_path": "/dnNITMDud9MyfGOgppApA7BTgzQ.jpg",
-      "backdrop_path": "/5U0dYTkHXPhoExNnEm5iKrpDqtr.jpg",
-      "genre_ids": [
-        16,
-        35,
-        18,
-        9648,
-        10765
-      ],
-      "media_type": "tv",
-      "first_air_date": "2008-10-02",
-      "crawledAt": "2025-11-30T13:49:46.542Z"
-    },
-    {
-      "title": "3年Z组银八老师",
-      "tmdbId": 222624,
-      "vote_average": 9,
-      "poster_path": "/tr7JQ0WFvRufdUp03RFkiIf6UIl.jpg",
-      "backdrop_path": "/p3z41RTX1Y9qmb9LwOiZY0Qrs1j.jpg",
-      "genre_ids": [
-        16,
-        35
-      ],
-      "media_type": "tv",
-      "first_air_date": "2025-10-07",
-      "crawledAt": "2025-11-30T13:49:47.092Z"
-    },
-    {
-      "title": "鬼灭之刃",
-      "tmdbId": 85937,
-      "vote_average": 8.638,
-      "poster_path": "/tZ0yGfG4EIox7bYJTxAtqUhoOmR.jpg",
-      "backdrop_path": "/3GQKYh6Trm8pxd2AypovoYQf4Ay.jpg",
-      "genre_ids": [
-        16,
-        10759,
-        10765
-      ],
-      "media_type": "tv",
-      "first_air_date": "2019-04-06",
-      "crawledAt": "2025-11-30T13:49:47.641Z"
-    },
-    {
-      "title": "绝妙舞步",
-      "tmdbId": 262259,
-      "vote_average": 7.7,
-      "poster_path": "/pJK854765DLPBS3nRWiMaYP6tz2.jpg",
-      "backdrop_path": "/b6ZtSMxji30liJBCDViqqcK3gPD.jpg",
-      "genre_ids": [
-        16,
-        18
-      ],
-      "media_type": "tv",
-      "first_air_date": "2025-10-08",
-      "crawledAt": "2025-11-30T13:49:48.189Z"
-    },
-    {
-      "title": "BanG",
-      "tmdbId": 74412,
-      "vote_average": 7.9,
-      "poster_path": "/O1Gp6QYjxbcqgjJ4COnTd9kpqq.jpg",
-      "backdrop_path": "/1l7cmV7UyxgbQYexx8HIOtlc0Vn.jpg",
-      "genre_ids": [
-        18,
-        80
-      ],
-      "media_type": "tv",
-      "first_air_date": "2017-09-10",
-      "crawledAt": "2025-11-30T13:49:48.756Z"
-    }
-  ]
+	"platform": "bilibili",
+	"type": "anime",
+	"count": 11,
+	"lastUpdated": "2025-11-30T13:49:49.057Z",
+	"data": [
+		{
+			"title": "超常技能开启奇幻世界美食之旅",
+			"tmdbId": 213402,
+			"vote_average": 8.3,
+			"poster_path": "/eF4kURBplv75PtKR3gXy3N9E8k5.jpg",
+			"backdrop_path": "/47cdJm6WGJqCsdE6QvPh6fLKwuo.jpg",
+			"genre_ids": [16, 10759, 10765],
+			"media_type": "tv",
+			"first_air_date": "2023-01-11",
+			"crawledAt": "2025-11-30T13:49:42.254Z"
+		},
+		{
+			"title": "最后可以再拜托您一件事吗？",
+			"tmdbId": 271605,
+			"vote_average": 8,
+			"poster_path": "/uWkrICKx3qW9qeR9BgkSyn2x95o.jpg",
+			"backdrop_path": "/cSAVRsNxzpuf51wpwbju1udVgsz.jpg",
+			"genre_ids": [16, 35, 18, 10759, 10765],
+			"media_type": "tv",
+			"first_air_date": "2025-10-04",
+			"crawledAt": "2025-11-30T13:49:42.803Z"
+		},
+		{
+			"title": "间谍过家家",
+			"tmdbId": 120089,
+			"vote_average": 8.5,
+			"poster_path": "/lxxWe2u4NHMqzooIe1czHDvzjXl.jpg",
+			"backdrop_path": "/lysUnU6V0VfcthDbviuVlIqgHOR.jpg",
+			"genre_ids": [16, 35, 10759],
+			"media_type": "tv",
+			"first_air_date": "2022-04-09",
+			"crawledAt": "2025-11-30T13:49:43.351Z"
+		},
+		{
+			"title": "咔嗒咔嗒",
+			"tmdbId": 256721,
+			"vote_average": 8.672,
+			"poster_path": "/66S7aHihelhdzUqArxpoFJKgLMT.jpg",
+			"backdrop_path": "/mrapJp0qb6Fvo3IW9IrjCK9IgSo.jpg",
+			"genre_ids": [16, 10759, 18, 10765],
+			"media_type": "tv",
+			"first_air_date": "2025-07-06",
+			"crawledAt": "2025-11-30T13:49:43.902Z"
+		},
+		{
+			"title": "东岛丹三郎想成为假面骑士",
+			"tmdbId": 285788,
+			"vote_average": 8.2,
+			"poster_path": "/rpZIWYIFv1crMfZgS3ieDuEAqki.jpg",
+			"backdrop_path": "/qFODG6ZkEnpyDGCMuELo9Jgv086.jpg",
+			"genre_ids": [16, 35, 9648, 10765, 18],
+			"media_type": "tv",
+			"first_air_date": "2025-10-05",
+			"crawledAt": "2025-11-30T13:49:44.890Z"
+		},
+		{
+			"title": "明明只是暗杀者，我的面板数值却比勇者还要强",
+			"tmdbId": 284644,
+			"vote_average": 8.4,
+			"poster_path": "/tw6Dgceec86fUO70BS7KkhXEHsA.jpg",
+			"backdrop_path": "/k0aoy0vcLxpI8d6USLMM2qzhwsb.jpg",
+			"genre_ids": [16, 10759, 10765],
+			"media_type": "tv",
+			"first_air_date": "2025-10-07",
+			"crawledAt": "2025-11-30T13:49:45.993Z"
+		},
+		{
+			"title": "黑执事",
+			"tmdbId": 50712,
+			"vote_average": 7.7,
+			"poster_path": "/dnNITMDud9MyfGOgppApA7BTgzQ.jpg",
+			"backdrop_path": "/5U0dYTkHXPhoExNnEm5iKrpDqtr.jpg",
+			"genre_ids": [16, 35, 18, 9648, 10765],
+			"media_type": "tv",
+			"first_air_date": "2008-10-02",
+			"crawledAt": "2025-11-30T13:49:46.542Z"
+		},
+		{
+			"title": "3年Z组银八老师",
+			"tmdbId": 222624,
+			"vote_average": 9,
+			"poster_path": "/tr7JQ0WFvRufdUp03RFkiIf6UIl.jpg",
+			"backdrop_path": "/p3z41RTX1Y9qmb9LwOiZY0Qrs1j.jpg",
+			"genre_ids": [16, 35],
+			"media_type": "tv",
+			"first_air_date": "2025-10-07",
+			"crawledAt": "2025-11-30T13:49:47.092Z"
+		},
+		{
+			"title": "鬼灭之刃",
+			"tmdbId": 85937,
+			"vote_average": 8.638,
+			"poster_path": "/tZ0yGfG4EIox7bYJTxAtqUhoOmR.jpg",
+			"backdrop_path": "/3GQKYh6Trm8pxd2AypovoYQf4Ay.jpg",
+			"genre_ids": [16, 10759, 10765],
+			"media_type": "tv",
+			"first_air_date": "2019-04-06",
+			"crawledAt": "2025-11-30T13:49:47.641Z"
+		},
+		{
+			"title": "绝妙舞步",
+			"tmdbId": 262259,
+			"vote_average": 7.7,
+			"poster_path": "/pJK854765DLPBS3nRWiMaYP6tz2.jpg",
+			"backdrop_path": "/b6ZtSMxji30liJBCDViqqcK3gPD.jpg",
+			"genre_ids": [16, 18],
+			"media_type": "tv",
+			"first_air_date": "2025-10-08",
+			"crawledAt": "2025-11-30T13:49:48.189Z"
+		},
+		{
+			"title": "BanG",
+			"tmdbId": 74412,
+			"vote_average": 7.9,
+			"poster_path": "/O1Gp6QYjxbcqgjJ4COnTd9kpqq.jpg",
+			"backdrop_path": "/1l7cmV7UyxgbQYexx8HIOtlc0Vn.jpg",
+			"genre_ids": [18, 80],
+			"media_type": "tv",
+			"first_air_date": "2017-09-10",
+			"crawledAt": "2025-11-30T13:49:48.756Z"
+		}
+	]
 }

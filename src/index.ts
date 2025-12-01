@@ -1,17 +1,17 @@
 import { Hono } from "hono";
-import tmdbApp from "./tmdb/index.js";
 import crawlerApp from "./crawler/index.js";
+import tmdbApp from "./tmdb/index.js";
 
 const app = new Hono();
 
 const welcomeStrings = [
-  "Hello Hono!",
-  "To learn more about Hono on Vercel, visit https://vercel.com/docs/frameworks/backend/hono",
+	"Hello Hono!",
+	"To learn more about Hono on Vercel, visit https://vercel.com/docs/frameworks/backend/hono",
 ];
 
 // Root route
 app.get("/", (c) => {
-  return c.text(welcomeStrings.join("\n\n"));
+	return c.text(welcomeStrings.join("\n\n"));
 });
 
 // Mount TMDB routes
