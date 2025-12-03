@@ -387,7 +387,7 @@ tmdbApp.get("/tv/on_the_air", async (c) => {
   return c.json(result.data);
 });
 
-tmdbApp.get("/treding/all", async (c) => {
+tmdbApp.get("/trending/all", async (c) => {
   const language = c.req.query("language") || "en";
   const timeWindow: "day" | "week" =
     (c.req.query("timeWindow") as "day" | "week") || "day";
