@@ -9,6 +9,7 @@
 		"crawler:test": "bun run src/crawler/test.ts"
 	},
 	"dependencies": {
+		"@fanart-tv/api": "^1.0.2",
 		"@sparticuz/chromium": "^141.0.0",
 		"@vercel/blob": "^2.0.0",
 		"cheerio": "^1.1.2",

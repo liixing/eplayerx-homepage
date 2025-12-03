@@ -4,6 +4,7 @@
     "": {
       "name": "hono",
       "dependencies": {
+        "@fanart-tv/api": "^1.0.2",
         "@sparticuz/chromium": "^141.0.0",
         "@vercel/blob": "^2.0.0",
         "cheerio": "^1.1.2",
@@ -94,6 +95,8 @@
     "@esbuild/win32-ia32": ["@esbuild/win32-ia32@0.25.10", "", { "os": "win32", "cpu": "ia32" }, "sha512-QHPDbKkrGO8/cz9LKVnJU22HOi4pxZnZhhA2HYHez5Pz4JeffhDjf85E57Oyco163GnzNCVkZK0b/n4Y0UHcSw=="],
 
     "@esbuild/win32-x64": ["@esbuild/win32-x64@0.25.10", "", { "os": "win32", "cpu": "x64" }, "sha512-9KpxSVFCu0iK1owoez6aC/s/EdUQLDN3adTxGCqxMVhrPDj6bt5dbrHDXUuq+Bs2vATFBBrQS5vdQ/Ed2P+nbw=="],
+
+    "@fanart-tv/api": ["@fanart-tv/api@1.0.2", "", {}, "sha512-F4HjxgNWNEhpkSwNr3M5BwiUWmMzPOes92pVHmoNOZpZPJnXFR9i7v+lCV4wUQRlh4mHA4pFjx5nn1YaWOipQA=="],
 
     "@fastify/busboy": ["@fastify/busboy@2.1.1", "", {}, "sha512-vBZP4NlzfOlerQTnba4aqZoMhE/a9HY7HRqoOPaETQcSQuWEIyZMHGfVu6w9wGtGK5fED5qRs2DteVCjOH60sA=="],
 
