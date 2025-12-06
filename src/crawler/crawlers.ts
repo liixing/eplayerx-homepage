@@ -3,18 +3,15 @@
  */
 
 import { tmdb } from "../tmdb/client.js";
-import {
-  fetchBilibiliHotAnime,
-  fetchBilibiliHotGuochuang,
-} from "./bilibili-scraper.js";
+import { getThumbFromImages } from "../tmdb/utils.js";
 import {
   fetchDoubanHotMovies,
   fetchDoubanHotTVSeries,
+  fetchDoubanHotAnimation,
 } from "./douban-scraper.js";
 import {
   type ContentItem,
-  saveBilibiliAnime,
-  saveBilibiliGuochuang,
+  saveDoubanAnimation,
   saveMovies,
   saveTVSeries,
 } from "./service.js";
@@ -63,6 +60,7 @@ async function searchTMDB(
   }
 }
 
+
 /**
  * Crawl Douban movies
  */
@@ -80,9 +78,12 @@ export async function crawlDoubanMovies() {
     const tmdbData = await searchTMDB(item.title, "movie");
 
     if (tmdbData) {
+      const tmdbId = tmdbData.id as number;
+      const thumb = await getThumbFromImages(tmdbId, "movie", "zh");
+
       results.push({
         title: item.title,
-        tmdbId: tmdbData.id as number,
+        tmdbId,
         vote_average: tmdbData.vote_average,
         poster_path: tmdbData.poster_path,
         backdrop_path: tmdbData.backdrop_path,
@@ -90,9 +91,10 @@ export async function crawlDoubanMovies() {
         media_type: "movie",
         release_date: (tmdbData as any)?.release_date || null,
         overview: tmdbData?.overview,
+        thumb: thumb || null,
         crawledAt: new Date().toISOString(),
       });
-      console.log(`✅ ${tmdbData.id}`);
+      console.log(`✅ ${tmdbId}`);
     } else {
       console.log(`❌ Not found`);
     }
@@ -130,9 +132,12 @@ export async function crawlDoubanTVSeries() {
     const tmdbData = await searchTMDB(item.title, "tv");
 
     if (tmdbData) {
+      const tmdbId = tmdbData.id as number;
+      const thumb = await getThumbFromImages(tmdbId, "tv", "zh");
+
       results.push({
         title: item.title,
-        tmdbId: tmdbData.id as number,
+        tmdbId,
         vote_average: tmdbData.vote_average,
         poster_path: tmdbData.poster_path,
         backdrop_path: tmdbData.backdrop_path,
@@ -140,9 +145,10 @@ export async function crawlDoubanTVSeries() {
         media_type: "tv",
         first_air_date: (tmdbData as any).first_air_date,
         overview: tmdbData?.overview,
+        thumb: thumb || null,
         crawledAt: new Date().toISOString(),
       });
-      console.log(`✅ ${tmdbData.id}`);
+      console.log(`✅ ${tmdbId}`);
     } else {
       console.log(`❌ Not found`);
     }
@@ -164,13 +170,13 @@ export async function crawlDoubanTVSeries() {
 }
 
 /**
- * Crawl Bilibili anime
+ * Crawl Douban animation
  */
-export async function crawlBilibiliAnime() {
-  console.log("📺 Crawling Bilibili anime...");
+export async function crawlDoubanAnimation() {
+  console.log("🎨 Crawling Douban animation...");
 
-  const items = await fetchBilibiliHotAnime();
-  console.log(`📥 Found ${items.length} anime`);
+  const items = await fetchDoubanHotAnimation();
+  console.log(`📥 Found ${items.length} animation`);
 
   const results: ContentItem[] = [];
 
@@ -180,9 +186,12 @@ export async function crawlBilibiliAnime() {
     const tmdbData = await searchTMDB(item.title, "tv");
 
     if (tmdbData) {
+      const tmdbId = tmdbData.id as number;
+      const thumb = await getThumbFromImages(tmdbId, "tv", "zh");
+
       results.push({
         title: item.title,
-        tmdbId: tmdbData.id as number,
+        tmdbId,
         vote_average: tmdbData.vote_average,
         poster_path: tmdbData.poster_path,
         backdrop_path: tmdbData.backdrop_path,
@@ -190,9 +199,10 @@ export async function crawlBilibiliAnime() {
         media_type: "tv",
         first_air_date: (tmdbData as any).first_air_date,
         overview: tmdbData?.overview,
+        thumb: thumb || null,
         crawledAt: new Date().toISOString(),
       });
-      console.log(`✅ ${tmdbData.id}`);
+      console.log(`✅ ${tmdbId}`);
     } else {
       console.log(`❌ Not found`);
     }
@@ -202,59 +212,9 @@ export async function crawlBilibiliAnime() {
 
   if (results.length > 0) {
     const deduplicated = deduplicateByTmdbId(results);
-    await saveBilibiliAnime(deduplicated);
+    await saveDoubanAnimation(deduplicated);
     console.log(
-      `💾 Saved ${deduplicated.length} anime to JSON (${
-        results.length - deduplicated.length
-      } duplicates removed)\n`
-    );
-  }
-
-  return results;
-}
-
-/**
- * Crawl Bilibili guochuang
- */
-export async function crawlBilibiliGuochuang() {
-  console.log("🇨🇳 Crawling Bilibili guochuang...");
-
-  const items = await fetchBilibiliHotGuochuang();
-  console.log(`📥 Found ${items.length} guochuang`);
-
-  const results: ContentItem[] = [];
-
-  for (const item of items) {
-    console.log(`🔍 Searching: ${item.title}`);
-
-    const tmdbData = await searchTMDB(item.title, "tv");
-
-    if (tmdbData) {
-      results.push({
-        title: item.title,
-        tmdbId: tmdbData.id as number,
-        vote_average: tmdbData.vote_average,
-        poster_path: tmdbData.poster_path,
-        backdrop_path: tmdbData.backdrop_path,
-        genre_ids: tmdbData.genre_ids || [],
-        media_type: "tv",
-        first_air_date: (tmdbData as any).first_air_date,
-        overview: tmdbData?.overview,
-        crawledAt: new Date().toISOString(),
-      });
-      console.log(`✅ ${tmdbData.id}`);
-    } else {
-      console.log(`❌ Not found`);
-    }
-
-    await delay(300);
-  }
-
-  if (results.length > 0) {
-    const deduplicated = deduplicateByTmdbId(results);
-    await saveBilibiliGuochuang(deduplicated);
-    console.log(
-      `💾 Saved ${deduplicated.length} guochuang to JSON (${
+      `💾 Saved ${deduplicated.length} animation to JSON (${
         results.length - deduplicated.length
       } duplicates removed)\n`
     );
@@ -271,8 +231,7 @@ async function runAllCrawlers() {
 
   await crawlDoubanMovies();
   await crawlDoubanTVSeries();
-  await crawlBilibiliAnime();
-  await crawlBilibiliGuochuang();
+  await crawlDoubanAnimation();
 
   console.log("✅ Done!");
 }

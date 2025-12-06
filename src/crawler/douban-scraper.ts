@@ -90,3 +90,12 @@ export async function fetchDoubanHotTVSeries(): Promise<DoubanItem[]> {
     "https://m.douban.com/subject_collection/tv_real_time_hotest"
   );
 }
+
+/**
+ * Fetch hot animation from Douban
+ */
+export async function fetchDoubanHotAnimation(): Promise<DoubanItem[]> {
+  return await fetchDoubanCollection(
+    "https://m.douban.com/subject_collection/tv_animation"
+  );
+}

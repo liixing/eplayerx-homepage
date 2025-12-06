@@ -6,8 +6,7 @@ import { put, head } from "@vercel/blob";
 
 const MOVIES_BLOB_KEY = "douban-movies.json";
 const TV_BLOB_KEY = "douban-tv.json";
-const BILIBILI_BLOB_KEY = "bilibili-anime.json";
-const BILIBILI_GUOCHUANG_BLOB_KEY = "bilibili-guochuang.json";
+const DOUBAN_ANIMATION_BLOB_KEY = "douban-animation.json";
 
 export interface ContentItem {
   title: string;
@@ -20,6 +19,7 @@ export interface ContentItem {
   release_date?: string | null;
   first_air_date?: string | null;
   overview?: string | null;
+  thumb?: string | null;
   crawledAt: string;
 }
 
@@ -138,17 +138,17 @@ export async function getTVSeriesLastUpdate(): Promise<string | null> {
 }
 
 /**
- * Save Bilibili anime to Blob
+ * Save Douban animation to Blob
  */
-export async function saveBilibiliAnime(anime: ContentItem[]) {
+export async function saveDoubanAnimation(animation: ContentItem[]) {
   const data: BlobData = {
-    platform: "bilibili",
-    type: "anime",
-    count: anime.length,
+    platform: "douban",
+    type: "animation",
+    count: animation.length,
     lastUpdated: new Date().toISOString(),
-    data: anime,
+    data: animation,
   };
-  await put(BILIBILI_BLOB_KEY, JSON.stringify(data, null, 2), {
+  await put(DOUBAN_ANIMATION_BLOB_KEY, JSON.stringify(data, null, 2), {
     access: "public",
     contentType: "application/json",
     addRandomSuffix: false,
@@ -157,68 +157,24 @@ export async function saveBilibiliAnime(anime: ContentItem[]) {
 }
 
 /**
- * Load Bilibili anime from Blob
+ * Load Douban animation from Blob
  */
-export async function loadBilibiliAnime(): Promise<ContentItem[]> {
+export async function loadDoubanAnimation(): Promise<ContentItem[]> {
   try {
-    const blobData = await loadBlobContent(BILIBILI_BLOB_KEY);
+    const blobData = await loadBlobContent(DOUBAN_ANIMATION_BLOB_KEY);
     return blobData?.data || [];
   } catch (error) {
-    console.error("Error loading Bilibili anime:", error);
+    console.error("Error loading Douban animation:", error);
     return [];
   }
 }
 
 /**
- * Get last update time for Bilibili anime
+ * Get last update time for Douban animation
  */
-export async function getBilibiliAnimeLastUpdate(): Promise<string | null> {
+export async function getDoubanAnimationLastUpdate(): Promise<string | null> {
   try {
-    const blobData = await loadBlobContent(BILIBILI_BLOB_KEY);
-    return blobData?.lastUpdated || null;
-  } catch (error) {
-    return null;
-  }
-}
-
-/**
- * Save Bilibili guochuang to Blob
- */
-export async function saveBilibiliGuochuang(guochuang: ContentItem[]) {
-  const data: BlobData = {
-    platform: "bilibili",
-    type: "guochuang",
-    count: guochuang.length,
-    lastUpdated: new Date().toISOString(),
-    data: guochuang,
-  };
-  await put(BILIBILI_GUOCHUANG_BLOB_KEY, JSON.stringify(data, null, 2), {
-    access: "public",
-    contentType: "application/json",
-    addRandomSuffix: false,
-    allowOverwrite: true,
-  });
-}
-
-/**
- * Load Bilibili guochuang from Blob
- */
-export async function loadBilibiliGuochuang(): Promise<ContentItem[]> {
-  try {
-    const blobData = await loadBlobContent(BILIBILI_GUOCHUANG_BLOB_KEY);
-    return blobData?.data || [];
-  } catch (error) {
-    console.error("Error loading Bilibili guochuang:", error);
-    return [];
-  }
-}
-
-/**
- * Get last update time for Bilibili guochuang
- */
-export async function getBilibiliGuochuangLastUpdate(): Promise<string | null> {
-  try {
-    const blobData = await loadBlobContent(BILIBILI_GUOCHUANG_BLOB_KEY);
+    const blobData = await loadBlobContent(DOUBAN_ANIMATION_BLOB_KEY);
     return blobData?.lastUpdated || null;
   } catch (error) {
     return null;

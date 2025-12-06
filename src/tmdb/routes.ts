@@ -1,6 +1,5 @@
 import { Hono } from "hono";
 import { tmdb } from "./client.js";
-import { fanartClient } from "./fanart-client.js";
 
 const tmdbApp = new Hono();
 
@@ -74,10 +73,14 @@ tmdbApp.get("/movie/details", async (c) => {
 
 tmdbApp.get("/movie/images", async (c) => {
   const id = c.req.query("id") || "";
+  const language = c.req.query("language") || "en";
   const result = await tmdb.GET(`/3/movie/${Number(id)}/images`, {
     params: {
       path: {
         movie_id: Number(id),
+      },
+      query: {
+        include_image_language: language === "en" ? "en" : `${language},en`,
       },
     },
   });
@@ -177,52 +180,6 @@ tmdbApp.get("/movie/popular", async (c) => {
   return c.json(result.data);
 });
 
-tmdbApp.get("/movie/popular/enriched", async (c) => {
-  const language = c.req.query("language") || "en";
-  const page = Number.parseInt(c.req.query("page") || "1");
-  const result = await tmdb.GET("/3/movie/popular", {
-    params: {
-      query: {
-        language,
-        page,
-      },
-    },
-  });
-  if (result.response.status !== 200) {
-    return c.json({ error: result.error }, 500);
-  }
-
-  // Fetch FanartTV images for each movie
-  if (result.data?.results) {
-    const enrichedResults = await Promise.all(
-      result.data.results.map(async (movie) => {
-        try {
-          const fanartData = await fanartClient.getMovie(movie.id);
-          return {
-            ...movie,
-            thumb:
-              fanartData.moviethumb && fanartData.moviethumb.length > 0
-                ? fanartData.moviethumb[0].url
-                : null,
-          };
-        } catch (error) {
-          return {
-            ...movie,
-            thumb: null,
-          };
-        }
-      })
-    );
-
-    return c.json({
-      ...result.data,
-      results: enrichedResults,
-    });
-  }
-
-  return c.json(result.data);
-});
-
 tmdbApp.get("/movie/top_rated", async (c) => {
   const language = c.req.query("language") || "en";
   const result = await tmdb.GET("/3/movie/top_rated", {
@@ -292,10 +249,14 @@ tmdbApp.get("/tv/details", async (c) => {
 
 tmdbApp.get("/tv/images", async (c) => {
   const id = c.req.query("id") || "";
+  const language = c.req.query("language") || "en";
   const result = await tmdb.GET(`/3/tv/${Number(id)}/images`, {
     params: {
       path: {
         series_id: Number(id),
+      },
+      query: {
+        include_image_language: language === "en" ? "en" : `${language},en`,
       },
     },
   });
@@ -403,77 +364,6 @@ tmdbApp.get("/tv/popular", async (c) => {
   return c.json(result.data);
 });
 
-tmdbApp.get("/tv/popular/enriched", async (c) => {
-  const language = c.req.query("language") || "en";
-  const page = Number.parseInt(c.req.query("page") || "1");
-  const result = await tmdb.GET("/3/tv/popular", {
-    params: {
-      query: {
-        language,
-        page,
-      },
-    },
-  });
-  if (result.response.status !== 200) {
-    return c.json({ error: result.error }, 500);
-  }
-
-  if (result.data?.results) {
-    const enrichedResults = await Promise.all(
-      result.data.results.map(async (tv) => {
-        try {
-          // First, get external IDs to get TVDB ID
-          const externalIdsResult = await tmdb.GET(
-            `/3/tv/${tv.id}/external_ids`,
-            {
-              params: {
-                path: {
-                  series_id: tv.id,
-                },
-              },
-            }
-          );
-
-          if (
-            externalIdsResult.response.status === 200 &&
-            externalIdsResult.data?.tvdb_id
-          ) {
-            // Use TVDB ID to fetch FanartTV images
-            const fanartData = await fanartClient.getShow(
-              externalIdsResult.data.tvdb_id
-            );
-            return {
-              ...tv,
-              thumb:
-                fanartData.tvthumb && fanartData.tvthumb.length > 0
-                  ? fanartData.tvthumb[0].url
-                  : null,
-            };
-          }
-          // If no TVDB ID found, return TV show without thumb
-          return {
-            ...tv,
-            thumb: null,
-          };
-        } catch (error) {
-          // If FanartTV API fails, return TV show without fanart data
-          return {
-            ...tv,
-            thumb: null,
-          };
-        }
-      })
-    );
-
-    return c.json({
-      ...result.data,
-      results: enrichedResults,
-    });
-  }
-
-  return c.json(result.data);
-});
-
 tmdbApp.get("/tv/top_rated", async (c) => {
   const language = c.req.query("language") || "en";
   const result = await tmdb.GET("/3/tv/top_rated", {
@@ -514,6 +404,50 @@ tmdbApp.get("/trending/all", async (c) => {
     params: {
       query: {
         language,
+      },
+      path: {
+        time_window: timeWindow,
+      },
+    },
+  });
+  if (result.response.status !== 200) {
+    return c.json({ error: result.error }, 500);
+  }
+  return c.json(result.data);
+});
+
+tmdbApp.get("/trending/movie", async (c) => {
+  const language = c.req.query("language") || "en";
+  const timeWindow: "day" | "week" =
+    (c.req.query("timeWindow") as "day" | "week") || "day";
+  const page = Number.parseInt(c.req.query("page") || "1");
+  const result = await tmdb.GET(`/3/trending/movie/${timeWindow}`, {
+    params: {
+      query: {
+        language,
+        page,
+      },
+      path: {
+        time_window: timeWindow,
+      },
+    },
+  });
+  if (result.response.status !== 200) {
+    return c.json({ error: result.error }, 500);
+  }
+  return c.json(result.data);
+});
+
+tmdbApp.get("/trending/tv", async (c) => {
+  const language = c.req.query("language") || "en";
+  const timeWindow: "day" | "week" =
+    (c.req.query("timeWindow") as "day" | "week") || "day";
+  const page = Number.parseInt(c.req.query("page") || "1");
+  const result = await tmdb.GET(`/3/trending/tv/${timeWindow}`, {
+    params: {
+      query: {
+        language,
+        page,
       },
       path: {
         time_window: timeWindow,
