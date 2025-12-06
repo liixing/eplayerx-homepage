@@ -3,7 +3,6 @@
  */
 
 import { tmdb } from "../tmdb/client.js";
-import { getThumbFromImages } from "../tmdb/utils.js";
 import {
   fetchDoubanHotMovies,
   fetchDoubanHotTVSeries,
@@ -60,7 +59,6 @@ async function searchTMDB(
   }
 }
 
-
 /**
  * Crawl Douban movies
  */
@@ -79,7 +77,6 @@ export async function crawlDoubanMovies() {
 
     if (tmdbData) {
       const tmdbId = tmdbData.id as number;
-      const thumb = await getThumbFromImages(tmdbId, "movie", "zh");
 
       results.push({
         title: item.title,
@@ -91,7 +88,6 @@ export async function crawlDoubanMovies() {
         media_type: "movie",
         release_date: (tmdbData as any)?.release_date || null,
         overview: tmdbData?.overview,
-        thumb: thumb || null,
         crawledAt: new Date().toISOString(),
       });
       console.log(`✅ ${tmdbId}`);
@@ -133,7 +129,6 @@ export async function crawlDoubanTVSeries() {
 
     if (tmdbData) {
       const tmdbId = tmdbData.id as number;
-      const thumb = await getThumbFromImages(tmdbId, "tv", "zh");
 
       results.push({
         title: item.title,
@@ -145,7 +140,6 @@ export async function crawlDoubanTVSeries() {
         media_type: "tv",
         first_air_date: (tmdbData as any).first_air_date,
         overview: tmdbData?.overview,
-        thumb: thumb || null,
         crawledAt: new Date().toISOString(),
       });
       console.log(`✅ ${tmdbId}`);
@@ -187,7 +181,6 @@ export async function crawlDoubanAnimation() {
 
     if (tmdbData) {
       const tmdbId = tmdbData.id as number;
-      const thumb = await getThumbFromImages(tmdbId, "tv", "zh");
 
       results.push({
         title: item.title,
@@ -199,7 +192,7 @@ export async function crawlDoubanAnimation() {
         media_type: "tv",
         first_air_date: (tmdbData as any).first_air_date,
         overview: tmdbData?.overview,
-        thumb: thumb || null,
+
         crawledAt: new Date().toISOString(),
       });
       console.log(`✅ ${tmdbId}`);

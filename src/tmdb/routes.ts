@@ -80,7 +80,7 @@ tmdbApp.get("/movie/images", async (c) => {
         movie_id: Number(id),
       },
       query: {
-        include_image_language: language === "en" ? "en" : `${language},en`,
+        include_image_language: language,
       },
     },
   });
