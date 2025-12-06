@@ -73,14 +73,10 @@ tmdbApp.get("/movie/details", async (c) => {
 
 tmdbApp.get("/movie/images", async (c) => {
   const id = c.req.query("id") || "";
-  const language = c.req.query("language") || "en-US";
   const result = await tmdb.GET(`/3/movie/${Number(id)}/images`, {
     params: {
       path: {
         movie_id: Number(id),
-      },
-      query: {
-        include_image_language: language,
       },
     },
   });
@@ -249,14 +245,10 @@ tmdbApp.get("/tv/details", async (c) => {
 
 tmdbApp.get("/tv/images", async (c) => {
   const id = c.req.query("id") || "";
-  const language = c.req.query("language") || "en-US";
   const result = await tmdb.GET(`/3/tv/${Number(id)}/images`, {
     params: {
       path: {
         series_id: Number(id),
-      },
-      query: {
-        include_image_language: language,
       },
     },
   });
