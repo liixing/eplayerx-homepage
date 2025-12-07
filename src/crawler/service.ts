@@ -11,6 +11,7 @@ import {
 const MOVIES_BLOB_KEY = "douban-movies.json";
 const TV_BLOB_KEY = "douban-tv.json";
 const DOUBAN_ANIMATION_BLOB_KEY = "douban-animation.json";
+const HOT_VARIETY_SHOWS_BLOB_KEY = "douban-hot-variety-shows.json";
 
 // Validate required environment variables
 const R2_ACCESS_KEY_ID = process.env.R2_ACCESS_KEY_ID;
@@ -271,6 +272,65 @@ export async function loadDoubanAnimation(): Promise<ContentItem[]> {
 export async function getDoubanAnimationLastUpdate(): Promise<string | null> {
   try {
     const blobData = await loadBlobContent(DOUBAN_ANIMATION_BLOB_KEY);
+    return blobData?.lastUpdated || null;
+  } catch (error) {
+    return null;
+  }
+}
+
+/**
+ * Save hot variety shows to R2
+ */
+export async function saveHotVarietyShows(varietyShows: ContentItem[]) {
+  if (!R2_BUCKET_NAME) {
+    throw new Error("R2_BUCKET_NAME is not configured");
+  }
+
+  const data: BlobData = {
+    platform: "douban",
+    type: "hot_variety_show",
+    count: varietyShows.length,
+    lastUpdated: new Date().toISOString(),
+    data: varietyShows,
+  };
+  const command = new PutObjectCommand({
+    Bucket: R2_BUCKET_NAME,
+    Key: HOT_VARIETY_SHOWS_BLOB_KEY,
+    Body: JSON.stringify(data, null, 2),
+    ContentType: "application/json",
+  });
+
+  try {
+    await r2Client.send(command);
+  } catch (error: any) {
+    if (error.$metadata?.httpStatusCode === 401) {
+      throw new Error(
+        "R2 authentication failed (401). Please check your R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY environment variables."
+      );
+    }
+    throw error;
+  }
+}
+
+/**
+ * Load hot variety shows from R2
+ */
+export async function loadHotVarietyShows(): Promise<ContentItem[]> {
+  try {
+    const blobData = await loadBlobContent(HOT_VARIETY_SHOWS_BLOB_KEY);
+    return blobData?.data || [];
+  } catch (error) {
+    console.error("Error loading hot variety shows:", error);
+    return [];
+  }
+}
+
+/**
+ * Get last update time for hot variety shows
+ */
+export async function getHotVarietyShowsLastUpdate(): Promise<string | null> {
+  try {
+    const blobData = await loadBlobContent(HOT_VARIETY_SHOWS_BLOB_KEY);
     return blobData?.lastUpdated || null;
   } catch (error) {
     return null;

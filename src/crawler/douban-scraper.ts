@@ -93,3 +93,12 @@ export async function fetchDoubanHotAnimation(): Promise<DoubanItem[]> {
     "https://m.douban.com/subject_collection/tv_animation"
   );
 }
+
+/**
+ * Fetch hot variety shows from Douban (recent hot)
+ */
+export async function fetchDoubanHotVarietyShows(): Promise<DoubanItem[]> {
+  return await fetchDoubanCollection(
+    "https://m.douban.com/subject_collection/show_hot"
+  );
+}

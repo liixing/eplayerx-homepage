@@ -7,10 +7,12 @@ import {
   fetchDoubanHotMovies,
   fetchDoubanHotTVSeries,
   fetchDoubanHotAnimation,
+  fetchDoubanHotVarietyShows,
 } from "./douban-scraper.js";
 import {
   type ContentItem,
   saveDoubanAnimation,
+  saveHotVarietyShows,
   saveMovies,
   saveTVSeries,
 } from "./service.js";
@@ -217,6 +219,58 @@ export async function crawlDoubanAnimation() {
 }
 
 /**
+ * Crawl Douban hot variety shows
+ */
+export async function crawlDoubanHotVarietyShows() {
+  console.log("🔥 Crawling Douban hot variety shows...");
+
+  const items = await fetchDoubanHotVarietyShows();
+  console.log(`📥 Found ${items.length} hot variety shows`);
+
+  const results: ContentItem[] = [];
+
+  for (const item of items) {
+    console.log(`🔍 Searching: ${item.title}`);
+
+    const tmdbData = await searchTMDB(item.title, "tv");
+
+    if (tmdbData) {
+      const tmdbId = tmdbData.id as number;
+
+      results.push({
+        title: item.title,
+        tmdbId,
+        vote_average: tmdbData.vote_average,
+        poster_path: tmdbData.poster_path,
+        backdrop_path: tmdbData.backdrop_path,
+        genre_ids: tmdbData.genre_ids || [],
+        media_type: "tv",
+        first_air_date: (tmdbData as any).first_air_date,
+        overview: tmdbData?.overview,
+        crawledAt: new Date().toISOString(),
+      });
+      console.log(`✅ ${tmdbId}`);
+    } else {
+      console.log(`❌ Not found`);
+    }
+
+    await delay(300);
+  }
+
+  if (results.length > 0) {
+    const deduplicated = deduplicateByTmdbId(results);
+    await saveHotVarietyShows(deduplicated);
+    console.log(
+      `💾 Saved ${deduplicated.length} hot variety shows to JSON (${
+        results.length - deduplicated.length
+      } duplicates removed)\n`
+    );
+  }
+
+  return results;
+}
+
+/**
  * Run all crawlers
  */
 async function runAllCrawlers() {
@@ -225,6 +279,7 @@ async function runAllCrawlers() {
   await crawlDoubanMovies();
   await crawlDoubanTVSeries();
   await crawlDoubanAnimation();
+  await crawlDoubanHotVarietyShows();
 
   console.log("✅ Done!");
 }
