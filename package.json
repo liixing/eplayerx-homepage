@@ -5,8 +5,7 @@
     "lint": "biome check --write",
     "test:ts": "tsc --noEmit",
     "gen:tmdb": "npx openapi-typescript https://developer.themoviedb.org/openapi/tmdb-api.json --output ./lib/tmdb-api.ts",
-    "crawler:run": "bun run src/crawler/crawlers.ts",
-    "crawler:test": "bun run src/crawler/test.ts"
+    "crawler:run": "bun run src/crawler/crawlers.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.946.0",
