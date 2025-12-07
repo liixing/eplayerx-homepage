@@ -13,6 +13,8 @@ import {
   loadTVSeries,
 } from "./service.js";
 
+const R2_CUSTOM_DOMAIN = process.env.R2_CUSTOM_DOMAIN || "assets.eplayerx.com";
+
 const app = new Hono();
 
 app.post("/crawl/movies", async (c) => {
@@ -66,41 +68,38 @@ app.get("/cron/crawl-all", async (c) => {
 });
 
 app.get("/popular/douban/movies", async (c) => {
-  const movies = await loadMovies();
-  const lastUpdate = await getMoviesLastUpdate();
-  return c.json({
-    success: true,
-    platform: "douban",
-    type: "movie",
-    count: movies.length,
-    lastUpdated: lastUpdate,
-    data: movies,
+  const url = `https://${R2_CUSTOM_DOMAIN}/douban-movies.json`;
+  const response = await fetch(url);
+  return new Response(response.body, {
+    status: response.status,
+    headers: {
+      "Content-Type":
+        response.headers.get("Content-Type") || "application/json",
+    },
   });
 });
 
 app.get("/popular/douban/tv", async (c) => {
-  const tvSeries = await loadTVSeries();
-  const lastUpdate = await getTVSeriesLastUpdate();
-  return c.json({
-    success: true,
-    platform: "douban",
-    type: "tv",
-    count: tvSeries.length,
-    lastUpdated: lastUpdate,
-    data: tvSeries,
+  const url = `https://${R2_CUSTOM_DOMAIN}/douban-tv.json`;
+  const response = await fetch(url);
+  return new Response(response.body, {
+    status: response.status,
+    headers: {
+      "Content-Type":
+        response.headers.get("Content-Type") || "application/json",
+    },
   });
 });
 
 app.get("/popular/douban/animation", async (c) => {
-  const animation = await loadDoubanAnimation();
-  const lastUpdate = await getDoubanAnimationLastUpdate();
-  return c.json({
-    success: true,
-    platform: "douban",
-    type: "animation",
-    count: animation.length,
-    lastUpdated: lastUpdate,
-    data: animation,
+  const url = `https://${R2_CUSTOM_DOMAIN}/douban-animation.json`;
+  const response = await fetch(url);
+  return new Response(response.body, {
+    status: response.status,
+    headers: {
+      "Content-Type":
+        response.headers.get("Content-Type") || "application/json",
+    },
   });
 });
 

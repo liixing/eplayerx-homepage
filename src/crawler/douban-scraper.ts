@@ -2,8 +2,7 @@
  * Douban scraper - fetch hot content
  */
 
-import chromium from "@sparticuz/chromium";
-import puppeteer from "puppeteer-core";
+import puppeteer from "puppeteer";
 
 export interface DoubanItem {
   title: string;
@@ -15,15 +14,10 @@ export interface DoubanItem {
 async function fetchDoubanCollection(url: string): Promise<DoubanItem[]> {
   let browser;
   try {
-    // Configure chromium for Vercel environment
-    chromium.setGraphicsMode = false;
-
-    // Launch browser with chromium for Vercel compatibility
+    // Launch browser (puppeteer comes with bundled Chromium)
     browser = await puppeteer.launch({
-      args: puppeteer.defaultArgs({ args: chromium.args, headless: "shell" }),
-      defaultViewport: { width: 1920, height: 1080 },
-      executablePath: await chromium.executablePath(),
-      headless: "shell",
+      headless: true,
+      args: ["--no-sandbox", "--disable-setuid-sandbox"],
     });
 
     const page = await browser.newPage();

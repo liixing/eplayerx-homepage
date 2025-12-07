@@ -2,28 +2,19 @@
  * Bilibili scraper - fetch hot anime
  */
 
-import chromium from "@sparticuz/chromium";
-import puppeteer from "puppeteer-core";
+import puppeteer from "puppeteer";
 
 export interface BilibiliItem {
   title: string;
 }
 
-/**
- * Fetch hot anime from Bilibili
- */
 export async function fetchBilibiliHotAnime(): Promise<BilibiliItem[]> {
   let browser;
   try {
-    // Configure chromium for Vercel environment
-    chromium.setGraphicsMode = false;
-
-    // Launch browser with chromium for Vercel compatibility
+    // Launch browser (puppeteer comes with bundled Chromium)
     browser = await puppeteer.launch({
-      args: puppeteer.defaultArgs({ args: chromium.args, headless: "shell" }),
-      defaultViewport: { width: 1920, height: 1080 },
-      executablePath: await chromium.executablePath(),
-      headless: "shell",
+      headless: true,
+      args: ["--no-sandbox", "--disable-setuid-sandbox"],
     });
 
     const page = await browser.newPage();
@@ -84,15 +75,10 @@ export async function fetchBilibiliHotAnime(): Promise<BilibiliItem[]> {
 export async function fetchBilibiliHotGuochuang(): Promise<BilibiliItem[]> {
   let browser;
   try {
-    // Configure chromium for Vercel environment
-    chromium.setGraphicsMode = false;
-
-    // Launch browser with chromium for Vercel compatibility
+    // Launch browser (puppeteer comes with bundled Chromium)
     browser = await puppeteer.launch({
-      args: puppeteer.defaultArgs({ args: chromium.args, headless: "shell" }),
-      defaultViewport: { width: 1920, height: 1080 },
-      executablePath: await chromium.executablePath(),
-      headless: "shell",
+      headless: true,
+      args: ["--no-sandbox", "--disable-setuid-sandbox"],
     });
 
     const page = await browser.newPage();

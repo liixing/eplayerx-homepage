@@ -1,26 +1,25 @@
 {
-	"name": "hono",
-	"type": "module",
-	"scripts": {
-		"lint": "biome check --write",
-		"test:ts": "tsc --noEmit",
-		"gen:tmdb": "npx openapi-typescript https://developer.themoviedb.org/openapi/tmdb-api.json --output ./lib/tmdb-api.ts",
-		"crawler:run": "bun run src/crawler/crawlers.ts",
-		"crawler:test": "bun run src/crawler/test.ts"
-	},
-	"dependencies": {
-		"@sparticuz/chromium": "^141.0.0",
-		"@vercel/blob": "^2.0.0",
-		"cheerio": "^1.1.2",
-		"hono": "^4.9.9",
-		"openapi-fetch": "^0.15.0",
-		"puppeteer-core": "^24.31.0"
-	},
-	"devDependencies": {
-		"@biomejs/biome": "2.2.5",
-		"@types/node": "^20.11.17",
-		"openapi-typescript": "^7.10.1",
-		"tsx": "^4.7.1",
-		"typescript": "^5.9.3"
-	}
+  "name": "hono",
+  "type": "module",
+  "scripts": {
+    "lint": "biome check --write",
+    "test:ts": "tsc --noEmit",
+    "gen:tmdb": "npx openapi-typescript https://developer.themoviedb.org/openapi/tmdb-api.json --output ./lib/tmdb-api.ts",
+    "crawler:run": "bun run src/crawler/crawlers.ts",
+    "crawler:test": "bun run src/crawler/test.ts"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.946.0",
+    "cheerio": "^1.1.2",
+    "hono": "^4.9.9",
+    "openapi-fetch": "^0.15.0",
+    "puppeteer": "^24.31.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.2.5",
+    "@types/node": "^20.11.17",
+    "openapi-typescript": "^7.10.1",
+    "tsx": "^4.7.1",
+    "typescript": "^5.9.3"
+  }
 }

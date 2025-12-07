@@ -1,12 +1,45 @@
 /**
- * JSON storage service using Vercel Blob
+ * JSON storage service using Cloudflare R2
  */
 
-import { put, head } from "@vercel/blob";
+import {
+  S3Client,
+  PutObjectCommand,
+  GetObjectCommand,
+} from "@aws-sdk/client-s3";
 
 const MOVIES_BLOB_KEY = "douban-movies.json";
 const TV_BLOB_KEY = "douban-tv.json";
 const DOUBAN_ANIMATION_BLOB_KEY = "douban-animation.json";
+
+// Validate required environment variables
+const R2_ACCESS_KEY_ID = process.env.R2_ACCESS_KEY_ID;
+const R2_SECRET_ACCESS_KEY = process.env.R2_SECRET_ACCESS_KEY;
+const R2_BUCKET_NAME = process.env.R2_BUCKET_NAME;
+
+if (!R2_ACCESS_KEY_ID || !R2_SECRET_ACCESS_KEY || !R2_BUCKET_NAME) {
+  console.warn(
+    "Warning: R2 credentials not fully configured. R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, and R2_BUCKET_NAME are required."
+  );
+}
+
+// Initialize R2 client
+// Priority: explicit endpoint > account ID endpoint
+const r2Endpoint =
+  process.env.R2_ENDPOINT ||
+  (process.env.R2_ACCOUNT_ID
+    ? `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`
+    : undefined);
+
+const r2Client = new S3Client({
+  region: "auto",
+  endpoint: r2Endpoint,
+  credentials: {
+    accessKeyId: R2_ACCESS_KEY_ID || "",
+    secretAccessKey: R2_SECRET_ACCESS_KEY || "",
+  },
+  forcePathStyle: true, // Use path-style for R2 endpoint
+});
 
 export interface ContentItem {
   title: string;
@@ -36,23 +69,45 @@ interface BlobData {
  */
 async function loadBlobContent(pathname: string): Promise<BlobData | null> {
   try {
-    const blobInfo = await head(pathname);
-    const response = await fetch(blobInfo.url);
+    // Use custom domain for reading (default: assets.eplayerx.com)
+    const customDomain = process.env.R2_CUSTOM_DOMAIN || "assets.eplayerx.com";
+    const url = `https://${customDomain}/${pathname}`;
+    const response = await fetch(url);
+
     if (!response.ok) {
-      return null;
+      if (response.status === 404) {
+        return null;
+      }
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
+
     const text = await response.text();
     return JSON.parse(text) as BlobData;
-  } catch (error) {
-    // If blob doesn't exist, return null
+  } catch (error: any) {
+    // If blob doesn't exist (404), return null
+    if (error.$metadata?.httpStatusCode === 404) {
+      return null;
+    }
+    // Log other errors for debugging
+    if (error.$metadata?.httpStatusCode === 401) {
+      console.error(
+        "R2 authentication error (401). Please check your R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY environment variables."
+      );
+    } else {
+      console.error("Error loading blob content:", error.message || error);
+    }
     return null;
   }
 }
 
 /**
- * Save movies to Blob
+ * Save movies to R2
  */
 export async function saveMovies(movies: ContentItem[]) {
+  if (!R2_BUCKET_NAME) {
+    throw new Error("R2_BUCKET_NAME is not configured");
+  }
+
   const data: BlobData = {
     platform: "douban",
     type: "movie",
@@ -60,18 +115,33 @@ export async function saveMovies(movies: ContentItem[]) {
     lastUpdated: new Date().toISOString(),
     data: movies,
   };
-  await put(MOVIES_BLOB_KEY, JSON.stringify(data, null, 2), {
-    access: "public",
-    contentType: "application/json",
-    addRandomSuffix: false,
-    allowOverwrite: true,
+  const command = new PutObjectCommand({
+    Bucket: R2_BUCKET_NAME,
+    Key: MOVIES_BLOB_KEY,
+    Body: JSON.stringify(data, null, 2),
+    ContentType: "application/json",
   });
+
+  try {
+    await r2Client.send(command);
+  } catch (error: any) {
+    if (error.$metadata?.httpStatusCode === 401) {
+      throw new Error(
+        "R2 authentication failed (401). Please check your R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY environment variables."
+      );
+    }
+    throw error;
+  }
 }
 
 /**
- * Save TV series to Blob
+ * Save TV series to R2
  */
 export async function saveTVSeries(tvSeries: ContentItem[]) {
+  if (!R2_BUCKET_NAME) {
+    throw new Error("R2_BUCKET_NAME is not configured");
+  }
+
   const data: BlobData = {
     platform: "douban",
     type: "tv_series",
@@ -79,16 +149,27 @@ export async function saveTVSeries(tvSeries: ContentItem[]) {
     lastUpdated: new Date().toISOString(),
     data: tvSeries,
   };
-  await put(TV_BLOB_KEY, JSON.stringify(data, null, 2), {
-    access: "public",
-    contentType: "application/json",
-    addRandomSuffix: false,
-    allowOverwrite: true,
+  const command = new PutObjectCommand({
+    Bucket: R2_BUCKET_NAME,
+    Key: TV_BLOB_KEY,
+    Body: JSON.stringify(data, null, 2),
+    ContentType: "application/json",
   });
+
+  try {
+    await r2Client.send(command);
+  } catch (error: any) {
+    if (error.$metadata?.httpStatusCode === 401) {
+      throw new Error(
+        "R2 authentication failed (401). Please check your R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY environment variables."
+      );
+    }
+    throw error;
+  }
 }
 
 /**
- * Load movies from Blob
+ * Load movies from R2
  */
 export async function loadMovies(): Promise<ContentItem[]> {
   try {
@@ -101,7 +182,7 @@ export async function loadMovies(): Promise<ContentItem[]> {
 }
 
 /**
- * Load TV series from Blob
+ * Load TV series from R2
  */
 export async function loadTVSeries(): Promise<ContentItem[]> {
   try {
@@ -138,9 +219,13 @@ export async function getTVSeriesLastUpdate(): Promise<string | null> {
 }
 
 /**
- * Save Douban animation to Blob
+ * Save Douban animation to R2
  */
 export async function saveDoubanAnimation(animation: ContentItem[]) {
+  if (!R2_BUCKET_NAME) {
+    throw new Error("R2_BUCKET_NAME is not configured");
+  }
+
   const data: BlobData = {
     platform: "douban",
     type: "animation",
@@ -148,16 +233,27 @@ export async function saveDoubanAnimation(animation: ContentItem[]) {
     lastUpdated: new Date().toISOString(),
     data: animation,
   };
-  await put(DOUBAN_ANIMATION_BLOB_KEY, JSON.stringify(data, null, 2), {
-    access: "public",
-    contentType: "application/json",
-    addRandomSuffix: false,
-    allowOverwrite: true,
+  const command = new PutObjectCommand({
+    Bucket: R2_BUCKET_NAME,
+    Key: DOUBAN_ANIMATION_BLOB_KEY,
+    Body: JSON.stringify(data, null, 2),
+    ContentType: "application/json",
   });
+
+  try {
+    await r2Client.send(command);
+  } catch (error: any) {
+    if (error.$metadata?.httpStatusCode === 401) {
+      throw new Error(
+        "R2 authentication failed (401). Please check your R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY environment variables."
+      );
+    }
+    throw error;
+  }
 }
 
 /**
- * Load Douban animation from Blob
+ * Load Douban animation from R2
  */
 export async function loadDoubanAnimation(): Promise<ContentItem[]> {
   try {
