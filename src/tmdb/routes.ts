@@ -182,10 +182,12 @@ tmdbApp.get("/movie/popular", async (c) => {
 
 tmdbApp.get("/movie/top_rated", async (c) => {
   const language = c.req.query("language") || "en";
+  const page = Number.parseInt(c.req.query("page") || "1");
   const result = await tmdb.GET("/3/movie/top_rated", {
     params: {
       query: {
         language,
+        page,
       },
     },
   });
@@ -366,10 +368,12 @@ tmdbApp.get("/tv/popular", async (c) => {
 
 tmdbApp.get("/tv/top_rated", async (c) => {
   const language = c.req.query("language") || "en";
+  const page = Number.parseInt(c.req.query("page") || "1");
   const result = await tmdb.GET("/3/tv/top_rated", {
     params: {
       query: {
         language,
+        page,
       },
     },
   });
