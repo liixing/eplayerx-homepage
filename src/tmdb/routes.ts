@@ -3,6 +3,83 @@ import { tmdb } from "./client.js";
 
 const tmdbApp = new Hono();
 
+// Movie sort_by type and validation
+type MovieSortBy =
+  | "original_title.asc"
+  | "original_title.desc"
+  | "popularity.asc"
+  | "popularity.desc"
+  | "revenue.asc"
+  | "revenue.desc"
+  | "primary_release_date.asc"
+  | "title.asc"
+  | "title.desc"
+  | "primary_release_date.desc"
+  | "vote_average.asc"
+  | "vote_average.desc"
+  | "vote_count.asc"
+  | "vote_count.desc";
+
+const VALID_MOVIE_SORT_BY_VALUES: readonly MovieSortBy[] = [
+  "original_title.asc",
+  "original_title.desc",
+  "popularity.asc",
+  "popularity.desc",
+  "revenue.asc",
+  "revenue.desc",
+  "primary_release_date.asc",
+  "title.asc",
+  "title.desc",
+  "primary_release_date.desc",
+  "vote_average.asc",
+  "vote_average.desc",
+  "vote_count.asc",
+  "vote_count.desc",
+] as const;
+
+function isValidMovieSortBy(value: string | undefined): value is MovieSortBy {
+  return (
+    value !== undefined &&
+    VALID_MOVIE_SORT_BY_VALUES.includes(value as MovieSortBy)
+  );
+}
+
+// TV sort_by type and validation
+type TvSortBy =
+  | "popularity.asc"
+  | "popularity.desc"
+  | "vote_average.asc"
+  | "vote_average.desc"
+  | "vote_count.asc"
+  | "vote_count.desc"
+  | "first_air_date.asc"
+  | "first_air_date.desc"
+  | "name.asc"
+  | "name.desc"
+  | "original_name.asc"
+  | "original_name.desc";
+
+const VALID_TV_SORT_BY_VALUES: readonly TvSortBy[] = [
+  "popularity.asc",
+  "popularity.desc",
+  "vote_average.asc",
+  "vote_average.desc",
+  "vote_count.asc",
+  "vote_count.desc",
+  "first_air_date.asc",
+  "first_air_date.desc",
+  "name.asc",
+  "name.desc",
+  "original_name.asc",
+  "original_name.desc",
+] as const;
+
+function isValidTvSortBy(value: string | undefined): value is TvSortBy {
+  return (
+    value !== undefined && VALID_TV_SORT_BY_VALUES.includes(value as TvSortBy)
+  );
+}
+
 tmdbApp.get("/search/keyword", async (c) => {
   const query = c.req.query("query") || "";
   const page = Number.parseInt(c.req.query("page") || "1");
@@ -73,14 +150,10 @@ tmdbApp.get("/movie/details", async (c) => {
 
 tmdbApp.get("/movie/images", async (c) => {
   const id = c.req.query("id") || "";
-  const language = c.req.query("language");
   const result = await tmdb.GET(`/3/movie/${Number(id)}/images`, {
     params: {
       path: {
         movie_id: Number(id),
-      },
-      query: {
-        include_image_language: language,
       },
     },
   });
@@ -251,14 +324,10 @@ tmdbApp.get("/tv/details", async (c) => {
 
 tmdbApp.get("/tv/images", async (c) => {
   const id = c.req.query("id") || "";
-  const language = c.req.query("language");
   const result = await tmdb.GET(`/3/tv/${Number(id)}/images`, {
     params: {
       path: {
         series_id: Number(id),
-      },
-      query: {
-        include_image_language: language,
       },
     },
   });
@@ -455,6 +524,82 @@ tmdbApp.get("/trending/tv", async (c) => {
       },
       path: {
         time_window: timeWindow,
+      },
+    },
+  });
+  if (result.response.status !== 200) {
+    return c.json({ error: result.error }, 500);
+  }
+  return c.json(result.data);
+});
+
+tmdbApp.get("/discover/movie", async (c) => {
+  const language = c.req.query("language") || "en";
+  const page = Number.parseInt(c.req.query("page") || "1");
+  const with_genres = c.req.query("with_genres") || "";
+  const without_companies = c.req.query("without_companies") || "";
+  const with_original_language = c.req.query("with_original_language") || "";
+  const sortByQuery = c.req.query("sort_by");
+
+  if (sortByQuery && !isValidMovieSortBy(sortByQuery)) {
+    return c.json(
+      {
+        error: `Invalid sort_by value. Allowed values: ${VALID_MOVIE_SORT_BY_VALUES.join(
+          ", "
+        )}`,
+      },
+      400
+    );
+  }
+
+  const sort_by = sortByQuery as MovieSortBy | undefined;
+  const result = await tmdb.GET("/3/discover/movie", {
+    params: {
+      query: {
+        language,
+        page,
+        sort_by,
+        with_genres,
+        without_companies,
+        with_original_language,
+      },
+    },
+  });
+  if (result.response.status !== 200) {
+    return c.json({ error: result.error }, 500);
+  }
+  return c.json(result.data);
+});
+
+tmdbApp.get("/discover/tv", async (c) => {
+  const language = c.req.query("language") || "en";
+  const page = Number.parseInt(c.req.query("page") || "1");
+  const with_genres = c.req.query("with_genres") || "";
+  const without_companies = c.req.query("without_companies") || "";
+  const with_original_language = c.req.query("with_original_language") || "";
+  const sortByQuery = c.req.query("sort_by");
+
+  if (sortByQuery && !isValidTvSortBy(sortByQuery)) {
+    return c.json(
+      {
+        error: `Invalid sort_by value. Allowed values: ${VALID_TV_SORT_BY_VALUES.join(
+          ", "
+        )}`,
+      },
+      400
+    );
+  }
+
+  const sort_by = sortByQuery as TvSortBy | undefined;
+  const result = await tmdb.GET("/3/discover/tv", {
+    params: {
+      query: {
+        language,
+        page,
+        sort_by,
+        with_genres,
+        without_companies,
+        with_original_language,
       },
     },
   });
