@@ -536,10 +536,10 @@ tmdbApp.get("/trending/tv", async (c) => {
 tmdbApp.get("/discover/movie", async (c) => {
   const language = c.req.query("language") || "en";
   const page = Number.parseInt(c.req.query("page") || "1");
-  const with_genres = c.req.query("with_genres") || "";
-  const without_genres = c.req.query("without_genres") || "";
-  const with_networks = c.req.query("with_networks") || "";
-  const with_original_language = c.req.query("with_original_language") || "";
+  const with_genres = c.req.query("with_genres");
+  const without_genres = c.req.query("without_genres");
+  const with_networks = c.req.query("with_networks");
+  const with_original_language = c.req.query("with_original_language");
   const sortByQuery = c.req.query("sort_by");
 
   if (sortByQuery && !isValidMovieSortBy(sortByQuery)) {
@@ -576,9 +576,12 @@ tmdbApp.get("/discover/movie", async (c) => {
 tmdbApp.get("/discover/tv", async (c) => {
   const language = c.req.query("language") || "en";
   const page = Number.parseInt(c.req.query("page") || "1");
-  const with_genres = c.req.query("with_genres") || "";
-  const without_genres = c.req.query("without_genres") || "";
-  const with_networks = Number.parseInt(c.req.query("with_networks") || "0");
+  const with_genres = c.req.query("with_genres");
+  const without_genres = c.req.query("without_genres");
+  const with_networks_query = c.req.query("with_networks");
+  const with_networks = with_networks_query
+    ? Number.parseInt(with_networks_query)
+    : undefined;
   const with_original_language = c.req.query("with_original_language") || "";
   const sortByQuery = c.req.query("sort_by");
 
