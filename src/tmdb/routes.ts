@@ -564,6 +564,7 @@ tmdbApp.get("/discover/movie", async (c) => {
         without_genres,
         with_networks,
         with_original_language,
+        "vote_average.lte": 10,
       },
     },
   });
@@ -607,6 +608,7 @@ tmdbApp.get("/discover/tv", async (c) => {
         without_genres,
         with_networks,
         with_original_language,
+        "vote_average.lte": 10,
       },
     },
   });
