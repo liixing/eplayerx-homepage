@@ -5,16 +5,6 @@ import {
   crawlDoubanMovies,
   crawlDoubanTVSeries,
 } from "./crawlers.js";
-import {
-  getDoubanAnimationLastUpdate,
-  getHotVarietyShowsLastUpdate,
-  getMoviesLastUpdate,
-  getTVSeriesLastUpdate,
-  loadDoubanAnimation,
-  loadHotVarietyShows,
-  loadMovies,
-  loadTVSeries,
-} from "./service.js";
 
 const R2_CUSTOM_DOMAIN = process.env.R2_CUSTOM_DOMAIN || "assets.eplayerx.com";
 
@@ -116,6 +106,30 @@ app.get("/popular/douban/animation", async (c) => {
 
 app.get("/popular/douban/hot-variety-shows", async (c) => {
   const url = `https://${R2_CUSTOM_DOMAIN}/douban-hot-variety-shows.json`;
+  const response = await fetch(url);
+  return new Response(response.body, {
+    status: response.status,
+    headers: {
+      "Content-Type":
+        response.headers.get("Content-Type") || "application/json",
+    },
+  });
+});
+
+app.get("/discover/tv-by-language", async (c) => {
+  const url = `https://${R2_CUSTOM_DOMAIN}/discover-tv-by-language.json`;
+  const response = await fetch(url);
+  return new Response(response.body, {
+    status: response.status,
+    headers: {
+      "Content-Type":
+        response.headers.get("Content-Type") || "application/json",
+    },
+  });
+});
+
+app.get("/discover/tv-by-network", async (c) => {
+  const url = `https://${R2_CUSTOM_DOMAIN}/discover-tv-by-network.json`;
   const response = await fetch(url);
   return new Response(response.body, {
     status: response.status,
