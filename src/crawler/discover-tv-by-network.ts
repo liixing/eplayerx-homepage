@@ -12,7 +12,7 @@ import {
 // Streaming platform network IDs
 const NETWORKS = [
   {
-    id: 2130,
+    id: 213,
     name: "Netflix",
     logo_path: "/tyHnxjQJLH6h4iDQKhN5iqebWmX.png",
   },
