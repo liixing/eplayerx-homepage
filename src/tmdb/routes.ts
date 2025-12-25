@@ -618,4 +618,27 @@ tmdbApp.get("/discover/tv", async (c) => {
   return c.json(result.data);
 });
 
+tmdbApp.get("/image/*", async (c) => {
+  const path = c.req.param("*");
+  if (!path) {
+    return c.json({ error: "Image path is required" }, 400);
+  }
+
+  const imageUrl = `https://image.tmdb.org/t/p/${path}`;
+
+  const response = await fetch(imageUrl);
+  if (!response.ok) {
+    return c.json({ error: "Failed to fetch image" }, 502);
+  }
+
+  const contentType = response.headers.get("content-type") || "image/jpeg";
+
+  return new Response(response.body, {
+    headers: {
+      "Content-Type": contentType,
+      "Cache-Control": "public, max-age=31536000, immutable",
+    },
+  });
+});
+
 export default tmdbApp;
