@@ -619,7 +619,10 @@ tmdbApp.get("/discover/tv", async (c) => {
 });
 
 tmdbApp.get("/image/*", async (c) => {
-  const path = c.req.param("*");
+  const url = new URL(c.req.url);
+  const match = url.pathname.match(/\/image\/(.+)/);
+  const path = match?.[1];
+
   if (!path) {
     return c.json({ error: "Image path is required" }, 400);
   }
