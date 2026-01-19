@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import {
+  crawlBangumiAnimation,
   crawlDoubanAnimation,
   crawlDoubanHotVarietyShows,
   crawlDoubanMovies,
@@ -30,6 +31,11 @@ app.post("/crawl/douban/hot-variety-shows", async (c) => {
   return c.json({ success: true, count: results.length });
 });
 
+app.post("/crawl/bangumi/animation", async (c) => {
+  const results = await crawlBangumiAnimation();
+  return c.json({ success: true, count: results.length });
+});
+
 app.get("/cron/crawl-all", async (c) => {
   const startTime = Date.now();
 
@@ -37,13 +43,19 @@ app.get("/cron/crawl-all", async (c) => {
     console.log("🕐 Scheduled crawl started at", new Date().toISOString());
 
     // Run all crawlers in parallel for better performance
-    const [movies, tvSeries, doubanAnimation, hotVarietyShows] =
-      await Promise.all([
-        crawlDoubanMovies(),
-        crawlDoubanTVSeries(),
-        crawlDoubanAnimation(),
-        crawlDoubanHotVarietyShows(),
-      ]);
+    const [
+      movies,
+      tvSeries,
+      doubanAnimation,
+      hotVarietyShows,
+      bangumiAnimation,
+    ] = await Promise.all([
+      crawlDoubanMovies(),
+      crawlDoubanTVSeries(),
+      crawlDoubanAnimation(),
+      crawlDoubanHotVarietyShows(),
+      crawlBangumiAnimation(),
+    ]);
 
     const duration = Date.now() - startTime;
 
@@ -53,6 +65,7 @@ app.get("/cron/crawl-all", async (c) => {
       tvSeries: { count: tvSeries.length },
       doubanAnimation: { count: doubanAnimation.length },
       hotVarietyShows: { count: hotVarietyShows.length },
+      bangumiAnimation: { count: bangumiAnimation.length },
       duration: `${Math.round(duration / 1000)}s`,
       timestamp: new Date().toISOString(),
     });
@@ -106,6 +119,18 @@ app.get("/popular/douban/animation", async (c) => {
 
 app.get("/popular/douban/hot-variety-shows", async (c) => {
   const url = `https://${R2_CUSTOM_DOMAIN}/douban-hot-variety-shows.json`;
+  const response = await fetch(url);
+  return new Response(response.body, {
+    status: response.status,
+    headers: {
+      "Content-Type":
+        response.headers.get("Content-Type") || "application/json",
+    },
+  });
+});
+
+app.get("/popular/bangumi/animation", async (c) => {
+  const url = `https://${R2_CUSTOM_DOMAIN}/bangumi-animation.json`;
   const response = await fetch(url);
   return new Response(response.body, {
     status: response.status,

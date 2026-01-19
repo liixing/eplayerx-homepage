@@ -9,8 +9,10 @@ import {
   fetchDoubanHotAnimation,
   fetchDoubanHotVarietyShows,
 } from "./douban-scraper.js";
+import { fetchBangumiHotAnime } from "./bangumi-scraper.js";
 import {
   type ContentItem,
+  saveBangumiAnimation,
   saveDoubanAnimation,
   saveHotVarietyShows,
   saveMovies,
@@ -271,6 +273,58 @@ export async function crawlDoubanHotVarietyShows() {
 }
 
 /**
+ * Crawl Bangumi animation
+ */
+export async function crawlBangumiAnimation() {
+  console.log("🎌 Crawling Bangumi animation...");
+
+  const items = await fetchBangumiHotAnime();
+  console.log(`📥 Found ${items.length} animation`);
+
+  const results: ContentItem[] = [];
+
+  for (const item of items) {
+    console.log(`🔍 Searching: ${item.title}`);
+
+    const tmdbData = await searchTMDB(item.title, "tv");
+
+    if (tmdbData) {
+      const tmdbId = tmdbData.id as number;
+
+      results.push({
+        title: item.title,
+        tmdbId,
+        vote_average: tmdbData.vote_average,
+        poster_path: tmdbData.poster_path,
+        backdrop_path: tmdbData.backdrop_path,
+        genre_ids: tmdbData.genre_ids || [],
+        media_type: "tv",
+        first_air_date: (tmdbData as any).first_air_date,
+        overview: tmdbData?.overview,
+        crawledAt: new Date().toISOString(),
+      });
+      console.log(`✅ ${tmdbId}`);
+    } else {
+      console.log(`❌ Not found`);
+    }
+
+    await delay(300);
+  }
+
+  if (results.length > 0) {
+    const deduplicated = deduplicateByTmdbId(results);
+    await saveBangumiAnimation(deduplicated);
+    console.log(
+      `💾 Saved ${deduplicated.length} animation to JSON (${
+        results.length - deduplicated.length
+      } duplicates removed)\n`
+    );
+  }
+
+  return results;
+}
+
+/**
  * Run all crawlers
  */
 async function runAllCrawlers() {
@@ -280,6 +334,7 @@ async function runAllCrawlers() {
   await crawlDoubanTVSeries();
   await crawlDoubanAnimation();
   await crawlDoubanHotVarietyShows();
+  await crawlBangumiAnimation();
 
   console.log("✅ Done!");
 }

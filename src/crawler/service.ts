@@ -12,6 +12,7 @@ const MOVIES_BLOB_KEY = "douban-movies.json";
 const TV_BLOB_KEY = "douban-tv.json";
 const DOUBAN_ANIMATION_BLOB_KEY = "douban-animation.json";
 const HOT_VARIETY_SHOWS_BLOB_KEY = "douban-hot-variety-shows.json";
+const BANGUMI_ANIMATION_BLOB_KEY = "bangumi-animation.json";
 const DISCOVER_TV_BY_LANGUAGE_BLOB_KEY = "discover-tv-by-language.json";
 const DISCOVER_TV_BY_NETWORK_BLOB_KEY = "discover-tv-by-network.json";
 
@@ -333,6 +334,65 @@ export async function loadHotVarietyShows(): Promise<ContentItem[]> {
 export async function getHotVarietyShowsLastUpdate(): Promise<string | null> {
   try {
     const blobData = await loadBlobContent(HOT_VARIETY_SHOWS_BLOB_KEY);
+    return blobData?.lastUpdated || null;
+  } catch (error) {
+    return null;
+  }
+}
+
+/**
+ * Save Bangumi animation to R2
+ */
+export async function saveBangumiAnimation(animation: ContentItem[]) {
+  if (!R2_BUCKET_NAME) {
+    throw new Error("R2_BUCKET_NAME is not configured");
+  }
+
+  const data: BlobData = {
+    platform: "bangumi",
+    type: "animation",
+    count: animation.length,
+    lastUpdated: new Date().toISOString(),
+    data: animation,
+  };
+  const command = new PutObjectCommand({
+    Bucket: R2_BUCKET_NAME,
+    Key: BANGUMI_ANIMATION_BLOB_KEY,
+    Body: JSON.stringify(data, null, 2),
+    ContentType: "application/json",
+  });
+
+  try {
+    await r2Client.send(command);
+  } catch (error: any) {
+    if (error.$metadata?.httpStatusCode === 401) {
+      throw new Error(
+        "R2 authentication failed (401). Please check your R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY environment variables."
+      );
+    }
+    throw error;
+  }
+}
+
+/**
+ * Load Bangumi animation from R2
+ */
+export async function loadBangumiAnimation(): Promise<ContentItem[]> {
+  try {
+    const blobData = await loadBlobContent(BANGUMI_ANIMATION_BLOB_KEY);
+    return blobData?.data || [];
+  } catch (error) {
+    console.error("Error loading Bangumi animation:", error);
+    return [];
+  }
+}
+
+/**
+ * Get last update time for Bangumi animation
+ */
+export async function getBangumiAnimationLastUpdate(): Promise<string | null> {
+  try {
+    const blobData = await loadBlobContent(BANGUMI_ANIMATION_BLOB_KEY);
     return blobData?.lastUpdated || null;
   } catch (error) {
     return null;

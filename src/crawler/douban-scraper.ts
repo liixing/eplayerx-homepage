@@ -44,7 +44,7 @@ async function fetchDoubanCollection(
     const items = data.subject_collection_items || [];
 
     return items.map((item) => ({
-      title: item.title,
+      title: item.title.split(" ")[0],
     }));
   } catch (error) {
     console.error("Error fetching Douban:", error);
