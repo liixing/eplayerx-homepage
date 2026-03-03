@@ -2,6 +2,8 @@
   "name": "hono",
   "type": "module",
   "scripts": {
+    "dev:cf": "wrangler dev",
+    "deploy:cf": "wrangler deploy",
     "lint": "biome check --write",
     "test:ts": "tsc --noEmit",
     "gen:tmdb": "npx openapi-typescript https://developer.themoviedb.org/openapi/tmdb-api.json --output ./lib/tmdb-api.ts",
@@ -16,9 +18,11 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.2.5",
+    "@cloudflare/workers-types": "^4.20260301.1",
     "@types/node": "^20.11.17",
     "openapi-typescript": "^7.10.1",
     "tsx": "^4.7.1",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "wrangler": "^4.69.0"
   }
 }
