@@ -2,6 +2,8 @@
   "name": "hono",
   "type": "module",
   "scripts": {
+    "dev": "bun run --hot src/serve.ts",
+    "start": "bun run src/serve.ts",
     "dev:cf": "wrangler dev",
     "deploy:cf": "wrangler deploy",
     "lint": "biome check --write",
