@@ -4,11 +4,45 @@
 
 一个基于 [Hono](https://hono.dev/) 框架构建的媒体内容 API 服务，提供 TMDB API 代理和豆瓣热门内容爬取功能。
 
-## ☁️ 一键部署
+## 🚀 部署
+
+### Docker 部署（推荐）
+
+```bash
+docker run -d \
+  --name eplayerx-homepage \
+  -p 3000:3000 \
+  --env-file .env \
+  --restart unless-stopped \
+  snowleee/eplayerx-homepage:latest
+```
+
+或使用 Docker Compose，创建 `docker-compose.yml`：
+
+```yaml
+services:
+  app:
+    image: snowleee/eplayerx-homepage:latest
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    restart: unless-stopped
+```
+
+```bash
+docker compose up -d
+```
+
+### Vercel 部署
 
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fliixing%2Feplayerx-homepage&env=TMDB_API_TOKEN&envDescription=TMDB%20API%20Token%20is%20required.%20Get%20it%20from%20https%3A%2F%2Fwww.themoviedb.org%2Fsettings%2Fapi&project-name=eplayerx-api&repository-name=eplayerx-api)
 
-> ⚠️ **重要提示**：部署时 Vercel 会提示你填入 `TMDB_API_TOKEN` 环境变量，这是必填项。请先按照下方说明获取 Token。
+### Cloudflare Workers 部署
+
+```bash
+npm run deploy:cf
+```
 
 ## 🔑 获取 TMDB API Token
 
@@ -25,6 +59,19 @@
 - 📡 **发现功能** - 按语言、平台发现电视剧内容
 - 🖼️ **图片代理** - TMDB 图片代理服务，支持缓存
 - ☁️ **云存储** - 使用 Cloudflare R2 存储爬取数据
+
+## 🛠️ 本地开发
+
+```bash
+# 安装依赖
+bun install
+
+# 启动开发服务器（热重载）
+bun run dev
+
+# 或使用 Cloudflare Workers 本地模拟
+bun run dev:cf
+```
 
 ## ⚙️ 环境变量
 
