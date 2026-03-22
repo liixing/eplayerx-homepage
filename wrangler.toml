@@ -4,14 +4,13 @@ name = "eplayerx-homepage"
 main = "src/worker.ts"
 compatibility_date = "2025-04-01"
 compatibility_flags = ["nodejs_compat"]
-workers_dev = false
-preview_urls = false
 
-routes = [
-	{ pattern = "api.eplayerx.com", zone_name = "eplayerx.com", custom_domain = true },
-	{ pattern = "api2.eplayerx.com", zone_name = "eplayerx.com", custom_domain = true },
-	{ pattern = "tmdb.eplayerx.com", zone_name = "eplayerx.com", custom_domain = true },
-]
+# To use a custom domain instead of *.workers.dev, uncomment and edit:
+# workers_dev = false
+# preview_urls = false
+# routes = [
+# 	{ pattern = "api.example.com", zone_name = "example.com", custom_domain = true },
+# ]
 
 [observability]
 enabled = true
