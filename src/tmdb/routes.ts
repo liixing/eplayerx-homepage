@@ -561,13 +561,13 @@ async function enrichWithImages(
       )?.file_path;
 
       const backdrops = (images?.backdrops ?? []) as ImageEntry[];
-      const thumbnail =
+      const thumb =
         backdrops.find((b) => b.iso_639_1 === languageCode)?.file_path ||
         backdrops.find((b) => b.iso_639_1 === "en")?.file_path ||
         (item.backdrop_path as string | undefined) ||
         (item.poster_path as string | undefined);
 
-      return { ...item, logo, noLogoPoster, thumbnail };
+      return { ...item, logo, noLogoPoster, thumb };
     } catch {
       return item;
     }

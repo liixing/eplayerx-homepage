@@ -5,7 +5,7 @@
 		"dev": "bun run --hot src/serve.ts",
 		"start": "bun run src/serve.ts",
 		"dev:cf": "wrangler dev",
-		"deploy:cf": "wrangler deploy",
+		"deploy:cf": "wrangler deploy --keep-vars",
 		"lint": "biome check --write",
 		"test:ts": "tsc --noEmit",
 		"gen:tmdb": "npx openapi-typescript https://developer.themoviedb.org/openapi/tmdb-api.json --output ./lib/tmdb-api.ts",
