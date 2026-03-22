@@ -3,9 +3,9 @@
  */
 
 import {
-  S3Client,
-  PutObjectCommand,
   GetObjectCommand,
+  PutObjectCommand,
+  S3Client,
 } from "@aws-sdk/client-s3";
 
 const MOVIES_BLOB_KEY = "douban-movies.json";
@@ -57,6 +57,8 @@ export interface ContentItem {
   first_air_date?: string | null;
   overview?: string | null;
   thumb?: string | null;
+  logo?: string | null;
+  noLogoPoster?: string | null;
   crawledAt: string;
 }
 

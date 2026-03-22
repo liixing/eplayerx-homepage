@@ -29,7 +29,8 @@ export async function fetchBangumiHotAnime(): Promise<BangumiItem[]> {
     const html = await response.text();
 
     // Extract titles from <h3>...<a href="/subject/..." class="l">Title</a>...</h3>
-    const titleRegex = /<h3>\s*(?:<[^>]*>\s*)*<a\s+href="\/subject\/\d+"\s+class="l">([^<]+)<\/a>/g;
+    const titleRegex =
+      /<h3>\s*(?:<[^>]*>\s*)*<a\s+href="\/subject\/\d+"\s+class="l">([^<]+)<\/a>/g;
     const items: BangumiItem[] = [];
     const titleSet = new Set<string>();
 

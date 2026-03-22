@@ -3,6 +3,26 @@ import { tmdb } from "./client.js";
 
 const tmdbApp = new Hono();
 
+const TMDB_IMAGE_CACHE_CONTROL =
+  "public, max-age=31536000, s-maxage=31536000, immutable";
+
+function workersDefaultCache():
+  | {
+      match(request: Request): Promise<Response | undefined>;
+      put(request: Request, response: Response): Promise<void>;
+    }
+  | undefined {
+  const w = globalThis as typeof globalThis & {
+    caches?: {
+      default: {
+        match(request: Request): Promise<Response | undefined>;
+        put(request: Request, response: Response): Promise<void>;
+      };
+    };
+  };
+  return w.caches?.default;
+}
+
 // Movie sort_by type and validation
 type MovieSortBy =
   | "original_title.asc"
@@ -469,6 +489,80 @@ tmdbApp.get("/tv/on_the_air", async (c) => {
   return c.json(result.data);
 });
 
+type ImageEntry = {
+  iso_639_1?: string | null;
+  iso_3166_1?: string;
+  file_path?: string;
+  vote_average?: number;
+};
+
+function bestByVote<T extends { vote_average?: number }>(items: T[]) {
+  return items.length
+    ? items.sort((a, b) => (b.vote_average ?? 0) - (a.vote_average ?? 0))[0]
+    : undefined;
+}
+
+async function enrichWithImages(
+  items: Record<string, unknown>[],
+  language: string,
+  mediaType?: "movie" | "tv"
+) {
+  const [languageCode] = language.split("-");
+  const preferredRegion =
+    languageCode === "zh" ? (language.includes("TW") ? "TW" : "CN") : undefined;
+
+  return Promise.all(
+    items.map(async (item) => {
+      const type = mediaType ?? (item.media_type as string);
+      if (type !== "movie" && type !== "tv") return item;
+
+      const id = item.id as number;
+      const imagesResult =
+        type === "tv"
+          ? await tmdb.GET(`/3/tv/${id}/images`, {
+              params: { path: { series_id: id } },
+            })
+          : await tmdb.GET(`/3/movie/${id}/images`, {
+              params: { path: { movie_id: id } },
+            });
+      if (imagesResult.response.status !== 200) return item;
+
+      const images = imagesResult.data;
+
+      const logos = (images?.logos ?? []) as ImageEntry[];
+      let logo: string | undefined;
+      if (logos.length) {
+        const regionMatches = preferredRegion
+          ? logos.filter(
+              (l) =>
+                l.iso_639_1 === languageCode && l.iso_3166_1 === preferredRegion
+            )
+          : [];
+        const langMatches = logos.filter((l) => l.iso_639_1 === languageCode);
+        const best =
+          bestByVote(regionMatches) ??
+          bestByVote(langMatches) ??
+          bestByVote(logos);
+        logo = best?.file_path;
+      }
+
+      const posters = (images?.posters ?? []) as ImageEntry[];
+      const noLogoPoster = bestByVote(
+        posters.filter((p) => !p.iso_639_1)
+      )?.file_path;
+
+      const backdrops = (images?.backdrops ?? []) as ImageEntry[];
+      const thumbnail =
+        backdrops.find((b) => b.iso_639_1 === languageCode)?.file_path ||
+        backdrops.find((b) => b.iso_639_1 === "en")?.file_path ||
+        (item.backdrop_path as string | undefined) ||
+        (item.poster_path as string | undefined);
+
+      return { ...item, logo, noLogoPoster, thumbnail };
+    })
+  );
+}
+
 tmdbApp.get("/trending/all", async (c) => {
   const language = c.req.query("language") || "en";
   const timeWindow: "day" | "week" =
@@ -508,6 +602,14 @@ tmdbApp.get("/trending/movie", async (c) => {
   if (result.response.status !== 200) {
     return c.json({ error: result.error }, 500);
   }
+  if (page === 1 && result.data?.results?.length) {
+    const enriched = await enrichWithImages(
+      result.data.results as Record<string, unknown>[],
+      language,
+      "movie"
+    );
+    return c.json({ ...result.data, results: enriched });
+  }
   return c.json(result.data);
 });
 
@@ -529,6 +631,15 @@ tmdbApp.get("/trending/tv", async (c) => {
   });
   if (result.response.status !== 200) {
     return c.json({ error: result.error }, 500);
+  }
+
+  if (page === 1 && result.data?.results?.length) {
+    const enriched = await enrichWithImages(
+      result.data.results as Record<string, unknown>[],
+      language,
+      "tv"
+    );
+    return c.json({ ...result.data, results: enriched });
   }
   return c.json(result.data);
 });
@@ -684,21 +795,55 @@ tmdbApp.get("/image/*", async (c) => {
     return c.json({ error: "Image path is required" }, 400);
   }
 
-  const imageUrl = `https://image.tmdb.org/t/p/${path}`;
+  if (
+    path.includes("..") ||
+    path.startsWith("//") ||
+    /^\s*https?:/i.test(path)
+  ) {
+    return c.json({ error: "Invalid image path" }, 400);
+  }
 
-  const response = await fetch(imageUrl);
-  if (!response.ok) {
+  const cache = workersDefaultCache();
+  const cacheRequest = new Request(c.req.url, { method: "GET" });
+  if (cache) {
+    const cached = await cache.match(cacheRequest);
+    if (cached) {
+      return cached;
+    }
+  }
+
+  const imageUrl = new URL(path, "https://image.tmdb.org/t/p/").href;
+
+  const onCf = cache !== undefined;
+  const upstream = await fetch(
+    imageUrl,
+    onCf
+      ? ({
+          cf: { cacheEverything: true, cacheTtl: 31_536_000 },
+        } as RequestInit)
+      : undefined
+  );
+  if (!upstream.ok) {
     return c.json({ error: "Failed to fetch image" }, 502);
   }
 
-  const contentType = response.headers.get("content-type") || "image/jpeg";
-
-  return new Response(response.body, {
-    headers: {
-      "Content-Type": contentType,
-      "Cache-Control": "public, max-age=31536000, immutable",
-    },
+  const contentType = upstream.headers.get("content-type") || "image/jpeg";
+  const headers = new Headers({
+    "Content-Type": contentType,
+    "Cache-Control": TMDB_IMAGE_CACHE_CONTROL,
   });
+
+  const forCache = upstream.clone();
+  const outgoing = new Response(upstream.body, { headers });
+
+  if (cache && c.executionCtx) {
+    const responseToStore = new Response(forCache.body, {
+      headers: new Headers(headers),
+    });
+    c.executionCtx.waitUntil(cache.put(cacheRequest, responseToStore));
+  }
+
+  return outgoing;
 });
 
 export default tmdbApp;

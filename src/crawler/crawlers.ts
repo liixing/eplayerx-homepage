@@ -3,13 +3,13 @@
  */
 
 import { tmdb } from "../tmdb/client.js";
+import { fetchBangumiHotAnime } from "./bangumi-scraper.js";
 import {
+  fetchDoubanHotAnimation,
   fetchDoubanHotMovies,
   fetchDoubanHotTVSeries,
-  fetchDoubanHotAnimation,
   fetchDoubanHotVarietyShows,
 } from "./douban-scraper.js";
-import { fetchBangumiHotAnime } from "./bangumi-scraper.js";
 import {
   type ContentItem,
   saveBangumiAnimation,
@@ -21,16 +21,37 @@ import {
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-/**
- * Fetch the best backdrop image path as thumbnail from TMDB images API.
- * Priority: zh backdrop > en backdrop > null language backdrop > first backdrop > backdrop_path > poster_path
- */
-async function fetchThumb(
+interface ImageMeta {
+  thumb: string | null;
+  logo: string | null;
+  noLogoPoster: string | null;
+}
+
+type ImageEntry = {
+  iso_639_1?: string | null;
+  iso_3166_1?: string;
+  file_path?: string;
+  vote_average?: number;
+};
+
+function bestByVote(items: ImageEntry[]) {
+  return items.length
+    ? items.sort((a, b) => (b.vote_average ?? 0) - (a.vote_average ?? 0))[0]
+    : undefined;
+}
+
+async function fetchImageMeta(
   tmdbId: number,
   mediaType: "movie" | "tv",
   backdropPath?: string | null,
   posterPath?: string | null
-): Promise<string | null> {
+): Promise<ImageMeta> {
+  const fallback: ImageMeta = {
+    thumb: backdropPath || posterPath || null,
+    logo: null,
+    noLogoPoster: null,
+  };
+
   try {
     const result =
       mediaType === "movie"
@@ -41,22 +62,40 @@ async function fetchThumb(
             params: { path: { series_id: tmdbId } },
           });
 
-    const backdrops = result.data?.backdrops;
+    const images = result.data;
 
-    if (backdrops?.length) {
-      const thumb =
-        backdrops.find((b) => b.iso_639_1 === "zh")?.file_path ||
-        backdrops.find((b) => b.iso_639_1 === "en")?.file_path ||
-        backdrops.find((b) => b.iso_639_1 === null)?.file_path ||
-        backdrops[0]?.file_path;
+    const backdrops = (images?.backdrops ?? []) as ImageEntry[];
+    const thumb =
+      backdrops.find((b) => b.iso_639_1 === "zh")?.file_path ||
+      backdrops.find((b) => b.iso_639_1 === "en")?.file_path ||
+      backdrops.find((b) => b.iso_639_1 === null)?.file_path ||
+      backdrops[0]?.file_path ||
+      backdropPath ||
+      posterPath ||
+      null;
 
-      if (thumb) return thumb;
+    const logos = (images?.logos ?? []) as ImageEntry[];
+    let logo: string | null = null;
+    if (logos.length) {
+      const regionMatches = logos.filter(
+        (l) => l.iso_639_1 === "zh" && l.iso_3166_1 === "CN"
+      );
+      const langMatches = logos.filter((l) => l.iso_639_1 === "zh");
+      const best =
+        bestByVote(regionMatches) ??
+        bestByVote(langMatches) ??
+        bestByVote(logos);
+      logo = best?.file_path ?? null;
     }
 
-    return backdropPath || posterPath || null;
+    const posters = (images?.posters ?? []) as ImageEntry[];
+    const noLogoPoster =
+      bestByVote(posters.filter((p) => !p.iso_639_1))?.file_path ?? null;
+
+    return { thumb, logo, noLogoPoster };
   } catch (error) {
     console.error(`Failed to fetch images for ${mediaType}/${tmdbId}:`, error);
-    return backdropPath || posterPath || null;
+    return fallback;
   }
 }
 
@@ -120,7 +159,7 @@ export async function crawlDoubanMovies() {
 
     if (tmdbData) {
       const tmdbId = tmdbData.id as number;
-      const thumb = await fetchThumb(
+      const { thumb, logo, noLogoPoster } = await fetchImageMeta(
         tmdbId,
         "movie",
         tmdbData.backdrop_path,
@@ -138,6 +177,8 @@ export async function crawlDoubanMovies() {
         release_date: (tmdbData as any)?.release_date || null,
         overview: tmdbData?.overview,
         thumb,
+        logo,
+        noLogoPoster,
         crawledAt: new Date().toISOString(),
       });
       console.log(`✅ ${tmdbId}`);
@@ -179,7 +220,7 @@ export async function crawlDoubanTVSeries() {
 
     if (tmdbData) {
       const tmdbId = tmdbData.id as number;
-      const thumb = await fetchThumb(
+      const { thumb, logo, noLogoPoster } = await fetchImageMeta(
         tmdbId,
         "tv",
         tmdbData.backdrop_path,
@@ -197,6 +238,8 @@ export async function crawlDoubanTVSeries() {
         first_air_date: (tmdbData as any).first_air_date,
         overview: tmdbData?.overview,
         thumb,
+        logo,
+        noLogoPoster,
         crawledAt: new Date().toISOString(),
       });
       console.log(`✅ ${tmdbId}`);
@@ -238,7 +281,7 @@ export async function crawlDoubanAnimation() {
 
     if (tmdbData) {
       const tmdbId = tmdbData.id as number;
-      const thumb = await fetchThumb(
+      const { thumb, logo, noLogoPoster } = await fetchImageMeta(
         tmdbId,
         "tv",
         tmdbData.backdrop_path,
@@ -256,6 +299,8 @@ export async function crawlDoubanAnimation() {
         first_air_date: (tmdbData as any).first_air_date,
         overview: tmdbData?.overview,
         thumb,
+        logo,
+        noLogoPoster,
         crawledAt: new Date().toISOString(),
       });
       console.log(`✅ ${tmdbId}`);
@@ -297,7 +342,7 @@ export async function crawlDoubanHotVarietyShows() {
 
     if (tmdbData) {
       const tmdbId = tmdbData.id as number;
-      const thumb = await fetchThumb(
+      const { thumb, logo, noLogoPoster } = await fetchImageMeta(
         tmdbId,
         "tv",
         tmdbData.backdrop_path,
@@ -315,6 +360,8 @@ export async function crawlDoubanHotVarietyShows() {
         first_air_date: (tmdbData as any).first_air_date,
         overview: tmdbData?.overview,
         thumb,
+        logo,
+        noLogoPoster,
         crawledAt: new Date().toISOString(),
       });
       console.log(`✅ ${tmdbId}`);
@@ -356,7 +403,7 @@ export async function crawlBangumiAnimation() {
 
     if (tmdbData) {
       const tmdbId = tmdbData.id as number;
-      const thumb = await fetchThumb(
+      const { thumb, logo, noLogoPoster } = await fetchImageMeta(
         tmdbId,
         "tv",
         tmdbData.backdrop_path,
@@ -374,6 +421,8 @@ export async function crawlBangumiAnimation() {
         first_air_date: (tmdbData as any).first_air_date,
         overview: tmdbData?.overview,
         thumb,
+        logo,
+        noLogoPoster,
         crawledAt: new Date().toISOString(),
       });
       console.log(`✅ ${tmdbId}`);
