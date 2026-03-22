@@ -486,6 +486,15 @@ tmdbApp.get("/tv/on_the_air", async (c) => {
   if (result.response.status !== 200) {
     return c.json({ error: result.error }, 500);
   }
+  if (result.data?.results?.length) {
+    const first10 = (result.data.results as Record<string, unknown>[]).slice(
+      0,
+      10
+    );
+    const rest = (result.data.results as Record<string, unknown>[]).slice(10);
+    const enriched = await enrichWithImages(first10, language, "tv");
+    return c.json({ ...result.data, results: [...enriched, ...rest] });
+  }
   return c.json(result.data);
 });
 
@@ -511,8 +520,8 @@ async function enrichWithImages(
   const preferredRegion =
     languageCode === "zh" ? (language.includes("TW") ? "TW" : "CN") : undefined;
 
-  return Promise.all(
-    items.map(async (item) => {
+  const enrichOne = async (item: Record<string, unknown>) => {
+    try {
       const type = mediaType ?? (item.media_type as string);
       if (type !== "movie" && type !== "tv") return item;
 
@@ -559,8 +568,19 @@ async function enrichWithImages(
         (item.poster_path as string | undefined);
 
       return { ...item, logo, noLogoPoster, thumbnail };
-    })
-  );
+    } catch {
+      return item;
+    }
+  };
+
+  const CONCURRENCY = 5;
+  const results: Record<string, unknown>[] = [];
+  for (let i = 0; i < items.length; i += CONCURRENCY) {
+    const batch = items.slice(i, i + CONCURRENCY);
+    const batchResults = await Promise.all(batch.map(enrichOne));
+    results.push(...batchResults);
+  }
+  return results;
 }
 
 tmdbApp.get("/trending/all", async (c) => {
@@ -603,12 +623,11 @@ tmdbApp.get("/trending/movie", async (c) => {
     return c.json({ error: result.error }, 500);
   }
   if (page === 1 && result.data?.results?.length) {
-    const enriched = await enrichWithImages(
-      result.data.results as Record<string, unknown>[],
-      language,
-      "movie"
-    );
-    return c.json({ ...result.data, results: enriched });
+    const results = result.data.results as Record<string, unknown>[];
+    const top = results.slice(0, 10);
+    const rest = results.slice(10);
+    const enriched = await enrichWithImages(top, language, "movie");
+    return c.json({ ...result.data, results: [...enriched, ...rest] });
   }
   return c.json(result.data);
 });
