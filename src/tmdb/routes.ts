@@ -340,6 +340,26 @@ tmdbApp.get("/tv/images", async (c) => {
   return c.json(result.data);
 });
 
+tmdbApp.get("/tv/season/images", async (c) => {
+  const id = c.req.query("id") || "";
+  const seasonNumber = c.req.query("seasonNumber") || "";
+  const result = await tmdb.GET(
+    `/3/tv/${Number(id)}/season/${Number(seasonNumber)}/images`,
+    {
+      params: {
+        path: {
+          series_id: Number(id),
+          season_number: Number(seasonNumber),
+        },
+      },
+    }
+  );
+  if (result.response.status !== 200) {
+    return c.json({ error: result.error }, 500);
+  }
+  return c.json(result.data);
+});
+
 tmdbApp.get("/tv/season/details", async (c) => {
   const id = c.req.query("id") || "";
   const seasonNumber = c.req.query("seasonNumber") || "";
