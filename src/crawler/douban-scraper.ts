@@ -7,9 +7,12 @@ export interface DoubanItem {
 }
 
 const DOUBAN_API_BASE = "https://m.douban.com/rexxar/api/v2/subject_collection";
+const DOUBAN_RECENT_HOT_MOVIE =
+  "https://m.douban.com/rexxar/api/v2/subject/recent_hot/movie";
+const DOUBAN_RECENT_HOT_TV =
+  "https://m.douban.com/rexxar/api/v2/subject/recent_hot/tv";
 const DOUBAN_NEW_SEARCH_SUBJECTS =
   "https://movie.douban.com/j/new_search_subjects";
-const DOUBAN_SEARCH_SUBJECTS = "https://movie.douban.com/j/search_subjects";
 
 const HEADERS = {
   "User-Agent":
@@ -36,8 +39,8 @@ interface NewSearchSubjectsResponse {
   }>;
 }
 
-interface SearchSubjectsResponse {
-  subjects?: Array<{
+interface RecentHotListResponse {
+  items?: Array<{
     title: string;
   }>;
 }
@@ -70,49 +73,6 @@ async function fetchDoubanCollection(
     }));
   } catch (error) {
     console.error("Error fetching Douban:", error);
-    return [];
-  }
-}
-
-/**
- * Listing from movie.douban.com/j/search_subjects (选电影/选剧集「热门」等).
- */
-async function fetchDoubanSearchSubjects(options: {
-  type: "movie" | "tv";
-  tag: string;
-  referer: string;
-  pageLimit?: number;
-  pageStart?: number;
-}): Promise<DoubanItem[]> {
-  const { type, tag, referer, pageLimit = 20, pageStart = 0 } = options;
-  try {
-    const params = new URLSearchParams({
-      type,
-      tag,
-      page_limit: String(pageLimit),
-      page_start: String(pageStart),
-    });
-    const url = `${DOUBAN_SEARCH_SUBJECTS}?${params.toString()}`;
-    const response = await fetch(url, {
-      headers: {
-        ...MOVIE_WEB_HEADERS,
-        Referer: referer,
-      },
-    });
-
-    if (!response.ok) {
-      console.error(`Douban search_subjects error: ${response.status}`);
-      return [];
-    }
-
-    const data = (await response.json()) as SearchSubjectsResponse;
-    const items = data.subjects || [];
-
-    return items.map((item) => ({
-      title: item.title.split(" ")[0],
-    }));
-  } catch (error) {
-    console.error("Error fetching Douban search_subjects:", error);
     return [];
   }
 }
@@ -163,27 +123,62 @@ async function fetchDoubanNewSearchSubjects(options: {
   }
 }
 
+async function fetchDoubanRecentHot(options: {
+  kind: "movie" | "tv";
+  query: Record<string, string>;
+}): Promise<DoubanItem[]> {
+  const base =
+    options.kind === "movie" ? DOUBAN_RECENT_HOT_MOVIE : DOUBAN_RECENT_HOT_TV;
+  try {
+    const params = new URLSearchParams({
+      start: "0",
+      limit: "20",
+      ...options.query,
+    });
+    const url = `${base}?${params.toString()}`;
+    const response = await fetch(url, {
+      headers: {
+        ...HEADERS,
+        Referer: "https://m.douban.com/",
+      },
+    });
+
+    if (!response.ok) {
+      console.error(
+        `Douban recent_hot/${options.kind} error: ${response.status}`
+      );
+      return [];
+    }
+
+    const data = (await response.json()) as RecentHotListResponse;
+    const items = data.items || [];
+
+    return items.map((item) => ({
+      title: item.title.split(" ")[0],
+    }));
+  } catch (error) {
+    console.error(`Error fetching Douban recent_hot/${options.kind}:`, error);
+    return [];
+  }
+}
+
 /**
- * Hot movies: 选电影 explore — 热门 + 全部 (not 华语).
- * Same listing as /j/search_subjects?type=movie&tag=热门
+ * Hot movies: m.douban rexxar recent_hot (热门 + 华语).
  */
 export async function fetchDoubanHotMovies(): Promise<DoubanItem[]> {
-  return await fetchDoubanSearchSubjects({
-    type: "movie",
-    tag: "热门",
-    referer:
-      "https://movie.douban.com/explore?support_type=movie&is_all=false&category=%E7%83%AD%E9%97%A8&type=%E5%85%A8%E9%83%A8",
+  return fetchDoubanRecentHot({
+    kind: "movie",
+    query: { category: "热门", type: "华语" },
   });
 }
 
 /**
- * Hot TV (实时热门电视剧/剧集): 选剧集 + tag 热门.
+ * Domestic TV dramas: m.douban rexxar recent_hot (国产剧 tab).
  */
 export async function fetchDoubanHotTVSeries(): Promise<DoubanItem[]> {
-  return await fetchDoubanSearchSubjects({
-    type: "tv",
-    tag: "热门",
-    referer: "https://movie.douban.com/tv/",
+  return fetchDoubanRecentHot({
+    kind: "tv",
+    query: { category: "tv", type: "tv_domestic" },
   });
 }
 
