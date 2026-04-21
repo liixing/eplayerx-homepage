@@ -21,6 +21,25 @@ import {
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+/** TMDB TV genre id for Animation (see /3/genre/tv/list). */
+const TMDB_TV_GENRE_ANIMATION = 16;
+
+interface SearchTmdbOptions {
+  language?: string;
+  /**
+   * TV search: use first result that includes all of these genre ids (e.g. Animation only).
+   */
+  requireTvGenreIds?: number[];
+}
+
+/** Align stored title + TMDB query when source uses alternate naming (e.g. 年番 suffix). */
+function resolveAnimationTitle(title: string): string {
+  if (title === "凡人修仙传年番") {
+    return "凡人修仙传";
+  }
+  return title;
+}
+
 interface ImageMeta {
   thumb: string | null;
   logo: string | null;
@@ -118,8 +137,9 @@ function deduplicateByTmdbId(items: ContentItem[]): ContentItem[] {
 async function searchTMDB(
   title: string,
   type: "movie" | "tv",
-  language = "zh-CN"
+  options: SearchTmdbOptions = {}
 ) {
+  const language = options.language ?? "zh-CN";
   try {
     const path = type === "movie" ? "/3/search/movie" : "/3/search/tv";
     const result = await tmdb.GET(path, {
@@ -131,10 +151,23 @@ async function searchTMDB(
       },
     });
 
-    if (result.data?.results?.[0]) {
-      return result.data.results[0];
+    const results = result.data?.results ?? [];
+    if (results.length === 0) {
+      return null;
     }
-    return null;
+
+    if (type === "tv" && options.requireTvGenreIds?.length) {
+      const need = options.requireTvGenreIds;
+      for (const r of results) {
+        const gids = (r as { genre_ids?: number[] }).genre_ids ?? [];
+        if (need.every((id) => gids.includes(id))) {
+          return r;
+        }
+      }
+      return null;
+    }
+
+    return results[0];
   } catch (error) {
     console.error(`TMDB search error for "${title}":`, error);
     return null;
@@ -275,9 +308,12 @@ export async function crawlDoubanAnimation() {
   const results: ContentItem[] = [];
 
   for (const item of items) {
-    console.log(`🔍 Searching: ${item.title}`);
+    const title = resolveAnimationTitle(item.title);
+    console.log(`🔍 Searching: ${title}`);
 
-    const tmdbData = await searchTMDB(item.title, "tv");
+    const tmdbData = await searchTMDB(title, "tv", {
+      requireTvGenreIds: [TMDB_TV_GENRE_ANIMATION],
+    });
 
     if (tmdbData) {
       const tmdbId = tmdbData.id as number;
@@ -289,7 +325,7 @@ export async function crawlDoubanAnimation() {
       );
 
       results.push({
-        title: item.title,
+        title,
         tmdbId,
         vote_average: tmdbData.vote_average,
         poster_path: tmdbData.poster_path,
@@ -305,7 +341,7 @@ export async function crawlDoubanAnimation() {
       });
       console.log(`✅ ${tmdbId}`);
     } else {
-      console.log(`❌ Not found`);
+      console.log(`❌ Not found (Animation genre)`);
     }
 
     await delay(300);
@@ -397,9 +433,12 @@ export async function crawlBangumiAnimation() {
   const results: ContentItem[] = [];
 
   for (const item of items) {
-    console.log(`🔍 Searching: ${item.title}`);
+    const title = resolveAnimationTitle(item.title);
+    console.log(`🔍 Searching: ${title}`);
 
-    const tmdbData = await searchTMDB(item.title, "tv");
+    const tmdbData = await searchTMDB(title, "tv", {
+      requireTvGenreIds: [TMDB_TV_GENRE_ANIMATION],
+    });
 
     if (tmdbData) {
       const tmdbId = tmdbData.id as number;
@@ -411,7 +450,7 @@ export async function crawlBangumiAnimation() {
       );
 
       results.push({
-        title: item.title,
+        title,
         tmdbId,
         vote_average: tmdbData.vote_average,
         poster_path: tmdbData.poster_path,
@@ -427,7 +466,7 @@ export async function crawlBangumiAnimation() {
       });
       console.log(`✅ ${tmdbId}`);
     } else {
-      console.log(`❌ Not found`);
+      console.log(`❌ Not found (Animation genre)`);
     }
 
     await delay(300);
