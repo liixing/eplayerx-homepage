@@ -1,4 +1,4 @@
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { tmdb } from "./client.js";
 
 const tmdbApp = new Hono();
@@ -6,81 +6,34 @@ const tmdbApp = new Hono();
 const TMDB_IMAGE_CACHE_CONTROL =
   "public, max-age=31536000, s-maxage=31536000, immutable";
 
-// Movie sort_by type and validation
-type MovieSortBy =
-  | "original_title.asc"
-  | "original_title.desc"
-  | "popularity.asc"
-  | "popularity.desc"
-  | "revenue.asc"
-  | "revenue.desc"
-  | "primary_release_date.asc"
-  | "title.asc"
-  | "title.desc"
-  | "primary_release_date.desc"
-  | "vote_average.asc"
-  | "vote_average.desc"
-  | "vote_count.asc"
-  | "vote_count.desc";
+async function proxyTmdbDiscover(c: Context, path: string) {
+  if (!process.env.TMDB_API_TOKEN) {
+    throw new Error("TMDB_API_TOKEN is not set");
+  }
 
-const VALID_MOVIE_SORT_BY_VALUES: readonly MovieSortBy[] = [
-  "original_title.asc",
-  "original_title.desc",
-  "popularity.asc",
-  "popularity.desc",
-  "revenue.asc",
-  "revenue.desc",
-  "primary_release_date.asc",
-  "title.asc",
-  "title.desc",
-  "primary_release_date.desc",
-  "vote_average.asc",
-  "vote_average.desc",
-  "vote_count.asc",
-  "vote_count.desc",
-] as const;
-
-function isValidMovieSortBy(value: string | undefined): value is MovieSortBy {
-  return (
-    value !== undefined &&
-    VALID_MOVIE_SORT_BY_VALUES.includes(value as MovieSortBy)
+  const requestUrl = new URL(c.req.url);
+  const upstream = new URL(
+    path,
+    process.env.PUBLIC_TMDB_API_BASE_URL || "https://api.themoviedb.org"
   );
-}
 
-// TV sort_by type and validation
-type TvSortBy =
-  | "popularity.asc"
-  | "popularity.desc"
-  | "vote_average.asc"
-  | "vote_average.desc"
-  | "vote_count.asc"
-  | "vote_count.desc"
-  | "first_air_date.asc"
-  | "first_air_date.desc"
-  | "name.asc"
-  | "name.desc"
-  | "original_name.asc"
-  | "original_name.desc";
+  for (const [key, value] of requestUrl.searchParams.entries()) {
+    upstream.searchParams.append(key, value);
+  }
 
-const VALID_TV_SORT_BY_VALUES: readonly TvSortBy[] = [
-  "popularity.asc",
-  "popularity.desc",
-  "vote_average.asc",
-  "vote_average.desc",
-  "vote_count.asc",
-  "vote_count.desc",
-  "first_air_date.asc",
-  "first_air_date.desc",
-  "name.asc",
-  "name.desc",
-  "original_name.asc",
-  "original_name.desc",
-] as const;
+  const response = await fetch(upstream, {
+    headers: {
+      accept: "application/json",
+      Authorization: `Bearer ${process.env.TMDB_API_TOKEN}`,
+    },
+  });
+  const data = await response.json().catch(() => null);
 
-function isValidTvSortBy(value: string | undefined): value is TvSortBy {
-  return (
-    value !== undefined && VALID_TV_SORT_BY_VALUES.includes(value as TvSortBy)
-  );
+  if (!response.ok) {
+    return c.json({ error: data }, 500);
+  }
+
+  return c.json(data);
 }
 
 tmdbApp.get("/search/keyword", async (c) => {
@@ -667,88 +620,11 @@ tmdbApp.get("/trending/tv", async (c) => {
 });
 
 tmdbApp.get("/discover/movie", async (c) => {
-  const language = c.req.query("language") || "en";
-  const page = Number.parseInt(c.req.query("page") || "1");
-  const with_genres = c.req.query("with_genres");
-  const without_genres = c.req.query("without_genres");
-  const with_networks = c.req.query("with_networks");
-  const with_original_language = c.req.query("with_original_language");
-  const sortByQuery = c.req.query("sort_by");
-
-  if (sortByQuery && !isValidMovieSortBy(sortByQuery)) {
-    return c.json(
-      {
-        error: `Invalid sort_by value. Allowed values: ${VALID_MOVIE_SORT_BY_VALUES.join(
-          ", "
-        )}`,
-      },
-      400
-    );
-  }
-
-  const sort_by = sortByQuery as MovieSortBy | undefined;
-  const result = await tmdb.GET("/3/discover/movie", {
-    params: {
-      query: {
-        language,
-        page,
-        sort_by,
-        with_genres,
-        without_genres,
-        with_networks,
-        with_original_language,
-        "vote_average.lte": 10,
-      },
-    },
-  });
-  if (result.response.status !== 200) {
-    return c.json({ error: result.error }, 500);
-  }
-  return c.json(result.data);
+  return proxyTmdbDiscover(c, "/3/discover/movie");
 });
 
 tmdbApp.get("/discover/tv", async (c) => {
-  const language = c.req.query("language") || "en";
-  const page = Number.parseInt(c.req.query("page") || "1");
-  const with_genres = c.req.query("with_genres");
-  const without_genres = c.req.query("without_genres");
-  const with_networks_query = c.req.query("with_networks");
-  const with_networks = with_networks_query
-    ? Number.parseInt(with_networks_query)
-    : undefined;
-  const with_original_language = c.req.query("with_original_language") || "";
-  const sortByQuery = c.req.query("sort_by");
-
-  if (sortByQuery && !isValidTvSortBy(sortByQuery)) {
-    return c.json(
-      {
-        error: `Invalid sort_by value. Allowed values: ${VALID_TV_SORT_BY_VALUES.join(
-          ", "
-        )}`,
-      },
-      400
-    );
-  }
-
-  const sort_by = sortByQuery as TvSortBy | undefined;
-  const result = await tmdb.GET("/3/discover/tv", {
-    params: {
-      query: {
-        language,
-        page,
-        sort_by,
-        with_genres,
-        without_genres,
-        with_networks,
-        with_original_language,
-        "vote_average.lte": 10,
-      },
-    },
-  });
-  if (result.response.status !== 200) {
-    return c.json({ error: result.error }, 500);
-  }
-  return c.json(result.data);
+  return proxyTmdbDiscover(c, "/3/discover/tv");
 });
 
 tmdbApp.get("/person/details", async (c) => {
