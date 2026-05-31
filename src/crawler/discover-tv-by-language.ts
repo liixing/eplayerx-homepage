@@ -18,6 +18,10 @@ const LANGUAGES = [
   { code: "es", name: "Spanish" },
   { code: "th", name: "Thai" },
   { code: "hi", name: "Hindi" },
+  { code: "tr", name: "Turkish" },
+  { code: "ar", name: "Arabic" },
+  { code: "fr", name: "French" },
+  { code: "it", name: "Italian" },
 ] as const;
 
 /**
