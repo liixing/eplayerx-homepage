@@ -36,19 +36,7 @@ type TmdbListRoute = {
   };
 };
 
-type SourceListRoute = {
-  type: "source-list";
-  title: string;
-  mediaType: "movie" | "tv";
-  source: {
-    path: string;
-    query?: Record<string, SourceQueryValue>;
-    itemEnvelope?: "data" | "results" | "array";
-    pagination?: HomePagination;
-  };
-};
-
-type HomeRoute = TmdbListRoute | SourceListRoute;
+type TmdbListRouteParams = TmdbListRoute["params"];
 
 interface HomeBlockSource {
   id?: string;
@@ -70,7 +58,7 @@ interface HomeBlock {
   metadata?: {
     isAnime?: boolean;
   };
-  route?: HomeRoute;
+  route?: TmdbListRoute;
 }
 
 type HomeBlockTemplate = Omit<HomeBlock, "title"> & {
@@ -208,6 +196,26 @@ const TITLE_TRANSLATIONS: Record<HomeTitleKey, Record<Locale, string>> = {
     ar: "المسلسلات الأعلى تقييماً",
   },
 };
+
+const TMDB_LIST_ROUTE_PARAMS: Partial<Record<string, TmdbListRouteParams>> = {
+  "tmdb-popular-tv-shows": {
+    category: "trending",
+    type: "tv",
+  },
+  "tmdb-popular-movies": {
+    category: "trending",
+    type: "movie",
+  },
+  "tmdb-top-rated-movies": {
+    category: "top-rated",
+    type: "movie",
+  },
+  "tmdb-top-rated-tv-shows": {
+    category: "top-rated",
+    type: "tv",
+  },
+};
+
 function resolveLocale(language: string): Locale {
   const normalized = language.toLowerCase();
   if (
@@ -230,30 +238,12 @@ function resolveTitle(titleKey: HomeTitleKey, language: string): string {
 
 function createTmdbListRoute(
   title: string,
-  params: TmdbListRoute["params"]
+  params: TmdbListRouteParams
 ): TmdbListRoute {
   return {
     type: "tmdb-list",
     title,
     params,
-  };
-}
-
-function createSourceListRoute(
-  title: string,
-  block: HomeBlock
-): SourceListRoute | undefined {
-  if (!block.source?.path || !block.mediaType) return undefined;
-  return {
-    type: "source-list",
-    title,
-    mediaType: block.mediaType,
-    source: {
-      path: block.source.path,
-      query: block.source.query,
-      itemEnvelope: block.source.itemEnvelope,
-      pagination: block.source.pagination,
-    },
   };
 }
 
@@ -453,45 +443,13 @@ function resolveBlockTitle(
   const { titleKey, ...rest } = block;
   if (!titleKey) return rest;
   const title = resolveTitle(titleKey, language);
-  const resolved: HomeBlock = {
+  const routeParams = TMDB_LIST_ROUTE_PARAMS[rest.id];
+
+  return {
     ...rest,
     title,
+    ...(routeParams ? { route: createTmdbListRoute(title, routeParams) } : {}),
   };
-
-  switch (resolved.id) {
-    case "tmdb-popular-tv-shows":
-      resolved.route = createTmdbListRoute(title, {
-        category: "trending",
-        type: "tv",
-      });
-      break;
-    case "tmdb-popular-movies":
-      resolved.route = createTmdbListRoute(title, {
-        category: "trending",
-        type: "movie",
-      });
-      break;
-    case "tmdb-top-rated-movies":
-      resolved.route = createTmdbListRoute(title, {
-        category: "top-rated",
-        type: "movie",
-      });
-      break;
-    case "tmdb-top-rated-tv-shows":
-      resolved.route = createTmdbListRoute(title, {
-        category: "top-rated",
-        type: "tv",
-      });
-      break;
-    case "tmdb-discover-genres":
-    case "tmdb-discover-tv-by-language":
-    case "tmdb-discover-networks":
-      break;
-    default:
-      resolved.route = createSourceListRoute(title, resolved);
-  }
-
-  return resolved;
 }
 
 export function createDefaultHomeConfig(
