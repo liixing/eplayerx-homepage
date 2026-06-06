@@ -18,11 +18,45 @@ type HomeTitleKey =
 
 type SourceQueryValue = string | number | boolean;
 
+interface HomePagination {
+  pageParam: string;
+  startPage: number;
+}
+
+type TmdbListRoute = {
+  type: "tmdb-list";
+  title: string;
+  params: {
+    category: "trending" | "top-rated" | "discover";
+    type: "movie" | "tv";
+    genre?: string;
+    language?: string;
+    network?: string;
+    networkName?: string;
+  };
+};
+
+type SourceListRoute = {
+  type: "source-list";
+  title: string;
+  mediaType: "movie" | "tv";
+  source: {
+    path: string;
+    query?: Record<string, SourceQueryValue>;
+    itemEnvelope?: "data" | "results" | "array";
+    pagination?: HomePagination;
+  };
+};
+
+type HomeRoute = TmdbListRoute | SourceListRoute;
+
 interface HomeBlockSource {
   id?: string;
   path?: string;
   query?: Record<string, SourceQueryValue>;
   haveInfinity?: boolean;
+  itemEnvelope?: "data" | "results" | "array";
+  pagination?: HomePagination;
 }
 
 interface HomeBlock {
@@ -33,6 +67,10 @@ interface HomeBlock {
   showRank?: boolean;
   showOverview?: boolean;
   source?: HomeBlockSource;
+  metadata?: {
+    isAnime?: boolean;
+  };
+  route?: HomeRoute;
 }
 
 type HomeBlockTemplate = Omit<HomeBlock, "title"> & {
@@ -50,6 +88,7 @@ export interface DefaultHomeConfig {
   version: number;
   apiBaseUrl: string;
   imageBaseUrl: string;
+  carouselSourceId: string;
   blocks: HomeBlock[];
 }
 
@@ -189,6 +228,35 @@ function resolveTitle(titleKey: HomeTitleKey, language: string): string {
   return TITLE_TRANSLATIONS[titleKey][resolveLocale(language)];
 }
 
+function createTmdbListRoute(
+  title: string,
+  params: TmdbListRoute["params"]
+): TmdbListRoute {
+  return {
+    type: "tmdb-list",
+    title,
+    params,
+  };
+}
+
+function createSourceListRoute(
+  title: string,
+  block: HomeBlock
+): SourceListRoute | undefined {
+  if (!block.source?.path || !block.mediaType) return undefined;
+  return {
+    type: "source-list",
+    title,
+    mediaType: block.mediaType,
+    source: {
+      path: block.source.path,
+      query: block.source.query,
+      itemEnvelope: block.source.itemEnvelope,
+      pagination: block.source.pagination,
+    },
+  };
+}
+
 function createDefaultBlockTemplates(
   language: string,
   timezone: string
@@ -208,6 +276,11 @@ function createDefaultBlockTemplates(
           limit: 20,
         },
         haveInfinity: true,
+        itemEnvelope: "results",
+        pagination: {
+          pageParam: "page",
+          startPage: 1,
+        },
       },
     },
     {
@@ -223,6 +296,11 @@ function createDefaultBlockTemplates(
           page: 1,
         },
         haveInfinity: true,
+        itemEnvelope: "results",
+        pagination: {
+          pageParam: "page",
+          startPage: 1,
+        },
       },
     },
     {
@@ -232,7 +310,9 @@ function createDefaultBlockTemplates(
       preset: "thumb-list",
       source: {
         path: "/crawler/popular/douban/animation",
+        itemEnvelope: "data",
       },
+      metadata: { isAnime: true },
     },
     {
       id: "bangumi-popular-anime",
@@ -241,7 +321,9 @@ function createDefaultBlockTemplates(
       preset: "thumb-list",
       source: {
         path: "/crawler/popular/bangumi/animation",
+        itemEnvelope: "data",
       },
+      metadata: { isAnime: true },
     },
     {
       id: "tmdb-on-the-air-tv-shows",
@@ -254,6 +336,7 @@ function createDefaultBlockTemplates(
           language,
           timezone,
         },
+        itemEnvelope: "results",
       },
     },
     {
@@ -263,6 +346,7 @@ function createDefaultBlockTemplates(
       preset: "thumb-list",
       source: {
         path: "/crawler/popular/douban/tv",
+        itemEnvelope: "data",
       },
       showOverview: true,
     },
@@ -273,6 +357,7 @@ function createDefaultBlockTemplates(
       preset: "thumb-list",
       source: {
         path: "/crawler/popular/douban/movies",
+        itemEnvelope: "data",
       },
       showOverview: true,
     },
@@ -283,6 +368,7 @@ function createDefaultBlockTemplates(
       preset: "thumb-list",
       source: {
         path: "/crawler/popular/douban/hot-variety-shows",
+        itemEnvelope: "data",
       },
       showOverview: true,
     },
@@ -295,6 +381,7 @@ function createDefaultBlockTemplates(
         query: {
           language,
         },
+        itemEnvelope: "data",
       },
     },
     {
@@ -303,6 +390,10 @@ function createDefaultBlockTemplates(
       preset: "languages-list",
       source: {
         path: "/crawler/discover/tv-by-language",
+        query: {
+          language,
+        },
+        itemEnvelope: "data",
       },
     },
     {
@@ -311,6 +402,7 @@ function createDefaultBlockTemplates(
       preset: "networks-list",
       source: {
         path: "/crawler/discover/tv-by-network",
+        itemEnvelope: "data",
       },
     },
     {
@@ -324,6 +416,11 @@ function createDefaultBlockTemplates(
           language,
           page: 1,
           limit: 20,
+        },
+        itemEnvelope: "results",
+        pagination: {
+          pageParam: "page",
+          startPage: 1,
         },
       },
     },
@@ -339,6 +436,11 @@ function createDefaultBlockTemplates(
           page: 1,
           limit: 20,
         },
+        itemEnvelope: "results",
+        pagination: {
+          pageParam: "page",
+          startPage: 1,
+        },
       },
     },
   ];
@@ -350,11 +452,46 @@ function resolveBlockTitle(
 ): HomeBlock {
   const { titleKey, ...rest } = block;
   if (!titleKey) return rest;
-
-  return {
+  const title = resolveTitle(titleKey, language);
+  const resolved: HomeBlock = {
     ...rest,
-    title: resolveTitle(titleKey, language),
+    title,
   };
+
+  switch (resolved.id) {
+    case "tmdb-popular-tv-shows":
+      resolved.route = createTmdbListRoute(title, {
+        category: "trending",
+        type: "tv",
+      });
+      break;
+    case "tmdb-popular-movies":
+      resolved.route = createTmdbListRoute(title, {
+        category: "trending",
+        type: "movie",
+      });
+      break;
+    case "tmdb-top-rated-movies":
+      resolved.route = createTmdbListRoute(title, {
+        category: "top-rated",
+        type: "movie",
+      });
+      break;
+    case "tmdb-top-rated-tv-shows":
+      resolved.route = createTmdbListRoute(title, {
+        category: "top-rated",
+        type: "tv",
+      });
+      break;
+    case "tmdb-discover-genres":
+    case "tmdb-discover-tv-by-language":
+    case "tmdb-discover-networks":
+      break;
+    default:
+      resolved.route = createSourceListRoute(title, resolved);
+  }
+
+  return resolved;
 }
 
 export function createDefaultHomeConfig(
@@ -364,6 +501,7 @@ export function createDefaultHomeConfig(
     version: HOME_CONFIG_VERSION,
     apiBaseUrl: options.apiBaseUrl,
     imageBaseUrl: options.imageBaseUrl,
+    carouselSourceId: "tmdb-popular-tv-shows",
     blocks: createDefaultBlockTemplates(options.language, options.timezone).map(
       (block) => resolveBlockTitle(block, options.language)
     ),

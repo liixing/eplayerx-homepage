@@ -13,9 +13,24 @@ const app = new Hono();
 
 type Locale = "en" | "zh" | "zh-Hant" | "ja" | "es" | "ar";
 
+interface TmdbListRoute {
+  type: "tmdb-list";
+  title: string;
+  params: {
+    category: "discover";
+    type: "movie" | "tv";
+    genre?: string;
+    language?: string;
+    network?: string;
+    networkName?: string;
+  };
+}
+
 interface DiscoverTVByLanguageItem {
   language: string;
   languageName?: string;
+  title?: string;
+  route?: TmdbListRoute;
   id: number;
   name?: string;
   original_name?: string;
@@ -49,12 +64,28 @@ interface DiscoverGenreItem {
   id: string;
   title: string;
   imageUri: string;
+  route: TmdbListRoute;
 }
 
 interface DiscoverGenresResponse {
   type: "discover_genres";
   count: number;
   data: DiscoverGenreItem[];
+}
+
+interface DiscoverTVByNetworkItem {
+  networkId: number;
+  networkName: string;
+  title?: string;
+  route?: TmdbListRoute;
+  [key: string]: unknown;
+}
+
+interface DiscoverTVByNetworkResponse {
+  type?: string;
+  count?: number;
+  lastUpdated?: string;
+  data?: DiscoverTVByNetworkItem[];
 }
 
 const LANGUAGE_NAME_TRANSLATIONS: Record<string, Record<Locale, string>> = {
@@ -226,6 +257,17 @@ const GENRE_ITEMS: { id: string; key: GenreKey; imageName: string }[] = [
   { id: "10751", key: "kids", imageName: "Kid.png" },
 ];
 
+function createTmdbListRoute(
+  title: string,
+  params: TmdbListRoute["params"]
+): TmdbListRoute {
+  return {
+    type: "tmdb-list",
+    title,
+    params,
+  };
+}
+
 function resolveLocale(language: string): Locale {
   const normalized = language.toLowerCase();
   if (
@@ -251,13 +293,22 @@ function localizeDiscoverTVByLanguage(
   payload: DiscoverTVByLanguageResponse,
   locale: Locale
 ): DiscoverTVByLanguageResponse {
-  const data = (payload.data ?? []).map((item) => ({
-    ...item,
-    languageName:
+  const data = (payload.data ?? []).map((item) => {
+    const title =
       LANGUAGE_NAME_TRANSLATIONS[item.language]?.[locale] ||
       item.languageName ||
-      item.language,
-  }));
+      item.language;
+    return {
+      ...item,
+      languageName: title,
+      title,
+      route: createTmdbListRoute(title, {
+        category: "discover",
+        type: "movie",
+        language: item.language,
+      }),
+    };
+  });
 
   return {
     ...payload,
@@ -267,11 +318,19 @@ function localizeDiscoverTVByLanguage(
 }
 
 function createDiscoverGenres(locale: Locale): DiscoverGenresResponse {
-  const data = GENRE_ITEMS.map((item) => ({
-    id: item.id,
-    title: GENRE_TRANSLATIONS[item.key][locale],
-    imageUri: `https://${R2_CUSTOM_DOMAIN}/genres/${item.imageName}`,
-  }));
+  const data = GENRE_ITEMS.map((item) => {
+    const title = GENRE_TRANSLATIONS[item.key][locale];
+    return {
+      id: item.id,
+      title,
+      imageUri: `https://${R2_CUSTOM_DOMAIN}/genres/${item.imageName}`,
+      route: createTmdbListRoute(title, {
+        category: "discover",
+        type: "movie",
+        genre: item.id,
+      }),
+    };
+  });
 
   return {
     type: "discover_genres",
@@ -442,15 +501,38 @@ app.get("/discover/tv-by-language", async (c) => {
   return c.json(localizeDiscoverTVByLanguage(payload, locale));
 });
 
-app.get("/discover/tv-by-network", async (_c) => {
+app.get("/discover/tv-by-network", async (c) => {
   const url = `https://${R2_CUSTOM_DOMAIN}/discover-tv-by-network.json`;
   const response = await fetch(url);
-  return new Response(response.body, {
-    status: response.status,
-    headers: {
-      "Content-Type":
-        response.headers.get("Content-Type") || "application/json",
-    },
+  if (!response.ok) {
+    return new Response(response.body, {
+      status: response.status,
+      headers: {
+        "Content-Type":
+          response.headers.get("Content-Type") || "application/json",
+      },
+    });
+  }
+
+  const payload = (await response.json()) as DiscoverTVByNetworkResponse;
+  const data = (payload.data ?? []).map((item) => {
+    const title = item.networkName || String(item.networkId);
+    return {
+      ...item,
+      title,
+      route: createTmdbListRoute(title, {
+        category: "discover",
+        type: "tv",
+        network: String(item.networkId),
+        networkName: title,
+      }),
+    };
+  });
+
+  return c.json({
+    ...payload,
+    count: payload.count ?? data.length,
+    data,
   });
 });
 
