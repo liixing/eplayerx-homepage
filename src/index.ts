@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import crawlerApp from "./crawler/index.js";
+import homeApp from "./home/index.js";
 import tmdbApp from "./tmdb/index.js";
 
 const app = new Hono();
@@ -19,5 +20,8 @@ app.route("/tmdb", tmdbApp);
 
 // Mount Crawler routes
 app.route("/crawler", crawlerApp);
+
+// Mount Home routes
+app.route("/home", homeApp);
 
 export default app;
