@@ -35,10 +35,18 @@ function normalizeTitle(value: string): string {
 
 function extractTitles(html: string): HamiItem[] {
   const titles = new Set<string>();
-  const h3Matches = html.matchAll(/<h3[^>]*>([\s\S]*?)<\/h3>/gi);
+  const itemMatches = html.matchAll(
+    /<div class="list_item"[\s\S]*?(?=<div class="list_item"|$)/gi
+  );
 
-  for (const match of h3Matches) {
-    const title = normalizeTitle(match[1] || "");
+  for (const match of itemMatches) {
+    const itemHtml = match[0];
+    if (/更新至第\s*0\s*集/.test(itemHtml)) {
+      continue;
+    }
+
+    const titleMatch = itemHtml.match(/<h3[^>]*>([\s\S]*?)<\/h3>/i);
+    const title = normalizeTitle(titleMatch?.[1] || "");
     if (!title || title.includes("{{")) {
       continue;
     }
