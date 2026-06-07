@@ -10,6 +10,10 @@ type HomeTitleKey =
   | "home.popular_tv_shows"
   | "home.popular_movies"
   | "home.popular_variety_shows"
+  | "home.popular_korean_tv_shows"
+  | "home.popular_japanese_tv_shows"
+  | "home.popular_spanish_tv_shows"
+  | "home.popular_taiwanese_tv_shows"
   | "home.tmdb_discover_genres"
   | "home.tmdb_discover_languages"
   | "home.tmdb_discover_networks"
@@ -42,7 +46,6 @@ interface HomeBlockSource {
   id?: string;
   path?: string;
   query?: Record<string, SourceQueryValue>;
-  haveInfinity?: boolean;
   itemEnvelope?: "data" | "results" | "array";
   pagination?: HomePagination;
 }
@@ -132,12 +135,12 @@ const TITLE_TRANSLATIONS: Record<HomeTitleKey, Record<Locale, string>> = {
     ar: "يعرض الآن",
   },
   "home.popular_tv_shows": {
-    en: "Trending TV Shows",
-    zh: "实时热门电视剧",
-    "zh-Hant": "實時熱門電視劇",
-    ja: "リアルタイム人気テレビ番組",
-    es: "Series de TV en Tendencia",
-    ar: "مسلسلات رائجة",
+    en: "Trending Domestic Dramas",
+    zh: "时下最热门的国产剧",
+    "zh-Hant": "時下最熱門的國產劇",
+    ja: "話題の中国ドラマ",
+    es: "Dramas Chinos en Tendencia",
+    ar: "دراما صينية رائجة",
   },
   "home.popular_movies": {
     en: "Trending Movies",
@@ -154,6 +157,38 @@ const TITLE_TRANSLATIONS: Record<HomeTitleKey, Record<Locale, string>> = {
     ja: "今日の人気バラエティ",
     es: "Programas de Variedades Populares de Hoy",
     ar: "برامج منوعة",
+  },
+  "home.popular_korean_tv_shows": {
+    en: "Popular Korean Dramas",
+    zh: "备受欢迎的韩剧推荐",
+    "zh-Hant": "備受歡迎的韓劇推薦",
+    ja: "人気の韓国ドラマ",
+    es: "Dramas Coreanos Populares",
+    ar: "دراما كورية شائعة",
+  },
+  "home.popular_japanese_tv_shows": {
+    en: "Trending Japanese Dramas",
+    zh: "近期最流行日剧榜单",
+    "zh-Hant": "近期最流行日劇榜單",
+    ja: "最近人気の日本ドラマ",
+    es: "Dramas Japoneses en Tendencia",
+    ar: "دراما يابانية رائجة",
+  },
+  "home.popular_spanish_tv_shows": {
+    en: "Trending Spanish-Language Series",
+    zh: "时下流行的西语剧集",
+    "zh-Hant": "時下流行的西語劇集",
+    ja: "話題のスペイン語シリーズ",
+    es: "Series en Español en Tendencia",
+    ar: "مسلسلات إسبانية رائجة",
+  },
+  "home.popular_taiwanese_tv_shows": {
+    en: "Popular Taiwanese Dramas",
+    zh: "台剧当然也不能落下",
+    "zh-Hant": "台劇當然也不能落下",
+    ja: "人気の台湾ドラマ",
+    es: "Dramas Taiwaneses Populares",
+    ar: "دراما تايوانية شائعة",
   },
   "home.tmdb_discover_genres": {
     en: "Browse By Category",
@@ -265,7 +300,6 @@ function createDefaultBlockTemplates(
           page: 1,
           limit: 20,
         },
-        haveInfinity: true,
         itemEnvelope: "results",
         pagination: {
           pageParam: "page",
@@ -285,7 +319,6 @@ function createDefaultBlockTemplates(
           language,
           page: 1,
         },
-        haveInfinity: true,
         itemEnvelope: "results",
         pagination: {
           pageParam: "page",
@@ -339,6 +372,56 @@ function createDefaultBlockTemplates(
         itemEnvelope: "data",
       },
       showOverview: true,
+    },
+    {
+      id: "douban-popular-korean-tv-shows",
+      mediaType: "tv",
+      titleKey: "home.popular_korean_tv_shows",
+      preset: "thumb-list",
+      source: {
+        path: "/crawler/popular/douban/korean-tv",
+        itemEnvelope: "data",
+      },
+    },
+    {
+      id: "douban-popular-japanese-tv-shows",
+      mediaType: "tv",
+      titleKey: "home.popular_japanese_tv_shows",
+      preset: "thumb-list",
+      source: {
+        path: "/crawler/popular/douban/japanese-tv",
+        itemEnvelope: "data",
+      },
+    },
+    {
+      id: "tmdb-popular-spanish-tv-shows",
+      mediaType: "tv",
+      titleKey: "home.popular_spanish_tv_shows",
+      preset: "thumb-list",
+      source: {
+        path: "/tmdb/discover/tv",
+        query: {
+          with_original_language: "es",
+          sort_by: "popularity.desc",
+          language,
+          page: 1,
+        },
+        itemEnvelope: "results",
+        pagination: {
+          pageParam: "page",
+          startPage: 1,
+        },
+      },
+    },
+    {
+      id: "hami-popular-taiwanese-tv-shows",
+      mediaType: "tv",
+      titleKey: "home.popular_taiwanese_tv_shows",
+      preset: "thumb-list",
+      source: {
+        path: "/crawler/popular/hami/taiwanese-tv",
+        itemEnvelope: "data",
+      },
     },
     {
       id: "douban-popular-movies",

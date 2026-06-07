@@ -10,6 +10,9 @@ import {
 
 const MOVIES_BLOB_KEY = "douban-movies.json";
 const TV_BLOB_KEY = "douban-tv.json";
+const KOREAN_TV_BLOB_KEY = "douban-korean-tv.json";
+const JAPANESE_TV_BLOB_KEY = "douban-japanese-tv.json";
+const HAMI_TAIWANESE_TV_BLOB_KEY = "hami-taiwanese-tv.json";
 const DOUBAN_ANIMATION_BLOB_KEY = "douban-animation.json";
 const HOT_VARIETY_SHOWS_BLOB_KEY = "douban-hot-variety-shows.json";
 const BANGUMI_ANIMATION_BLOB_KEY = "bangumi-animation.json";
@@ -172,6 +175,67 @@ export async function saveTVSeries(tvSeries: ContentItem[]) {
     }
     throw error;
   }
+}
+
+async function saveTVSeriesCollection(
+  key: string,
+  type: string,
+  tvSeries: ContentItem[],
+  platform = "douban"
+) {
+  if (!R2_BUCKET_NAME) {
+    throw new Error("R2_BUCKET_NAME is not configured");
+  }
+
+  const data: BlobData = {
+    platform,
+    type,
+    count: tvSeries.length,
+    lastUpdated: new Date().toISOString(),
+    data: tvSeries,
+  };
+  const command = new PutObjectCommand({
+    Bucket: R2_BUCKET_NAME,
+    Key: key,
+    Body: JSON.stringify(data, null, 2),
+    ContentType: "application/json",
+  });
+
+  try {
+    await r2Client.send(command);
+  } catch (error: any) {
+    if (error.$metadata?.httpStatusCode === 401) {
+      throw new Error(
+        "R2 authentication failed (401). Please check your R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY environment variables."
+      );
+    }
+    throw error;
+  }
+}
+
+export async function saveKoreanTVSeries(tvSeries: ContentItem[]) {
+  return saveTVSeriesCollection(
+    KOREAN_TV_BLOB_KEY,
+    "korean_tv_series",
+    tvSeries
+  );
+}
+
+export async function saveJapaneseTVSeries(tvSeries: ContentItem[]) {
+  return saveTVSeriesCollection(
+    JAPANESE_TV_BLOB_KEY,
+    "japanese_tv_series",
+    tvSeries
+  );
+}
+
+export async function saveHamiTaiwaneseTVSeries(tvSeries: ContentItem[]) {
+  return saveTVSeriesCollection(
+    HAMI_TAIWANESE_TV_BLOB_KEY,
+    "taiwanese_tv_series",
+    tvSeries,
+    "hami"
+  );
 }
 
 /**

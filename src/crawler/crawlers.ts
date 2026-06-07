@@ -9,12 +9,18 @@ import {
   fetchDoubanHotMovies,
   fetchDoubanHotTVSeries,
   fetchDoubanHotVarietyShows,
+  fetchDoubanJapaneseTVSeries,
+  fetchDoubanKoreanTVSeries,
 } from "./douban-scraper.js";
+import { fetchHamiTaiwaneseTVSeries } from "./hami-scraper.js";
 import {
   type ContentItem,
   saveBangumiAnimation,
   saveDoubanAnimation,
+  saveHamiTaiwaneseTVSeries,
   saveHotVarietyShows,
+  saveJapaneseTVSeries,
+  saveKoreanTVSeries,
   saveMovies,
   saveTVSeries,
 } from "./service.js";
@@ -30,6 +36,12 @@ interface SearchTmdbOptions {
    * TV search: use first result that includes all of these genre ids (e.g. Animation only).
    */
   requireTvGenreIds?: number[];
+}
+
+interface CrawlTVSeriesOptions {
+  label: string;
+  fetchItems: () => Promise<Array<{ title: string }>>;
+  saveItems: (items: ContentItem[]) => Promise<unknown>;
 }
 
 /** Align stored title + TMDB query when source uses alternate naming (e.g. 年番 suffix). */
@@ -141,7 +153,7 @@ async function searchTMDB(
 ) {
   const language = options.language ?? "zh-CN";
   try {
-    const path = type === "movie" ? "/3/search/movie" : "/3/search/tv";
+    const path = type === "movie" ? "/3/search/movie" : "/3/search/multi";
     const result = await tmdb.GET(path, {
       params: {
         query: {
@@ -151,7 +163,13 @@ async function searchTMDB(
       },
     });
 
-    const results = result.data?.results ?? [];
+    const rawResults = result.data?.results ?? [];
+    const results =
+      type === "tv"
+        ? rawResults.filter(
+            (item) => (item as { media_type?: string }).media_type === "tv"
+          )
+        : rawResults;
     if (results.length === 0) {
       return null;
     }
@@ -172,6 +190,64 @@ async function searchTMDB(
     console.error(`TMDB search error for "${title}":`, error);
     return null;
   }
+}
+
+async function crawlDoubanTVSeriesCollection(options: CrawlTVSeriesOptions) {
+  console.log(`📺 Crawling ${options.label}...`);
+
+  const items = await options.fetchItems();
+  console.log(`📥 Found ${items.length} ${options.label}`);
+
+  const results: ContentItem[] = [];
+
+  for (const item of items) {
+    console.log(`🔍 Searching: ${item.title}`);
+
+    const tmdbData = await searchTMDB(item.title, "tv");
+
+    if (tmdbData) {
+      const tmdbId = tmdbData.id as number;
+      const { thumb, logo, noLogoPoster } = await fetchImageMeta(
+        tmdbId,
+        "tv",
+        tmdbData.backdrop_path,
+        tmdbData.poster_path
+      );
+
+      results.push({
+        title: item.title,
+        tmdbId,
+        vote_average: tmdbData.vote_average,
+        poster_path: tmdbData.poster_path,
+        backdrop_path: tmdbData.backdrop_path,
+        genre_ids: tmdbData.genre_ids || [],
+        media_type: "tv",
+        first_air_date: (tmdbData as any).first_air_date,
+        overview: tmdbData?.overview,
+        thumb,
+        logo,
+        noLogoPoster,
+        crawledAt: new Date().toISOString(),
+      });
+      console.log(`✅ ${tmdbId}`);
+    } else {
+      console.log(`❌ Not found`);
+    }
+
+    await delay(300);
+  }
+
+  if (results.length > 0) {
+    const deduplicated = deduplicateByTmdbId(results);
+    await options.saveItems(deduplicated);
+    console.log(
+      `💾 Saved ${deduplicated.length} ${options.label} to JSON (${
+        results.length - deduplicated.length
+      } duplicates removed)\n`
+    );
+  }
+
+  return results;
 }
 
 /**
@@ -239,61 +315,35 @@ export async function crawlDoubanMovies() {
  * Crawl Douban TV series
  */
 export async function crawlDoubanTVSeries() {
-  console.log("📺 Crawling Douban TV series...");
+  return crawlDoubanTVSeriesCollection({
+    label: "Douban domestic TV series",
+    fetchItems: fetchDoubanHotTVSeries,
+    saveItems: saveTVSeries,
+  });
+}
 
-  const items = await fetchDoubanHotTVSeries();
-  console.log(`📥 Found ${items.length} TV series`);
+export async function crawlDoubanKoreanTVSeries() {
+  return crawlDoubanTVSeriesCollection({
+    label: "Douban Korean TV series",
+    fetchItems: fetchDoubanKoreanTVSeries,
+    saveItems: saveKoreanTVSeries,
+  });
+}
 
-  const results: ContentItem[] = [];
+export async function crawlDoubanJapaneseTVSeries() {
+  return crawlDoubanTVSeriesCollection({
+    label: "Douban Japanese TV series",
+    fetchItems: fetchDoubanJapaneseTVSeries,
+    saveItems: saveJapaneseTVSeries,
+  });
+}
 
-  for (const item of items) {
-    console.log(`🔍 Searching: ${item.title}`);
-
-    const tmdbData = await searchTMDB(item.title, "tv");
-
-    if (tmdbData) {
-      const tmdbId = tmdbData.id as number;
-      const { thumb, logo, noLogoPoster } = await fetchImageMeta(
-        tmdbId,
-        "tv",
-        tmdbData.backdrop_path,
-        tmdbData.poster_path
-      );
-
-      results.push({
-        title: item.title,
-        tmdbId,
-        vote_average: tmdbData.vote_average,
-        poster_path: tmdbData.poster_path,
-        backdrop_path: tmdbData.backdrop_path,
-        genre_ids: tmdbData.genre_ids || [],
-        media_type: "tv",
-        first_air_date: (tmdbData as any).first_air_date,
-        overview: tmdbData?.overview,
-        thumb,
-        logo,
-        noLogoPoster,
-        crawledAt: new Date().toISOString(),
-      });
-      console.log(`✅ ${tmdbId}`);
-    } else {
-      console.log(`❌ Not found`);
-    }
-
-    await delay(300);
-  }
-
-  if (results.length > 0) {
-    const deduplicated = deduplicateByTmdbId(results);
-    await saveTVSeries(deduplicated);
-    console.log(
-      `💾 Saved ${deduplicated.length} TV series to JSON (${
-        results.length - deduplicated.length
-      } duplicates removed)\n`
-    );
-  }
-
-  return results;
+export async function crawlHamiTaiwaneseTVSeries() {
+  return crawlDoubanTVSeriesCollection({
+    label: "Hami Taiwanese TV series",
+    fetchItems: fetchHamiTaiwaneseTVSeries,
+    saveItems: saveHamiTaiwaneseTVSeries,
+  });
 }
 
 /**
@@ -493,6 +543,9 @@ async function runAllCrawlers() {
 
   await crawlDoubanMovies();
   await crawlDoubanTVSeries();
+  await crawlDoubanKoreanTVSeries();
+  await crawlDoubanJapaneseTVSeries();
+  await crawlHamiTaiwaneseTVSeries();
   await crawlDoubanAnimation();
   await crawlDoubanHotVarietyShows();
   await crawlBangumiAnimation();

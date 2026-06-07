@@ -2,9 +2,12 @@ import { type Context, Hono } from "hono";
 import {
   crawlBangumiAnimation,
   crawlDoubanAnimation,
+  crawlDoubanJapaneseTVSeries,
+  crawlDoubanKoreanTVSeries,
   crawlDoubanHotVarietyShows,
   crawlDoubanMovies,
   crawlDoubanTVSeries,
+  crawlHamiTaiwaneseTVSeries,
 } from "./crawlers.js";
 
 const R2_CUSTOM_DOMAIN = process.env.R2_CUSTOM_DOMAIN || "assets.eplayerx.com";
@@ -349,6 +352,21 @@ app.post("/crawl/tv", async (c) => {
   return c.json({ success: true, count: results.length });
 });
 
+app.post("/crawl/douban/korean-tv", async (c) => {
+  const results = await crawlDoubanKoreanTVSeries();
+  return c.json({ success: true, count: results.length });
+});
+
+app.post("/crawl/douban/japanese-tv", async (c) => {
+  const results = await crawlDoubanJapaneseTVSeries();
+  return c.json({ success: true, count: results.length });
+});
+
+app.post("/crawl/hami/taiwanese-tv", async (c) => {
+  const results = await crawlHamiTaiwaneseTVSeries();
+  return c.json({ success: true, count: results.length });
+});
+
 app.post("/crawl/douban/animation", async (c) => {
   const results = await crawlDoubanAnimation();
   return c.json({ success: true, count: results.length });
@@ -374,12 +392,18 @@ app.get("/cron/crawl-all", async (c) => {
     const [
       movies,
       tvSeries,
+      koreanTVSeries,
+      japaneseTVSeries,
+      taiwaneseTVSeries,
       doubanAnimation,
       hotVarietyShows,
       bangumiAnimation,
     ] = await Promise.all([
       crawlDoubanMovies(),
       crawlDoubanTVSeries(),
+      crawlDoubanKoreanTVSeries(),
+      crawlDoubanJapaneseTVSeries(),
+      crawlHamiTaiwaneseTVSeries(),
       crawlDoubanAnimation(),
       crawlDoubanHotVarietyShows(),
       crawlBangumiAnimation(),
@@ -391,6 +415,9 @@ app.get("/cron/crawl-all", async (c) => {
       success: true,
       movies: { count: movies.length },
       tvSeries: { count: tvSeries.length },
+      koreanTVSeries: { count: koreanTVSeries.length },
+      japaneseTVSeries: { count: japaneseTVSeries.length },
+      taiwaneseTVSeries: { count: taiwaneseTVSeries.length },
       doubanAnimation: { count: doubanAnimation.length },
       hotVarietyShows: { count: hotVarietyShows.length },
       bangumiAnimation: { count: bangumiAnimation.length },
@@ -423,6 +450,42 @@ app.get("/popular/douban/movies", async (_c) => {
 
 app.get("/popular/douban/tv", async (_c) => {
   const url = `https://${R2_CUSTOM_DOMAIN}/douban-tv.json`;
+  const response = await fetch(url);
+  return new Response(response.body, {
+    status: response.status,
+    headers: {
+      "Content-Type":
+        response.headers.get("Content-Type") || "application/json",
+    },
+  });
+});
+
+app.get("/popular/douban/korean-tv", async (_c) => {
+  const url = `https://${R2_CUSTOM_DOMAIN}/douban-korean-tv.json`;
+  const response = await fetch(url);
+  return new Response(response.body, {
+    status: response.status,
+    headers: {
+      "Content-Type":
+        response.headers.get("Content-Type") || "application/json",
+    },
+  });
+});
+
+app.get("/popular/douban/japanese-tv", async (_c) => {
+  const url = `https://${R2_CUSTOM_DOMAIN}/douban-japanese-tv.json`;
+  const response = await fetch(url);
+  return new Response(response.body, {
+    status: response.status,
+    headers: {
+      "Content-Type":
+        response.headers.get("Content-Type") || "application/json",
+    },
+  });
+});
+
+app.get("/popular/hami/taiwanese-tv", async (_c) => {
+  const url = `https://${R2_CUSTOM_DOMAIN}/hami-taiwanese-tv.json`;
   const response = await fetch(url);
   return new Response(response.body, {
     status: response.status,
