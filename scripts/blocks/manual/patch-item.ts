@@ -1,33 +1,60 @@
 /**
- * Surgically replace one mismatched item in a published block snapshot,
+ * Surgically replace mismatched items in a published block snapshot,
  * without re-scraping or re-resolving the other entries.
  *
- * Downloads the snapshot from R2, swaps the item whose tmdbId equals
+ * Downloads the snapshot from R2 once, swaps every item whose tmdbId equals
  * <oldTmdbId> with freshly fetched TMDB details for <newTmdbId> (same
- * position, TMDB localized title), and re-uploads.
+ * position, TMDB localized title), and re-uploads once.
  *
- * Run: bun run scripts/blocks/manual/patch-item.ts <blockId> <oldTmdbId> <newTmdbId> [movie|tv] [language]
- * e.g. bun run scripts/blocks/manual/patch-item.ts community-bfi-sight-sound-100 654086 843
+ * Run: bun run scripts/blocks/manual/patch-item.ts <blockId> <oldTmdbId:newTmdbId>... [movie|tv] [language]
+ * e.g. bun run scripts/blocks/manual/patch-item.ts community-bfi-sight-sound-100 654086:843 4960:11490
+ * (legacy two-arg form "<oldTmdbId> <newTmdbId>" still works)
  */
 
 import { fetchImageMeta } from "../../../src/crawler/tmdb-enrich.js";
-import { getSnapshot, publicKey, putSnapshot } from "../../../src/blocks/storage.js";
+import {
+	getSnapshot,
+	publicKey,
+	putSnapshot,
+} from "../../../src/blocks/storage.js";
 import type { MediaType, SnapshotItem } from "../../../src/blocks/types.js";
 import { tmdb } from "../../../src/tmdb/client.js";
 
-const [blockId, oldIdArg, newIdArg, typeArg, langArg] = process.argv.slice(2);
-if (!blockId || !oldIdArg || !newIdArg) {
-	console.error(
-		"Usage: bun run scripts/blocks/manual/patch-item.ts <blockId> <oldTmdbId> <newTmdbId> [movie|tv] [language]",
-	);
+const TMDB_REQUEST_DELAY_MS = 300;
+const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const USAGE =
+	"Usage: bun run scripts/blocks/manual/patch-item.ts <blockId> <oldTmdbId:newTmdbId>... [movie|tv] [language]";
+
+const [blockId, ...rest] = process.argv.slice(2);
+let mediaType: MediaType = "movie";
+let language = "zh-CN";
+const pairs: [number, number][] = [];
+const bareIds: number[] = [];
+
+for (const arg of rest) {
+	if (arg === "movie" || arg === "tv") {
+		mediaType = arg;
+	} else if (/^\d+:\d+$/.test(arg)) {
+		const [oldId, newId] = arg.split(":");
+		pairs.push([Number.parseInt(oldId, 10), Number.parseInt(newId, 10)]);
+	} else if (/^\d+$/.test(arg)) {
+		bareIds.push(Number.parseInt(arg, 10));
+	} else {
+		language = arg;
+	}
+}
+// Legacy form: two bare ids mean a single old -> new replacement.
+if (pairs.length === 0 && bareIds.length === 2) {
+	pairs.push([bareIds[0], bareIds[1]]);
+}
+
+if (!blockId || pairs.length === 0) {
+	console.error(USAGE);
 	process.exit(1);
 }
-const oldTmdbId = Number.parseInt(oldIdArg, 10);
-const newTmdbId = Number.parseInt(newIdArg, 10);
-const mediaType: MediaType = typeArg === "tv" ? "tv" : "movie";
-const language = langArg || "zh-CN";
 
-async function buildItem(): Promise<SnapshotItem> {
+async function buildItem(newTmdbId: number): Promise<SnapshotItem> {
 	const query = { language };
 	const result =
 		mediaType === "movie"
@@ -74,15 +101,23 @@ async function buildItem(): Promise<SnapshotItem> {
 
 const key = publicKey(blockId);
 const items = await getSnapshot(key);
-const index = items.findIndex((item) => item.tmdbId === oldTmdbId);
-if (index === -1) {
-	throw new Error(`tmdbId ${oldTmdbId} not found in ${blockId}`);
+
+// Validate all targets exist before any TMDB fetch, so the run is all-or-nothing.
+for (const [oldTmdbId] of pairs) {
+	if (!items.some((item) => item.tmdbId === oldTmdbId)) {
+		throw new Error(`tmdbId ${oldTmdbId} not found in ${blockId}`);
+	}
 }
 
-const replacement = await buildItem();
-console.log(
-	`🔁 #${index + 1} ${items[index].title} (${oldTmdbId}) -> ${replacement.title} (${replacement.tmdbId})`,
-);
-items[index] = replacement;
+for (const [oldTmdbId, newTmdbId] of pairs) {
+	const index = items.findIndex((item) => item.tmdbId === oldTmdbId);
+	const replacement = await buildItem(newTmdbId);
+	console.log(
+		`🔁 #${index + 1} ${items[index].title} (${oldTmdbId}) -> ${replacement.title} (${replacement.tmdbId})`,
+	);
+	items[index] = replacement;
+	await delay(TMDB_REQUEST_DELAY_MS);
+}
+
 await putSnapshot(key, items);
 console.log(`💾 ${blockId} updated (${items.length} items)`);
