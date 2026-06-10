@@ -22,6 +22,7 @@ import {
 	type SearchTmdbOptions,
 	searchTMDB,
 	type TmdbClient,
+	type TmdbSearchResult,
 } from "../crawler/tmdb-enrich.js";
 import { createTmdbClient } from "../tmdb/client.js";
 import { shortId } from "./runtime.js";
@@ -36,6 +37,10 @@ export interface PublishItem {
 	title: string;
 	/** Extra search queries (e.g. other languages) tried when the title misses. */
 	altTitles?: string[];
+	/** Known TMDB id: skip title search and fetch details directly. */
+	tmdbId?: number;
+	/** Movie release year, used to disambiguate title search (e.g. remakes). */
+	year?: number;
 }
 
 export interface PublishBlockOptions {
@@ -157,6 +162,37 @@ function buildQueries(item: PublishItem): string[] {
 	return queries;
 }
 
+/** Details payload carries `genres` objects instead of search's `genre_ids`. */
+interface TmdbDetails extends TmdbSearchResult {
+	genres?: { id: number }[];
+}
+
+/** Fetch localized details directly when the source already knows the TMDB id. */
+async function fetchDetailsById(
+	tmdbId: number,
+	mediaType: MediaType,
+	language: string | undefined,
+	client: TmdbClient,
+): Promise<TmdbSearchResult | null> {
+	try {
+		const query = { language: language ?? "zh-CN" };
+		const result =
+			mediaType === "movie"
+				? await client.GET(`/3/movie/${tmdbId}`, {
+						params: { path: { movie_id: tmdbId }, query },
+					})
+				: await client.GET(`/3/tv/${tmdbId}`, {
+						params: { path: { series_id: tmdbId }, query },
+					});
+		const data = result.data as TmdbDetails | undefined;
+		if (!data?.id) return null;
+		return { ...data, genre_ids: data.genres?.map((g) => g.id) ?? [] };
+	} catch (error) {
+		console.error(`TMDB details error for ${mediaType}/${tmdbId}:`, error);
+		return null;
+	}
+}
+
 function dedupeByTmdbId(items: SnapshotItem[]): SnapshotItem[] {
 	const map = new Map<number, SnapshotItem>();
 	for (const item of items) {
@@ -172,10 +208,31 @@ async function resolveItem(
 	client: TmdbClient,
 	useTmdbTitle: boolean,
 ): Promise<SnapshotItem | null> {
-	let tmdbData: Awaited<ReturnType<typeof searchTMDB>> = null;
-	for (const query of buildQueries(item)) {
-		tmdbData = await searchTMDB(query, mediaType, searchOptions, client);
-		if (tmdbData?.id) break;
+	let tmdbData: TmdbSearchResult | null = null;
+	if (item.tmdbId) {
+		tmdbData = await fetchDetailsById(
+			item.tmdbId,
+			mediaType,
+			searchOptions.language,
+			client,
+		);
+	}
+	if (!tmdbData?.id) {
+		const options = item.year
+			? { ...searchOptions, year: item.year }
+			: searchOptions;
+		for (const query of buildQueries(item)) {
+			tmdbData = await searchTMDB(query, mediaType, options, client);
+			if (tmdbData?.id) break;
+		}
+	}
+	// Source years can drift from TMDB (re-releases, remakes mislabeled):
+	// retry once without the year filter before giving up.
+	if (!tmdbData?.id && item.year) {
+		for (const query of buildQueries(item)) {
+			tmdbData = await searchTMDB(query, mediaType, searchOptions, client);
+			if (tmdbData?.id) break;
+		}
 	}
 	if (!tmdbData?.id) return null;
 

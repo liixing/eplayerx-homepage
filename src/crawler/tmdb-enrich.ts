@@ -21,6 +21,11 @@ export interface SearchTmdbOptions {
 	 * TV search: use first result that includes all of these genre ids (e.g. Animation only).
 	 */
 	requireTvGenreIds?: number[];
+	/**
+	 * Movie search: require a release year within ±1 of this (disambiguates
+	 * remakes while tolerating premiere/wide-release year offsets).
+	 */
+	year?: number;
 }
 
 export interface TmdbSearchResult {
@@ -74,12 +79,22 @@ export async function searchTMDB(
 		});
 
 		const rawResults = (result.data?.results ?? []) as TmdbSearchResult[];
-		const results =
+		let results =
 			type === "tv"
 				? rawResults.filter(
 						(item) => (item as { media_type?: string }).media_type === "tv",
 					)
 				: rawResults;
+		if (type === "movie" && options.year) {
+			const want = options.year;
+			results = results.filter((item) => {
+				const year = Number.parseInt(
+					(item.release_date ?? "").slice(0, 4),
+					10,
+				);
+				return Number.isFinite(year) && Math.abs(year - want) <= 1;
+			});
+		}
 		if (results.length === 0) {
 			return null;
 		}
