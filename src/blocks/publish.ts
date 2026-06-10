@@ -138,9 +138,11 @@ async function reportPublish(
 
 // Trailing season markers that break TMDB search, e.g. "第5期" / "Season2".
 const SEASON_SUFFIX_PATTERNS = [
-	/\s*第\s*[0-9０-９一二三四五六七八九十]+\s*(期|季|部|シリーズ|シーズン)$/,
+	/\s*第\s*[0-9０-９一二三四五六七八九十]+\s*(期|季|部分|部|シリーズ|シーズン)$/,
+	/\s*(最终季|最終季|最终章|最終章)$/,
 	/\s*season\s*[0-9０-９]+$/i,
 	/\s*[0-9]+(st|nd|rd|th)\s*season$/i,
+	/\s*part\.?\s*[0-9０-９]+$/i,
 	/\s*REBOOT$/i,
 ];
 
@@ -155,8 +157,10 @@ function stripSeasonSuffix(title: string): string | null {
 /** Search queries in priority order: originals first, season-stripped last. */
 function buildQueries(item: PublishItem): string[] {
 	const queries = [item.title, ...(item.altTitles ?? [])];
-	for (const query of [...queries]) {
-		const stripped = stripSeasonSuffix(query);
+	// Iterate the growing queue so stacked suffixes strip in turn,
+	// e.g. "石纪元 第四季 Part 3" -> "石纪元 第四季" -> "石纪元".
+	for (let i = 0; i < queries.length; i++) {
+		const stripped = stripSeasonSuffix(queries[i]);
 		if (stripped && !queries.includes(stripped)) queries.push(stripped);
 	}
 	return queries;
