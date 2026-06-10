@@ -1,9 +1,31 @@
 import { Hono } from "hono";
+import { cors } from "hono/cors";
+import adminApp from "./blocks/admin.js";
+import blocksApp from "./blocks/index.js";
 import crawlerApp from "./crawler/index.js";
 import homeApp from "./home/index.js";
 import tmdbApp from "./tmdb/index.js";
 
 const app = new Hono();
+
+const allowedCorsOrigins = [
+	"https://eplayerx.com",
+	"https://www.eplayerx.com",
+	"http://localhost:3000",
+	"http://localhost:8787",
+] as const;
+
+const publicCors = cors({
+	origin: [...allowedCorsOrigins],
+	allowHeaders: ["Content-Type", "Authorization"],
+	allowMethods: ["GET", "HEAD", "POST", "OPTIONS"],
+	maxAge: 86400,
+});
+
+app.use("/tmdb/*", publicCors);
+app.use("/crawler/*", publicCors);
+app.use("/blocks/community", publicCors);
+app.use("/blocks/data/*", publicCors);
 
 const welcomeStrings = [
 	"Hello Hono!",
@@ -23,5 +45,11 @@ app.route("/crawler", crawlerApp);
 
 // Mount Home routes
 app.route("/home", homeApp);
+
+// Mount EplayerX Blocks (community block builder)
+app.route("/blocks", blocksApp);
+
+// Mount EplayerX Blocks admin console (password gated)
+app.route("/admin", adminApp);
 
 export default app;

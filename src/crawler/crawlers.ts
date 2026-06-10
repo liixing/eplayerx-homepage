@@ -2,558 +2,427 @@
  * Main crawler: Douban -> TMDB -> JSON file
  */
 
-import { tmdb } from "../tmdb/client.js";
 import { fetchBangumiHotAnime } from "./bangumi-scraper.js";
 import {
-  fetchDoubanHotAnimation,
-  fetchDoubanHotMovies,
-  fetchDoubanHotTVSeries,
-  fetchDoubanHotVarietyShows,
-  fetchDoubanJapaneseTVSeries,
-  fetchDoubanKoreanTVSeries,
+	fetchDoubanHotAnimation,
+	fetchDoubanHotMovies,
+	fetchDoubanHotTVSeries,
+	fetchDoubanHotVarietyShows,
+	fetchDoubanJapaneseTVSeries,
+	fetchDoubanKoreanTVSeries,
 } from "./douban-scraper.js";
 import { fetchHamiTaiwaneseTVSeries } from "./hami-scraper.js";
 import {
-  type ContentItem,
-  saveBangumiAnimation,
-  saveDoubanAnimation,
-  saveHamiTaiwaneseTVSeries,
-  saveHotVarietyShows,
-  saveJapaneseTVSeries,
-  saveKoreanTVSeries,
-  saveMovies,
-  saveTVSeries,
+	type ContentItem,
+	saveBangumiAnimation,
+	saveDoubanAnimation,
+	saveHamiTaiwaneseTVSeries,
+	saveHotVarietyShows,
+	saveJapaneseTVSeries,
+	saveKoreanTVSeries,
+	saveMovies,
+	saveTVSeries,
 } from "./service.js";
+import {
+	fetchImageMeta,
+	searchTMDB,
+	TMDB_TV_GENRE_ANIMATION,
+} from "./tmdb-enrich.js";
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-/** TMDB TV genre id for Animation (see /3/genre/tv/list). */
-const TMDB_TV_GENRE_ANIMATION = 16;
-
-interface SearchTmdbOptions {
-  language?: string;
-  /**
-   * TV search: use first result that includes all of these genre ids (e.g. Animation only).
-   */
-  requireTvGenreIds?: number[];
-}
-
 interface CrawlTVSeriesOptions {
-  label: string;
-  fetchItems: () => Promise<Array<{ title: string }>>;
-  saveItems: (items: ContentItem[]) => Promise<unknown>;
+	label: string;
+	fetchItems: () => Promise<Array<{ title: string }>>;
+	saveItems: (items: ContentItem[]) => Promise<unknown>;
 }
 
 /** Align stored title + TMDB query when source uses alternate naming (e.g. 年番 suffix). */
 function resolveAnimationTitle(title: string): string {
-  if (title === "凡人修仙传年番") {
-    return "凡人修仙传";
-  }
-  return title;
-}
-
-interface ImageMeta {
-  thumb: string | null;
-  logo: string | null;
-  noLogoPoster: string | null;
-}
-
-type ImageEntry = {
-  iso_639_1?: string | null;
-  iso_3166_1?: string;
-  file_path?: string;
-  vote_average?: number;
-};
-
-function bestByVote(items: ImageEntry[]) {
-  return items.length
-    ? items.sort((a, b) => (b.vote_average ?? 0) - (a.vote_average ?? 0))[0]
-    : undefined;
-}
-
-async function fetchImageMeta(
-  tmdbId: number,
-  mediaType: "movie" | "tv",
-  backdropPath?: string | null,
-  posterPath?: string | null
-): Promise<ImageMeta> {
-  const fallback: ImageMeta = {
-    thumb: backdropPath || posterPath || null,
-    logo: null,
-    noLogoPoster: null,
-  };
-
-  try {
-    const result =
-      mediaType === "movie"
-        ? await tmdb.GET(`/3/movie/${tmdbId}/images`, {
-            params: { path: { movie_id: tmdbId } },
-          })
-        : await tmdb.GET(`/3/tv/${tmdbId}/images`, {
-            params: { path: { series_id: tmdbId } },
-          });
-
-    const images = result.data;
-
-    const backdrops = (images?.backdrops ?? []) as ImageEntry[];
-    const thumb =
-      backdrops.find((b) => b.iso_639_1 === "zh")?.file_path ||
-      backdrops.find((b) => b.iso_639_1 === "en")?.file_path ||
-      backdrops.find((b) => b.iso_639_1 === null)?.file_path ||
-      backdrops[0]?.file_path ||
-      backdropPath ||
-      posterPath ||
-      null;
-
-    const logos = (images?.logos ?? []) as ImageEntry[];
-    let logo: string | null = null;
-    if (logos.length) {
-      const regionMatches = logos.filter(
-        (l) => l.iso_639_1 === "zh" && l.iso_3166_1 === "CN"
-      );
-      const langMatches = logos.filter((l) => l.iso_639_1 === "zh");
-      const best =
-        bestByVote(regionMatches) ??
-        bestByVote(langMatches) ??
-        bestByVote(logos);
-      logo = best?.file_path ?? null;
-    }
-
-    const posters = (images?.posters ?? []) as ImageEntry[];
-    const noLogoPoster =
-      bestByVote(posters.filter((p) => !p.iso_639_1))?.file_path ?? null;
-
-    return { thumb, logo, noLogoPoster };
-  } catch (error) {
-    console.error(`Failed to fetch images for ${mediaType}/${tmdbId}:`, error);
-    return fallback;
-  }
+	if (title === "凡人修仙传年番") {
+		return "凡人修仙传";
+	}
+	return title;
 }
 
 /**
  * Deduplicate content items by tmdbId, keeping the latest one
  */
 function deduplicateByTmdbId(items: ContentItem[]): ContentItem[] {
-  const map = new Map<number, ContentItem>();
+	const map = new Map<number, ContentItem>();
 
-  for (const item of items) {
-    const existing = map.get(item.tmdbId);
-    if (!existing || item.crawledAt > existing.crawledAt) {
-      map.set(item.tmdbId, item);
-    }
-  }
+	for (const item of items) {
+		const existing = map.get(item.tmdbId);
+		if (!existing || item.crawledAt > existing.crawledAt) {
+			map.set(item.tmdbId, item);
+		}
+	}
 
-  return Array.from(map.values());
-}
-
-async function searchTMDB(
-  title: string,
-  type: "movie" | "tv",
-  options: SearchTmdbOptions = {}
-) {
-  const language = options.language ?? "zh-CN";
-  try {
-    const path = type === "movie" ? "/3/search/movie" : "/3/search/multi";
-    const result = await tmdb.GET(path, {
-      params: {
-        query: {
-          query: title,
-          language,
-        },
-      },
-    });
-
-    const rawResults = result.data?.results ?? [];
-    const results =
-      type === "tv"
-        ? rawResults.filter(
-            (item) => (item as { media_type?: string }).media_type === "tv"
-          )
-        : rawResults;
-    if (results.length === 0) {
-      return null;
-    }
-
-    if (type === "tv" && options.requireTvGenreIds?.length) {
-      const need = options.requireTvGenreIds;
-      for (const r of results) {
-        const gids = (r as { genre_ids?: number[] }).genre_ids ?? [];
-        if (need.every((id) => gids.includes(id))) {
-          return r;
-        }
-      }
-      return null;
-    }
-
-    return results[0];
-  } catch (error) {
-    console.error(`TMDB search error for "${title}":`, error);
-    return null;
-  }
+	return Array.from(map.values());
 }
 
 async function crawlDoubanTVSeriesCollection(options: CrawlTVSeriesOptions) {
-  console.log(`📺 Crawling ${options.label}...`);
+	console.log(`📺 Crawling ${options.label}...`);
 
-  const items = await options.fetchItems();
-  console.log(`📥 Found ${items.length} ${options.label}`);
+	const items = await options.fetchItems();
+	console.log(`📥 Found ${items.length} ${options.label}`);
 
-  const results: ContentItem[] = [];
+	const results: ContentItem[] = [];
 
-  for (const item of items) {
-    console.log(`🔍 Searching: ${item.title}`);
+	for (const item of items) {
+		console.log(`🔍 Searching: ${item.title}`);
 
-    const tmdbData = await searchTMDB(item.title, "tv");
+		const tmdbData = await searchTMDB(item.title, "tv");
 
-    if (tmdbData) {
-      const tmdbId = tmdbData.id as number;
-      const { thumb, logo, noLogoPoster } = await fetchImageMeta(
-        tmdbId,
-        "tv",
-        tmdbData.backdrop_path,
-        tmdbData.poster_path
-      );
+		if (tmdbData) {
+			const tmdbId = tmdbData.id as number;
+			const { thumb, logo, noLogoPoster } = await fetchImageMeta(
+				tmdbId,
+				"tv",
+				tmdbData.backdrop_path,
+				tmdbData.poster_path,
+			);
 
-      results.push({
-        title: item.title,
-        tmdbId,
-        vote_average: tmdbData.vote_average,
-        poster_path: tmdbData.poster_path,
-        backdrop_path: tmdbData.backdrop_path,
-        genre_ids: tmdbData.genre_ids || [],
-        media_type: "tv",
-        first_air_date: (tmdbData as any).first_air_date,
-        overview: tmdbData?.overview,
-        thumb,
-        logo,
-        noLogoPoster,
-        crawledAt: new Date().toISOString(),
-      });
-      console.log(`✅ ${tmdbId}`);
-    } else {
-      console.log(`❌ Not found`);
-    }
+			results.push({
+				title: item.title,
+				tmdbId,
+				vote_average: tmdbData.vote_average ?? null,
+				poster_path: tmdbData.poster_path,
+				backdrop_path: tmdbData.backdrop_path,
+				genre_ids: tmdbData.genre_ids || [],
+				media_type: "tv",
+				first_air_date: tmdbData.first_air_date,
+				overview: tmdbData?.overview,
+				thumb,
+				logo,
+				noLogoPoster,
+				crawledAt: new Date().toISOString(),
+			});
+			console.log(`✅ ${tmdbId}`);
+		} else {
+			console.log(`❌ Not found`);
+		}
 
-    await delay(300);
-  }
+		await delay(300);
+	}
 
-  if (results.length > 0) {
-    const deduplicated = deduplicateByTmdbId(results);
-    await options.saveItems(deduplicated);
-    console.log(
-      `💾 Saved ${deduplicated.length} ${options.label} to JSON (${
-        results.length - deduplicated.length
-      } duplicates removed)\n`
-    );
-  }
+	if (results.length > 0) {
+		const deduplicated = deduplicateByTmdbId(results);
+		await options.saveItems(deduplicated);
+		console.log(
+			`💾 Saved ${deduplicated.length} ${options.label} to JSON (${
+				results.length - deduplicated.length
+			} duplicates removed)\n`,
+		);
+	}
 
-  return results;
+	return results;
 }
 
 /**
  * Crawl Douban movies
  */
 export async function crawlDoubanMovies() {
-  console.log("🎬 Crawling Douban movies...");
+	console.log("🎬 Crawling Douban movies...");
 
-  const items = await fetchDoubanHotMovies();
-  console.log(`📥 Found ${items.length} movies`);
+	const items = await fetchDoubanHotMovies();
+	console.log(`📥 Found ${items.length} movies`);
 
-  const results: ContentItem[] = [];
+	const results: ContentItem[] = [];
 
-  for (const item of items) {
-    console.log(`🔍 Searching: ${item.title}`);
+	for (const item of items) {
+		console.log(`🔍 Searching: ${item.title}`);
 
-    const tmdbData = await searchTMDB(item.title, "movie");
+		const tmdbData = await searchTMDB(item.title, "movie");
 
-    if (tmdbData) {
-      const tmdbId = tmdbData.id as number;
-      const { thumb, logo, noLogoPoster } = await fetchImageMeta(
-        tmdbId,
-        "movie",
-        tmdbData.backdrop_path,
-        tmdbData.poster_path
-      );
+		if (tmdbData) {
+			const tmdbId = tmdbData.id as number;
+			const { thumb, logo, noLogoPoster } = await fetchImageMeta(
+				tmdbId,
+				"movie",
+				tmdbData.backdrop_path,
+				tmdbData.poster_path,
+			);
 
-      results.push({
-        title: item.title,
-        tmdbId,
-        vote_average: tmdbData.vote_average,
-        poster_path: tmdbData.poster_path,
-        backdrop_path: tmdbData.backdrop_path,
-        genre_ids: tmdbData.genre_ids || [],
-        media_type: "movie",
-        release_date: (tmdbData as any)?.release_date || null,
-        overview: tmdbData?.overview,
-        thumb,
-        logo,
-        noLogoPoster,
-        crawledAt: new Date().toISOString(),
-      });
-      console.log(`✅ ${tmdbId}`);
-    } else {
-      console.log(`❌ Not found`);
-    }
+			results.push({
+				title: item.title,
+				tmdbId,
+				vote_average: tmdbData.vote_average ?? null,
+				poster_path: tmdbData.poster_path,
+				backdrop_path: tmdbData.backdrop_path,
+				genre_ids: tmdbData.genre_ids || [],
+				media_type: "movie",
+				release_date: tmdbData.release_date || null,
+				overview: tmdbData?.overview,
+				thumb,
+				logo,
+				noLogoPoster,
+				crawledAt: new Date().toISOString(),
+			});
+			console.log(`✅ ${tmdbId}`);
+		} else {
+			console.log(`❌ Not found`);
+		}
 
-    await delay(300);
-  }
+		await delay(300);
+	}
 
-  if (results.length > 0) {
-    const deduplicated = deduplicateByTmdbId(results);
-    await saveMovies(deduplicated);
-    console.log(
-      `💾 Saved ${deduplicated.length} movies to JSON (${
-        results.length - deduplicated.length
-      } duplicates removed)\n`
-    );
-  }
+	if (results.length > 0) {
+		const deduplicated = deduplicateByTmdbId(results);
+		await saveMovies(deduplicated);
+		console.log(
+			`💾 Saved ${deduplicated.length} movies to JSON (${
+				results.length - deduplicated.length
+			} duplicates removed)\n`,
+		);
+	}
 
-  return results;
+	return results;
 }
 
 /**
  * Crawl Douban TV series
  */
 export async function crawlDoubanTVSeries() {
-  return crawlDoubanTVSeriesCollection({
-    label: "Douban domestic TV series",
-    fetchItems: fetchDoubanHotTVSeries,
-    saveItems: saveTVSeries,
-  });
+	return crawlDoubanTVSeriesCollection({
+		label: "Douban domestic TV series",
+		fetchItems: fetchDoubanHotTVSeries,
+		saveItems: saveTVSeries,
+	});
 }
 
 export async function crawlDoubanKoreanTVSeries() {
-  return crawlDoubanTVSeriesCollection({
-    label: "Douban Korean TV series",
-    fetchItems: fetchDoubanKoreanTVSeries,
-    saveItems: saveKoreanTVSeries,
-  });
+	return crawlDoubanTVSeriesCollection({
+		label: "Douban Korean TV series",
+		fetchItems: fetchDoubanKoreanTVSeries,
+		saveItems: saveKoreanTVSeries,
+	});
 }
 
 export async function crawlDoubanJapaneseTVSeries() {
-  return crawlDoubanTVSeriesCollection({
-    label: "Douban Japanese TV series",
-    fetchItems: fetchDoubanJapaneseTVSeries,
-    saveItems: saveJapaneseTVSeries,
-  });
+	return crawlDoubanTVSeriesCollection({
+		label: "Douban Japanese TV series",
+		fetchItems: fetchDoubanJapaneseTVSeries,
+		saveItems: saveJapaneseTVSeries,
+	});
 }
 
 export async function crawlHamiTaiwaneseTVSeries() {
-  return crawlDoubanTVSeriesCollection({
-    label: "Hami Taiwanese TV series",
-    fetchItems: fetchHamiTaiwaneseTVSeries,
-    saveItems: saveHamiTaiwaneseTVSeries,
-  });
+	return crawlDoubanTVSeriesCollection({
+		label: "Hami Taiwanese TV series",
+		fetchItems: fetchHamiTaiwaneseTVSeries,
+		saveItems: saveHamiTaiwaneseTVSeries,
+	});
 }
 
 /**
  * Crawl Douban animation
  */
 export async function crawlDoubanAnimation() {
-  console.log("🎨 Crawling Douban animation...");
+	console.log("🎨 Crawling Douban animation...");
 
-  const items = await fetchDoubanHotAnimation();
-  console.log(`📥 Found ${items.length} animation`);
+	const items = await fetchDoubanHotAnimation();
+	console.log(`📥 Found ${items.length} animation`);
 
-  const results: ContentItem[] = [];
+	const results: ContentItem[] = [];
 
-  for (const item of items) {
-    const title = resolveAnimationTitle(item.title);
-    console.log(`🔍 Searching: ${title}`);
+	for (const item of items) {
+		const title = resolveAnimationTitle(item.title);
+		console.log(`🔍 Searching: ${title}`);
 
-    const tmdbData = await searchTMDB(title, "tv", {
-      requireTvGenreIds: [TMDB_TV_GENRE_ANIMATION],
-    });
+		const tmdbData = await searchTMDB(title, "tv", {
+			requireTvGenreIds: [TMDB_TV_GENRE_ANIMATION],
+		});
 
-    if (tmdbData) {
-      const tmdbId = tmdbData.id as number;
-      const { thumb, logo, noLogoPoster } = await fetchImageMeta(
-        tmdbId,
-        "tv",
-        tmdbData.backdrop_path,
-        tmdbData.poster_path
-      );
+		if (tmdbData) {
+			const tmdbId = tmdbData.id as number;
+			const { thumb, logo, noLogoPoster } = await fetchImageMeta(
+				tmdbId,
+				"tv",
+				tmdbData.backdrop_path,
+				tmdbData.poster_path,
+			);
 
-      results.push({
-        title,
-        tmdbId,
-        vote_average: tmdbData.vote_average,
-        poster_path: tmdbData.poster_path,
-        backdrop_path: tmdbData.backdrop_path,
-        genre_ids: tmdbData.genre_ids || [],
-        media_type: "tv",
-        first_air_date: (tmdbData as any).first_air_date,
-        overview: tmdbData?.overview,
-        thumb,
-        logo,
-        noLogoPoster,
-        crawledAt: new Date().toISOString(),
-      });
-      console.log(`✅ ${tmdbId}`);
-    } else {
-      console.log(`❌ Not found (Animation genre)`);
-    }
+			results.push({
+				title,
+				tmdbId,
+				vote_average: tmdbData.vote_average ?? null,
+				poster_path: tmdbData.poster_path,
+				backdrop_path: tmdbData.backdrop_path,
+				genre_ids: tmdbData.genre_ids || [],
+				media_type: "tv",
+				first_air_date: tmdbData.first_air_date,
+				overview: tmdbData?.overview,
+				thumb,
+				logo,
+				noLogoPoster,
+				crawledAt: new Date().toISOString(),
+			});
+			console.log(`✅ ${tmdbId}`);
+		} else {
+			console.log(`❌ Not found (Animation genre)`);
+		}
 
-    await delay(300);
-  }
+		await delay(300);
+	}
 
-  if (results.length > 0) {
-    const deduplicated = deduplicateByTmdbId(results);
-    await saveDoubanAnimation(deduplicated);
-    console.log(
-      `💾 Saved ${deduplicated.length} animation to JSON (${
-        results.length - deduplicated.length
-      } duplicates removed)\n`
-    );
-  }
+	if (results.length > 0) {
+		const deduplicated = deduplicateByTmdbId(results);
+		await saveDoubanAnimation(deduplicated);
+		console.log(
+			`💾 Saved ${deduplicated.length} animation to JSON (${
+				results.length - deduplicated.length
+			} duplicates removed)\n`,
+		);
+	}
 
-  return results;
+	return results;
 }
 
 /**
  * Crawl Douban hot variety shows
  */
 export async function crawlDoubanHotVarietyShows() {
-  console.log("🔥 Crawling Douban hot variety shows...");
+	console.log("🔥 Crawling Douban hot variety shows...");
 
-  const items = await fetchDoubanHotVarietyShows();
-  console.log(`📥 Found ${items.length} hot variety shows`);
+	const items = await fetchDoubanHotVarietyShows();
+	console.log(`📥 Found ${items.length} hot variety shows`);
 
-  const results: ContentItem[] = [];
+	const results: ContentItem[] = [];
 
-  for (const item of items) {
-    console.log(`🔍 Searching: ${item.title}`);
+	for (const item of items) {
+		console.log(`🔍 Searching: ${item.title}`);
 
-    const tmdbData = await searchTMDB(item.title, "tv");
+		const tmdbData = await searchTMDB(item.title, "tv");
 
-    if (tmdbData) {
-      const tmdbId = tmdbData.id as number;
-      const { thumb, logo, noLogoPoster } = await fetchImageMeta(
-        tmdbId,
-        "tv",
-        tmdbData.backdrop_path,
-        tmdbData.poster_path
-      );
+		if (tmdbData) {
+			const tmdbId = tmdbData.id as number;
+			const { thumb, logo, noLogoPoster } = await fetchImageMeta(
+				tmdbId,
+				"tv",
+				tmdbData.backdrop_path,
+				tmdbData.poster_path,
+			);
 
-      results.push({
-        title: item.title,
-        tmdbId,
-        vote_average: tmdbData.vote_average,
-        poster_path: tmdbData.poster_path,
-        backdrop_path: tmdbData.backdrop_path,
-        genre_ids: tmdbData.genre_ids || [],
-        media_type: "tv",
-        first_air_date: (tmdbData as any).first_air_date,
-        overview: tmdbData?.overview,
-        thumb,
-        logo,
-        noLogoPoster,
-        crawledAt: new Date().toISOString(),
-      });
-      console.log(`✅ ${tmdbId}`);
-    } else {
-      console.log(`❌ Not found`);
-    }
+			results.push({
+				title: item.title,
+				tmdbId,
+				vote_average: tmdbData.vote_average ?? null,
+				poster_path: tmdbData.poster_path,
+				backdrop_path: tmdbData.backdrop_path,
+				genre_ids: tmdbData.genre_ids || [],
+				media_type: "tv",
+				first_air_date: tmdbData.first_air_date,
+				overview: tmdbData?.overview,
+				thumb,
+				logo,
+				noLogoPoster,
+				crawledAt: new Date().toISOString(),
+			});
+			console.log(`✅ ${tmdbId}`);
+		} else {
+			console.log(`❌ Not found`);
+		}
 
-    await delay(300);
-  }
+		await delay(300);
+	}
 
-  if (results.length > 0) {
-    const deduplicated = deduplicateByTmdbId(results);
-    await saveHotVarietyShows(deduplicated);
-    console.log(
-      `💾 Saved ${deduplicated.length} hot variety shows to JSON (${
-        results.length - deduplicated.length
-      } duplicates removed)\n`
-    );
-  }
+	if (results.length > 0) {
+		const deduplicated = deduplicateByTmdbId(results);
+		await saveHotVarietyShows(deduplicated);
+		console.log(
+			`💾 Saved ${deduplicated.length} hot variety shows to JSON (${
+				results.length - deduplicated.length
+			} duplicates removed)\n`,
+		);
+	}
 
-  return results;
+	return results;
 }
 
 /**
  * Crawl Bangumi animation
  */
 export async function crawlBangumiAnimation() {
-  console.log("🎌 Crawling Bangumi animation...");
+	console.log("🎌 Crawling Bangumi animation...");
 
-  const items = await fetchBangumiHotAnime();
-  console.log(`📥 Found ${items.length} animation`);
+	const items = await fetchBangumiHotAnime();
+	console.log(`📥 Found ${items.length} animation`);
 
-  const results: ContentItem[] = [];
+	const results: ContentItem[] = [];
 
-  for (const item of items) {
-    const title = resolveAnimationTitle(item.title);
-    console.log(`🔍 Searching: ${title}`);
+	for (const item of items) {
+		const title = resolveAnimationTitle(item.title);
+		console.log(`🔍 Searching: ${title}`);
 
-    const tmdbData = await searchTMDB(title, "tv", {
-      requireTvGenreIds: [TMDB_TV_GENRE_ANIMATION],
-    });
+		const tmdbData = await searchTMDB(title, "tv", {
+			requireTvGenreIds: [TMDB_TV_GENRE_ANIMATION],
+		});
 
-    if (tmdbData) {
-      const tmdbId = tmdbData.id as number;
-      const { thumb, logo, noLogoPoster } = await fetchImageMeta(
-        tmdbId,
-        "tv",
-        tmdbData.backdrop_path,
-        tmdbData.poster_path
-      );
+		if (tmdbData) {
+			const tmdbId = tmdbData.id as number;
+			const { thumb, logo, noLogoPoster } = await fetchImageMeta(
+				tmdbId,
+				"tv",
+				tmdbData.backdrop_path,
+				tmdbData.poster_path,
+			);
 
-      results.push({
-        title,
-        tmdbId,
-        vote_average: tmdbData.vote_average,
-        poster_path: tmdbData.poster_path,
-        backdrop_path: tmdbData.backdrop_path,
-        genre_ids: tmdbData.genre_ids || [],
-        media_type: "tv",
-        first_air_date: (tmdbData as any).first_air_date,
-        overview: tmdbData?.overview,
-        thumb,
-        logo,
-        noLogoPoster,
-        crawledAt: new Date().toISOString(),
-      });
-      console.log(`✅ ${tmdbId}`);
-    } else {
-      console.log(`❌ Not found (Animation genre)`);
-    }
+			results.push({
+				title,
+				tmdbId,
+				vote_average: tmdbData.vote_average ?? null,
+				poster_path: tmdbData.poster_path,
+				backdrop_path: tmdbData.backdrop_path,
+				genre_ids: tmdbData.genre_ids || [],
+				media_type: "tv",
+				first_air_date: tmdbData.first_air_date,
+				overview: tmdbData?.overview,
+				thumb,
+				logo,
+				noLogoPoster,
+				crawledAt: new Date().toISOString(),
+			});
+			console.log(`✅ ${tmdbId}`);
+		} else {
+			console.log(`❌ Not found (Animation genre)`);
+		}
 
-    await delay(300);
-  }
+		await delay(300);
+	}
 
-  if (results.length > 0) {
-    const deduplicated = deduplicateByTmdbId(results);
-    await saveBangumiAnimation(deduplicated);
-    console.log(
-      `💾 Saved ${deduplicated.length} animation to JSON (${
-        results.length - deduplicated.length
-      } duplicates removed)\n`
-    );
-  }
+	if (results.length > 0) {
+		const deduplicated = deduplicateByTmdbId(results);
+		await saveBangumiAnimation(deduplicated);
+		console.log(
+			`💾 Saved ${deduplicated.length} animation to JSON (${
+				results.length - deduplicated.length
+			} duplicates removed)\n`,
+		);
+	}
 
-  return results;
+	return results;
 }
 
 /**
  * Run all crawlers
  */
 async function runAllCrawlers() {
-  console.log("🚀 Starting crawlers...\n");
+	console.log("🚀 Starting crawlers...\n");
 
-  await crawlDoubanMovies();
-  await crawlDoubanTVSeries();
-  await crawlDoubanKoreanTVSeries();
-  await crawlDoubanJapaneseTVSeries();
-  await crawlHamiTaiwaneseTVSeries();
-  await crawlDoubanAnimation();
-  await crawlDoubanHotVarietyShows();
-  await crawlBangumiAnimation();
+	await crawlDoubanMovies();
+	await crawlDoubanTVSeries();
+	await crawlDoubanKoreanTVSeries();
+	await crawlDoubanJapaneseTVSeries();
+	await crawlHamiTaiwaneseTVSeries();
+	await crawlDoubanAnimation();
+	await crawlDoubanHotVarietyShows();
+	await crawlBangumiAnimation();
 
-  console.log("✅ Done!");
+	console.log("✅ Done!");
 }
 
 // Run if executed directly
 if (process.argv[1]?.includes("crawlers")) {
-  runAllCrawlers().catch(console.error);
+	runAllCrawlers().catch(console.error);
 }

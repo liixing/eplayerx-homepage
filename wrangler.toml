@@ -5,15 +5,27 @@ main = "src/worker.ts"
 compatibility_date = "2025-04-01"
 compatibility_flags = ["nodejs_compat"]
 
-# To use a custom domain instead of *.workers.dev, uncomment and edit:
-# workers_dev = false
-# preview_urls = false
-# routes = [
-# 	{ pattern = "api.example.com", zone_name = "example.com", custom_domain = true },
-# ]
+# Keep the default *.workers.dev address alive.
+workers_dev = true
+
+# Public routes for this Worker.
+routes = [
+	{ pattern = "api.eplayerx.com", custom_domain = true },
+	{ pattern = "tmdb.eplayerx.com", custom_domain = true },
+	{ pattern = "eplayerx.com/blocks*", zone_name = "eplayerx.com" },
+]
 
 [observability]
 enabled = true
+
+# D1 database for EplayerX Blocks (community submissions + approved blocks).
+# Create once: `wrangler d1 create eplayerx-blocks`, then paste the returned
+# database_id below. Apply schema: `wrangler d1 migrations apply eplayerx-blocks`.
+[[d1_databases]]
+binding = "DB"
+database_name = "blocks"
+database_id = "e8ba17f1-93da-4903-8ee5-53e2ace245cf"
+migrations_dir = "migrations"
 
 # Uncomment to enable cron trigger (e.g. daily crawl at 08:00 UTC)
 # [triggers]
