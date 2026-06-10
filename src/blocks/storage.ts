@@ -277,6 +277,7 @@ export interface InsertCommunityBlockInput {
 	dataKey: string;
 	itemCount: number;
 	author: string | null;
+	language: string;
 	createdAt: string;
 }
 
@@ -287,8 +288,8 @@ export async function insertCommunityBlock(
 	await db
 		.prepare(
 			`INSERT INTO community_blocks
-        (block_id, category, title, block_json, data_key, item_count, installs, author, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?)`,
+        (block_id, category, title, block_json, data_key, item_count, installs, author, language, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?)`,
 		)
 		.bind(
 			input.blockId,
@@ -298,26 +299,82 @@ export async function insertCommunityBlock(
 			input.dataKey,
 			input.itemCount,
 			input.author,
+			input.language,
 			input.createdAt,
 		)
 		.run();
 }
 
+export interface CommunityBlockFilter {
+	category?: BlockCategory;
+	language?: string;
+	/** Title substring search. */
+	q?: string;
+}
+
+/** Build the WHERE clause + bind values for a community block filter. */
+function communityWhere(filter: CommunityBlockFilter): {
+	clause: string;
+	binds: (string | number)[];
+} {
+	const conditions: string[] = [];
+	const binds: (string | number)[] = [];
+	if (filter.category) {
+		conditions.push("category = ?");
+		binds.push(filter.category);
+	}
+	if (filter.language) {
+		conditions.push("language = ?");
+		binds.push(filter.language);
+	}
+	if (filter.q) {
+		conditions.push("title LIKE ? ESCAPE '\\'");
+		binds.push(`%${filter.q.replace(/[\\%_]/g, (m) => `\\${m}`)}%`);
+	}
+	return {
+		clause: conditions.length ? `WHERE ${conditions.join(" AND ")}` : "",
+		binds,
+	};
+}
+
 export async function listCommunityBlocks(
 	db: D1Database,
-	category?: BlockCategory,
+	filter: CommunityBlockFilter = {},
+	limit = 200,
+	offset = 0,
 ): Promise<CommunityBlockRow[]> {
-	const stmt = category
-		? db
-				.prepare(
-					`SELECT * FROM community_blocks WHERE category = ? ORDER BY installs DESC, created_at DESC LIMIT 200`,
-				)
-				.bind(category)
-		: db.prepare(
-				`SELECT * FROM community_blocks ORDER BY installs DESC, created_at DESC LIMIT 200`,
-			);
-	const result = await stmt.all<CommunityBlockRow>();
+	const { clause, binds } = communityWhere(filter);
+	const result = await db
+		.prepare(
+			`SELECT * FROM community_blocks ${clause} ORDER BY installs DESC, created_at DESC LIMIT ? OFFSET ?`,
+		)
+		.bind(...binds, limit, offset)
+		.all<CommunityBlockRow>();
 	return result.results ?? [];
+}
+
+export async function countCommunityBlocks(
+	db: D1Database,
+	filter: CommunityBlockFilter = {},
+): Promise<number> {
+	const { clause, binds } = communityWhere(filter);
+	const row = await db
+		.prepare(`SELECT COUNT(*) AS n FROM community_blocks ${clause}`)
+		.bind(...binds)
+		.first<{ n: number }>();
+	return row?.n ?? 0;
+}
+
+/** Distinct output languages present in the library (for the filter menu). */
+export async function listCommunityLanguages(
+	db: D1Database,
+): Promise<string[]> {
+	const result = await db
+		.prepare(
+			`SELECT DISTINCT language FROM community_blocks WHERE language != '' ORDER BY language`,
+		)
+		.all<{ language: string }>();
+	return (result.results ?? []).map((r) => r.language);
 }
 
 export async function incrementInstalls(

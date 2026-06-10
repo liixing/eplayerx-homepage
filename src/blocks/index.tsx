@@ -13,9 +13,11 @@ import { createDefaultHomeConfig } from "../home/config.js";
 import { getDb, ServiceUnavailable, shortId } from "./runtime.js";
 import { validateToken } from "./scraper.js";
 import {
+	countCommunityBlocks,
 	incrementInstalls,
 	insertSubmission,
 	listCommunityBlocks,
+	listCommunityLanguages,
 	publicDataUrl,
 } from "./storage.js";
 import {
@@ -27,6 +29,7 @@ import {
 	type DisplayBlock,
 	type HomeBlock,
 	type MediaType,
+	type SnapshotBlob,
 	TMDB_LANGUAGES,
 } from "./types.js";
 import { ExplorePage, SubmitPage } from "./views.js";
@@ -41,6 +44,7 @@ const MEDIA_LIST_PRESETS = new Set(VALID_PRESETS);
 const VALID_LANGUAGES = new Set(TMDB_LANGUAGES.map((l) => l.code));
 
 const MAX_SOURCE_LEN = 100_000;
+const PREVIEW_LIMIT = 20;
 
 const PUBLIC_API_BASE =
 	process.env.PUBLIC_API_BASE_URL || "https://api.eplayerx.com";
@@ -124,7 +128,8 @@ function communityToDisplay(row: CommunityBlockRow): DisplayBlock {
 		preset,
 		showRank,
 		showOverview,
-		previewSrc: `/blocks/data/${row.block_id}`,
+		// Preview only needs the first items; the full snapshot may be huge.
+		previewSrc: `/blocks/data/${row.block_id}?limit=${PREVIEW_LIMIT}`,
 		official: false,
 		itemCount: row.item_count,
 		installs: row.installs,
@@ -225,16 +230,41 @@ app.post("/submit", async (c) => {
 
 app.get("/community", async (c) => {
 	const raw = c.req.query("category");
-	const category = VALID_CATEGORIES.includes(raw as BlockCategory)
-		? (raw as BlockCategory)
-		: undefined;
+	const filter = {
+		category: VALID_CATEGORIES.includes(raw as BlockCategory)
+			? (raw as BlockCategory)
+			: undefined,
+		language: c.req.query("language") || undefined,
+		q: c.req.query("q")?.trim() || undefined,
+	};
+	const limit = Math.min(
+		Math.max(Number.parseInt(c.req.query("limit") || "20", 10) || 20, 1),
+		50,
+	);
+	const offset = Math.max(
+		Number.parseInt(c.req.query("offset") || "0", 10) || 0,
+		0,
+	);
 	try {
-		const rows = await listCommunityBlocks(getDb(c), category);
-		const blocks = rows.map((r) => JSON.parse(r.block_json) as HomeBlock);
-		return c.json({ version: 1, blocks });
+		const db = getDb(c);
+		const [rows, total, languages] = await Promise.all([
+			listCommunityBlocks(db, filter, limit, offset),
+			countCommunityBlocks(db, filter),
+			listCommunityLanguages(db),
+		]);
+		// HomeBlock shape plus browse metadata for the client community browser.
+		const blocks = rows.map((r) => ({
+			...(JSON.parse(r.block_json) as HomeBlock),
+			category: r.category,
+			author: r.author,
+			installs: r.installs,
+			itemCount: r.item_count,
+			language: r.language,
+		}));
+		return c.json({ version: 1, total, languages, blocks });
 	} catch (error) {
 		if (error instanceof ServiceUnavailable) {
-			return c.json({ version: 1, blocks: [] });
+			return c.json({ version: 1, total: 0, languages: [], blocks: [] });
 		}
 		throw error;
 	}
@@ -242,14 +272,21 @@ app.get("/community", async (c) => {
 
 app.get("/data/:blockId", async (c) => {
 	const blockId = c.req.param("blockId").replace(/[^a-zA-Z0-9_-]/g, "");
+	const limit = Number.parseInt(c.req.query("limit") || "", 10);
 	const response = await fetch(publicDataUrl(blockId));
-	return new Response(response.body, {
-		status: response.status,
-		headers: {
-			"Content-Type":
-				response.headers.get("Content-Type") || "application/json",
-		},
-	});
+	// Without a limit (the iOS client) stream the snapshot through untouched.
+	if (!response.ok || !Number.isFinite(limit) || limit <= 0) {
+		return new Response(response.body, {
+			status: response.status,
+			headers: {
+				"Content-Type":
+					response.headers.get("Content-Type") || "application/json",
+			},
+		});
+	}
+	const blob = (await response.json()) as SnapshotBlob;
+	const data = (blob.data ?? []).slice(0, limit);
+	return c.json({ ...blob, count: data.length, data });
 });
 
 app.post("/:blockId/install", async (c) => {

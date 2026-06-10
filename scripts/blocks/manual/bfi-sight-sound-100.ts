@@ -32,6 +32,10 @@ const KNOWN_IDS: Record<string, number> = {
 	"The Leopard": 1040,
 	"Black Girl": 95597,
 	"Beau travail": 14626,
+	Parasite: 496243,
+	"Close-Up": 30017,
+	// "Histoire(s) du cinéma" only exists on TMDB as a TV series (206647);
+	// patched manually via patch-item.ts since this pipeline is movie-only.
 };
 
 const HEADERS = {

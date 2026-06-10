@@ -617,27 +617,58 @@ function hero(it){
   return '<div class="it it-hero"'+attrs(it)+'><div class="art art-hero">'+pic(u)+'</div>'+cap(it)+'</div>';
 }
 const BUILD={'thumb-list':thumb,'poster-list':poster,'hero-list':hero};
-// Fetch a section's preview once, then keep it in the DOM. Switching tabs only
-// toggles visibility, so previews are never re-fetched.
+// SWR preview cache: keep only the fields the renderers read, capped per row,
+// so dozens of blocks stay well under the localStorage quota.
+const CK='epx:prev:';
+function slim(it){
+  return {id:it.tmdbId||it.id,media_type:it.media_type,title:tt(it),
+    release_date:it.release_date||it.first_air_date||'',overview:it.overview||'',
+    thumb:it.thumb||'',backdrop_path:it.backdrop_path||'',poster_path:it.poster_path||''};
+}
+function readCache(src){
+  try{const v=JSON.parse(localStorage.getItem(CK+src));return Array.isArray(v)&&v.length?v:null;}catch(e){return null;}
+}
+function render(sc,items,preset,rank,ov,animate){
+  const b=BUILD[preset]||thumb;
+  sc.innerHTML=items.map((it,i)=>b(it,i,rank,ov)).join('');
+  if(animate)Array.from(sc.children).forEach((el,i)=>{el.style.animationDelay=Math.min(i*45,360)+'ms';});
+  sc.querySelectorAll('img').forEach(im=>{
+    if(im.complete&&im.naturalWidth)im.classList.add('ld');
+    else im.addEventListener('load',()=>im.classList.add('ld'),{once:true});
+  });
+  sc.classList.add('in');
+}
+// Stale-while-revalidate: paint the cached preview instantly (no skeleton),
+// then fetch in the background and only repaint when the data changed.
 async function load(sec){
   if(sec.dataset.loaded)return;sec.dataset.loaded='1';
   const sc=sec.querySelector('.scroller');
   const src=sec.dataset.src;const preset=sec.dataset.preset||'thumb-list';
   const rank=sec.dataset.rank==='1';const ov=sec.dataset.ov==='1';
+  const cached=readCache(src);
+  if(cached)render(sc,cached,preset,rank,ov,false);
   try{
     const r=await fetch(src);if(!r.ok)throw 0;
     const items=pickList(await r.json());if(!items.length)throw 0;
-    const max=preset==='hero-list'?8:20;const b=BUILD[preset]||thumb;
-    sc.innerHTML=items.slice(0,max).map((it,i)=>b(it,i,rank,ov)).join('');
-    // Staggered entrance + artwork fade-in once each image decodes.
-    Array.from(sc.children).forEach((el,i)=>{el.style.animationDelay=Math.min(i*45,360)+'ms';});
-    sc.querySelectorAll('img').forEach(im=>{
-      if(im.complete&&im.naturalWidth)im.classList.add('ld');
-      else im.addEventListener('load',()=>im.classList.add('ld'),{once:true});
-    });
-    sc.classList.add('in');
-  }catch(e){sc.dataset.loaded='';sec.dataset.loaded='';sc.innerHTML='<div class="prev-empty">预览暂不可用</div>';}
+    const max=preset==='hero-list'?8:20;
+    const fresh=items.slice(0,max).map(slim);
+    const s=JSON.stringify(fresh);
+    if(!cached||JSON.stringify(cached)!==s)render(sc,fresh,preset,rank,ov,!cached);
+    try{localStorage.setItem(CK+src,s);}catch(e){}
+  }catch(e){
+    if(cached)return; // stale preview is better than an error
+    sc.dataset.loaded='';sec.dataset.loaded='';sc.innerHTML='<div class="prev-empty">预览暂不可用</div>';
+  }
 }
+// Evict cache entries for blocks no longer on the page (all categories are
+// always rendered, so data-src is the complete live set).
+try{
+  const live=new Set(Array.from(document.querySelectorAll('.blk')).map(s=>CK+s.dataset.src));
+  for(let i=localStorage.length-1;i>=0;i--){
+    const k=localStorage.key(i);
+    if(k&&k.indexOf(CK)===0&&!live.has(k))localStorage.removeItem(k);
+  }
+}catch(e){}
 // Lazy-load on scroll; hidden (display:none) sections only load once their tab
 // is selected and they enter the viewport.
 const io=new IntersectionObserver((es)=>{es.forEach(e=>{if(e.isIntersecting)load(e.target);});},{rootMargin:'400px'});

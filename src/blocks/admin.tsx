@@ -213,6 +213,7 @@ app.post("/:id/approve", async (c) => {
 		dataKey: publicKey(blockId),
 		itemCount,
 		author: sub.author,
+		language: sub.language,
 		createdAt: now,
 	});
 	await markApproved(db, id, blockId, itemCount, now);

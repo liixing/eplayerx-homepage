@@ -137,6 +137,7 @@ export interface CommunityBlockRow {
 	item_count: number;
 	installs: number;
 	author: string | null;
+	language: string;
 	created_at: string;
 }
 
