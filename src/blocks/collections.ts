@@ -96,12 +96,14 @@ export function parseCollectionInput(
 		if (!label) return { error: "请为每个榜单填写标签" };
 		seen.add(blockId);
 		const weekday = Number(entry?.weekday);
+		const image = String(entry?.image || "").trim();
 		children.push({
 			blockId,
 			label,
 			...(mode === "weekday" && weekday >= 1 && weekday <= 7
 				? { weekday }
 				: {}),
+			...(image.startsWith("https://") ? { image } : {}),
 		});
 	}
 	return { input: { title, mode, children } };
@@ -152,6 +154,7 @@ export async function resolveCollectionChildren(
 				id: spec.blockId,
 				label: spec.label,
 				...(spec.weekday ? { weekday: spec.weekday } : {}),
+				...(spec.image ? { image: spec.image } : {}),
 				title: block.title,
 				mediaType: block.mediaType,
 				preset: block.preset,
@@ -174,6 +177,7 @@ export async function resolveCollectionChildren(
 				id: spec.blockId,
 				label: spec.label,
 				...(spec.weekday ? { weekday: spec.weekday } : {}),
+				...(spec.image ? { image: spec.image } : {}),
 				title: officialBlock.title,
 				mediaType: officialBlock.mediaType,
 				preset: officialBlock.preset,

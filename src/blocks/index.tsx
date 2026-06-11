@@ -10,13 +10,12 @@
 
 import { Hono } from "hono";
 import { createDefaultHomeConfig } from "../home/config.js";
+import { isAdmin } from "./admin.js";
 import {
 	absoluteSourcePath,
 	IMAGE_BASE,
 	officialHomeBlocksById,
 	PUBLIC_API_BASE,
-	parseCollectionInput,
-	resolveCollectionChildren,
 } from "./collections.js";
 import { getDb, ServiceUnavailable, shortId } from "./runtime.js";
 import { validateToken } from "./scraper.js";
@@ -302,6 +301,7 @@ app.get("/", async (c) => {
 			category={category}
 			languages={languages}
 			homepages={homepages}
+			isAdmin={isAdmin(c)}
 		/>,
 	);
 });
@@ -331,6 +331,28 @@ app.get("/homepages/:collectionId", async (c) => {
 	} catch (error) {
 		if (error instanceof ServiceUnavailable) {
 			return c.text("服务暂不可用", 503);
+		}
+		throw error;
+	}
+});
+
+/** Published homepages as JSON (client community browser's 首页 filter). */
+app.get("/homepages", async (c) => {
+	try {
+		const rows = await listApprovedBlockCollections(getDb(c));
+		const homepages = rows.map((row) => ({
+			collectionId: row.collection_id,
+			title: row.title,
+			blockCount: row.block_count,
+			installs: row.installs,
+			blockTitles: (JSON.parse(row.blocks_json) as { title: string }[]).map(
+				(b) => b.title,
+			),
+		}));
+		return c.json({ version: 1, homepages });
+	} catch (error) {
+		if (error instanceof ServiceUnavailable) {
+			return c.json({ version: 1, homepages: [] });
 		}
 		throw error;
 	}
@@ -395,64 +417,17 @@ app.post("/submit", async (c) => {
 	return c.json({ ok: true });
 });
 
-/**
- * User-submitted collection (a named group of existing charts). Goes through
- * the same review queue as chart submissions; the admin publishes it as a
- * `collection-list` community block on approval.
- */
-app.post("/groups/submit", async (c) => {
-	const body = await c.req.json().catch(() => null);
-	const parsed = parseCollectionInput(body);
-	if ("error" in parsed) return c.json({ error: parsed.error }, 400);
-	const { input } = parsed;
-	const language = VALID_LANGUAGES.has(String(body?.language))
-		? String(body.language)
-		: DEFAULT_LANGUAGE;
-	const author = body?.author ? String(body.author).slice(0, 40) : null;
-
-	try {
-		const db = getDb(c);
-		// Validate every child resolves before queueing for review.
-		const resolved = await resolveCollectionChildren(
-			db,
-			input.children,
-			language,
-		);
-		if (resolved.children.length !== input.children.length) {
-			return c.json({ error: "包含不存在或不支持的榜单" }, 400);
-		}
-		await insertSubmission(db, {
-			id: shortId(),
-			category: resolved.category,
-			mediaType: resolved.children[0]?.mediaType === "movie" ? "movie" : "tv",
-			isAnime: resolved.category === "anime",
-			title: input.title,
-			preset: COLLECTION_PRESET,
-			showRank: false,
-			showOverview: false,
-			language,
-			source: JSON.stringify({ mode: input.mode, children: input.children }),
-			tmdbToken: null,
-			author,
-			createdAt: new Date().toISOString(),
-		});
-	} catch (error) {
-		if (error instanceof ServiceUnavailable) {
-			return c.json({ error: error.message }, 503);
-		}
-		throw error;
-	}
-	return c.json({ ok: true });
-});
-
 // MARK: - Consumption API (for the client)
 
 app.get("/community", async (c) => {
 	const raw = c.req.query("category");
+	// "collection" is a pseudo-category: it filters by block kind instead of
+	// the movie/tv/anime taxonomy (mirrors the explore page's filter chips).
 	const filter = {
 		category: VALID_CATEGORIES.includes(raw as BlockCategory)
 			? (raw as BlockCategory)
 			: undefined,
+		kind: raw === "collection" ? ("collection" as const) : undefined,
 		language: c.req.query("language") || undefined,
 		q: c.req.query("q")?.trim() || undefined,
 	};

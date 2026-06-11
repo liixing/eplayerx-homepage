@@ -153,6 +153,16 @@ body.selecting .blk .share{display:none}
 .grouppanel .grow input{flex:0 0 150px}
 .grouppanel .gfoot{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:10px}
 .grouppanel .gfoot input{flex:1;min-width:140px}
+.colkids{margin-top:14px;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.colkid{display:flex;align-items:center;gap:12px;padding:8px 12px}
+.colkid+.colkid{border-top:1px solid var(--line)}
+.colkid:hover{background:rgba(255,255,255,.025)}
+.colkid .thumb{width:56px;height:28px;flex:none;display:flex;align-items:center;justify-content:center;border-radius:6px;background:rgba(255,255,255,.04);border:1px dashed var(--line);overflow:hidden}
+.colkid .thumb.has{border-style:solid}
+.colkid .thumb img{max-width:100%;max-height:100%;object-fit:contain}
+.colkid .thumb i{font-style:normal;font-size:10px;color:var(--mut);opacity:.7}
+.colkid .name{flex:1;font-size:13px}
+.btn.mini{padding:5px 12px;font-size:12px;font-weight:600;border-radius:8px;gap:4px}
 .bllist{display:flex;flex-direction:column;gap:16px}
 .bllist .card{margin-bottom:0;transition:transform .15s,border-color .15s}
 .bllist .card:hover{border-color:#33405a}
@@ -243,11 +253,7 @@ const Layout = ({ title, active, children }: LayoutProps) => (
 // MARK: - Community library (home)
 
 /** Explore type filter: media categories plus collections and homepages. */
-export type ExploreCategory =
-	| "all"
-	| BlockCategory
-	| "collection"
-	| "homepage";
+export type ExploreCategory = "all" | BlockCategory | "collection" | "homepage";
 
 const EXPLORE_FILTERS: { id: ExploreCategory; label: string }[] = [
 	{ id: "all", label: "全部" },
@@ -274,6 +280,8 @@ interface ExploreProps {
 	/** Distinct community languages, for the filter menu. */
 	languages: string[];
 	homepages: HomepageSummary[];
+	/** Admin session detected: renders the collection builder (direct publish). */
+	isAdmin: boolean;
 }
 
 function languageLabel(code: string): string {
@@ -312,13 +320,7 @@ function blockHidden(b: DisplayBlock, category: ExploreCategory): boolean {
 }
 
 /** One block row: header + preview strip (chart) or capsules (collection). */
-const BlockSection = ({
-	b,
-	hidden,
-}: {
-	b: DisplayBlock;
-	hidden?: boolean;
-}) => (
+const BlockSection = ({ b, hidden }: { b: DisplayBlock; hidden?: boolean }) => (
 	<section
 		class={`blk${hidden ? " hide" : ""}`}
 		data-id={b.id}
@@ -337,13 +339,7 @@ const BlockSection = ({
 			<span class="pick" />
 			<span class="bt">{b.title}</span>
 			<span class="chev">›</span>
-			{b.collectionChildren ? (
-				<span class="tag tag-official">合集</span>
-			) : b.official ? (
-				<span class="tag tag-official">官方</span>
-			) : (
-				<span class="tag">社区</span>
-			)}
+			{b.collectionChildren ? <span class="tag tag-official">合集</span> : null}
 			<span class="meta-inline">
 				{b.collectionChildren
 					? `${b.collectionChildren.length} 个榜单 · 安装 ${b.installs ?? 0}`
@@ -353,7 +349,7 @@ const BlockSection = ({
 				{b.author ? ` · @${b.author}` : ""}
 			</span>
 			<button class="share" type="button" data-share={b.id}>
-				分享
+				安装
 			</button>
 		</div>
 		{b.collectionChildren ? (
@@ -429,6 +425,7 @@ export const ExplorePage = ({
 	category,
 	languages,
 	homepages,
+	isAdmin,
 }: ExploreProps) => (
 	<Layout title="社区库" active="explore">
 		<h1 class="gradtext">社区 Blocks</h1>
@@ -449,9 +446,11 @@ export const ExplorePage = ({
 					<option value={code}>{languageLabel(code)}</option>
 				))}
 			</select>
-			<button type="button" class="mkbtn" id="makeGroupBtn">
-				生成合集
-			</button>
+			{isAdmin ? (
+				<button type="button" class="mkbtn" id="makeGroupBtn">
+					生成合集
+				</button>
+			) : null}
 			<button type="button" class="mkbtn" id="makeHomeBtn">
 				生成首页
 			</button>
@@ -462,13 +461,17 @@ export const ExplorePage = ({
 				<p class="meta">这个分类还没有板块,去投稿一个吧。</p>
 			</div>
 		) : (
-			blocks.map((b) => <BlockSection b={b} hidden={blockHidden(b, category)} />)
+			blocks.map((b) => (
+				<BlockSection b={b} hidden={blockHidden(b, category)} />
+			))
 		)}
 		{homepages.map((hp) => (
 			<HomepageCard hp={hp} hidden={category !== "homepage"} />
 		))}
 		<div
-			class={`card${category === "homepage" && homepages.length === 0 ? "" : " hide"}`}
+			class={`card${
+				category === "homepage" && homepages.length === 0 ? "" : " hide"
+			}`}
 			id="hpEmpty"
 		>
 			<p class="meta">还没有已发布的首页,选中几个区块点“生成首页”试试。</p>
@@ -479,10 +482,12 @@ export const ExplorePage = ({
 				<span class="selcount" id="selCount">
 					已选 0
 				</span>
-				<button class="btn" id="groupBtn" type="button">
-					投稿合集
-				</button>
-				<button class="btn sec" id="packBtn" type="button">
+				{isAdmin ? (
+					<button class="btn" id="groupBtn" type="button">
+						发布合集
+					</button>
+				) : null}
+				<button class="btn" id="packBtn" type="button">
 					生成首页
 				</button>
 				<button class="btn sec" id="selCancelBtn" type="button">
@@ -513,38 +518,39 @@ export const ExplorePage = ({
 					</div>
 				</div>
 
-				<div class="grouppanel hide" id="groupPanel">
-					<div class="gfoot" style="margin:0 0 10px">
-						<input
-							id="grpTitle"
-							placeholder="合集标题,如 每日新番榜"
-							maxlength={40}
-						/>
-						<div class="chips" id="grpMode">
-							<div class="chip on" data-v="custom">
-								自定义
-							</div>
-							<div class="chip" data-v="weekday">
-								按星期
+				{isAdmin ? (
+					<div class="grouppanel hide" id="groupPanel">
+						<div class="gfoot" style="margin:0 0 10px">
+							<input
+								id="grpTitle"
+								placeholder="合集标题,如 每日新番榜"
+								maxlength={40}
+							/>
+							<div class="chips" id="grpMode">
+								<div class="chip on" data-v="custom">
+									自定义
+								</div>
+								<div class="chip" data-v="weekday">
+									按星期
+								</div>
 							</div>
 						</div>
+						<div id="grpRows" />
+						<div class="gfoot">
+							<button class="btn" id="grpSubmitBtn" type="button">
+								创建并发布
+							</button>
+						</div>
+						<div class="hint">
+							管理员操作:合集直接发布上架社区库,以一行胶囊卡片展示在首页。
+						</div>
 					</div>
-					<div id="grpRows" />
-					<div class="gfoot">
-						<input id="grpAuthor" placeholder="署名（可选）" maxlength={40} />
-						<button class="btn" id="grpSubmitBtn" type="button">
-							提交审核
-						</button>
-					</div>
-					<div class="hint">
-						合集会以一行胶囊卡片展示在首页;提交后由管理员审核,通过即上架社区库。
-					</div>
-				</div>
+				) : null}
 			</div>
 		</div>
 		<script
 			dangerouslySetInnerHTML={{
-				__html: raw(exploreJs(imageBase)) as unknown as string,
+				__html: raw(exploreJs(imageBase, isAdmin)) as unknown as string,
 			}}
 		/>
 	</Layout>
@@ -573,10 +579,20 @@ export const HomepageDetailPage = ({
 				。在 iPhone 上安装后会作为一个新首页出现在客户端。
 			</p>
 			<div class="hp-actions">
-				<a class="btn" href={importUrl}>
+				<a
+					class="btn"
+					href={importUrl}
+					id="hpInstallBtn"
+					data-cid={homepage.collectionId}
+				>
 					安装到 App
 				</a>
-				<button class="btn sec" id="copyHpBtn" type="button" data-url={importUrl}>
+				<button
+					class="btn sec"
+					id="copyHpBtn"
+					type="button"
+					data-url={importUrl}
+				>
 					复制链接
 				</button>
 				<span class="msg" id="hpMsg" />
@@ -740,15 +756,36 @@ export const ImportLandingPage = ({
 			))}
 		</div>
 		<p style="display:flex;gap:10px;flex-wrap:wrap">
-			<a class="btn" href={importUrl}>
+			<a class="btn" href={importUrl} id="openAppBtn">
 				在 App 中导入
 			</a>
 			<a class="btn sec" href={`https://apps.apple.com/app/id${APP_STORE_ID}`}>
 				下载 EplayerX
 			</a>
 		</p>
+		<script
+			dangerouslySetInnerHTML={{
+				__html: raw(LANDING_JS) as unknown as string,
+			}}
+		/>
 	</Layout>
 );
+
+// Same-domain anchor can't trigger the universal link; try the custom scheme
+// first, then fall back to the App Store if the app doesn't take over.
+const LANDING_JS = `
+const btn=document.getElementById('openAppBtn');
+if(btn)btn.addEventListener('click',e=>{
+  if(!/iPad|iPhone|iPod/.test(navigator.userAgent))return;
+  e.preventDefault();
+  const q=(btn.getAttribute('href').split('?')[1])||'';
+  const t=setTimeout(()=>{location.href=${JSON.stringify(
+		`https://apps.apple.com/app/id${APP_STORE_ID}`,
+	)};},1200);
+  addEventListener('pagehide',()=>clearTimeout(t),{once:true});
+  location.href=${JSON.stringify(`${APP_SCHEME}://import/blocks`)}+'?'+q;
+});
+`;
 
 export const AdminLoginPage = ({ error }: { error?: boolean }) => (
 	<Layout title="审核" active="none">
@@ -773,7 +810,7 @@ export interface AdminCollectionRow {
 	blockId: string;
 	title: string;
 	mode: "weekday" | "custom";
-	childLabels: string[];
+	children: { id: string; label: string; image?: string }[];
 	installs: number;
 }
 
@@ -862,252 +899,278 @@ export const AdminPage = ({
 		</div>
 
 		<div data-panel="pending">
-		<p class="sub">
-			先在本地跑发布脚本（scripts/blocks/）抓取并上传 R2,再把输出的 blockId
-			填进来;参数可按需修改,点“校验并通过”即发布。合集投稿无需脚本,直接通过。
-		</p>
-		{pending.length === 0 ? (
-			<div class="card">
-				<p class="meta">暂无待审投稿。</p>
-			</div>
-		) : (
-			<div class="bllist">
-				{pending.map((s) =>
-					s.preset === "collection-list" ? (
-						<PendingCollectionCard s={s} />
-					) : (
-						<div class="card" data-id={s.id}>
-							<div>
-								<strong style="font-size:16px">{s.title}</strong>
-								<div class="meta">
-									<span class="tag">{s.category}</span>
-									<span class="tag">{s.preset}</span>
-									<span class="tag">{s.language}</span>
-									{s.show_rank ? " · 排行" : ""}
-									{s.show_overview ? " · 简介" : ""}
-									{s.author ? ` · @${s.author}` : ""}
-								</div>
-								<div class="meta">{s.created_at}</div>
-							</div>
-							<div class="srcbox mono">{s.source_spec}</div>
-							<label>
-								投稿 ID（发布脚本里填 submissionId,token 会自动读取）
-							</label>
-							<div class="srcbox mono">{s.id}</div>
-							<label>名称</label>
-							<input data-f="title" data-id={s.id} value={s.title} />
-							<div class="row">
+			<p class="sub">
+				先在本地跑发布脚本（scripts/blocks/）抓取并上传 R2,再把输出的 blockId
+				填进来;参数可按需修改,点“校验并通过”即发布。合集投稿无需脚本,直接通过。
+			</p>
+			{pending.length === 0 ? (
+				<div class="card">
+					<p class="meta">暂无待审投稿。</p>
+				</div>
+			) : (
+				<div class="bllist">
+					{pending.map((s) =>
+						s.preset === "collection-list" ? (
+							<PendingCollectionCard s={s} />
+						) : (
+							<div class="card" data-id={s.id}>
 								<div>
-									<label>分类</label>
-									<select data-f="category" data-id={s.id}>
-										{ADMIN_CATEGORY_OPTIONS.map((o) => (
-											<option value={o.value} selected={s.category === o.value}>
-												{o.label}
+									<strong style="font-size:16px">{s.title}</strong>
+									<div class="meta">
+										<span class="tag">{s.category}</span>
+										<span class="tag">{s.preset}</span>
+										<span class="tag">{s.language}</span>
+										{s.show_rank ? " · 排行" : ""}
+										{s.show_overview ? " · 简介" : ""}
+										{s.author ? ` · @${s.author}` : ""}
+									</div>
+									<div class="meta">{s.created_at}</div>
+								</div>
+								<div class="srcbox mono">{s.source_spec}</div>
+								<label>
+									投稿 ID（发布脚本里填 submissionId,token 会自动读取）
+								</label>
+								<div class="srcbox mono">{s.id}</div>
+								<label>名称</label>
+								<input data-f="title" data-id={s.id} value={s.title} />
+								<div class="row">
+									<div>
+										<label>分类</label>
+										<select data-f="category" data-id={s.id}>
+											{ADMIN_CATEGORY_OPTIONS.map((o) => (
+												<option
+													value={o.value}
+													selected={s.category === o.value}
+												>
+													{o.label}
+												</option>
+											))}
+										</select>
+									</div>
+									<div>
+										<label>媒体类型</label>
+										<select data-f="mediaType" data-id={s.id}>
+											<option value="movie" selected={s.media_type === "movie"}>
+												movie
 											</option>
-										))}
-									</select>
-								</div>
-								<div>
-									<label>媒体类型</label>
-									<select data-f="mediaType" data-id={s.id}>
-										<option value="movie" selected={s.media_type === "movie"}>
-											movie
-										</option>
-										<option value="tv" selected={s.media_type === "tv"}>
-											tv
-										</option>
-									</select>
-								</div>
-								<div>
-									<label>展示样式</label>
-									<select data-f="preset" data-id={s.id}>
-										{ADMIN_PRESET_OPTIONS.map((o) => (
-											<option value={o.value} selected={s.preset === o.value}>
-												{o.label}
+											<option value="tv" selected={s.media_type === "tv"}>
+												tv
 											</option>
-										))}
-									</select>
+										</select>
+									</div>
+									<div>
+										<label>展示样式</label>
+										<select data-f="preset" data-id={s.id}>
+											{ADMIN_PRESET_OPTIONS.map((o) => (
+												<option value={o.value} selected={s.preset === o.value}>
+													{o.label}
+												</option>
+											))}
+										</select>
+									</div>
 								</div>
-							</div>
-							<div class="row" style="margin-top:6px">
-								<div>
-									<label class="check">
-										<input
-											type="checkbox"
-											data-f="showRank"
-											data-id={s.id}
-											checked={!!s.show_rank}
-										/>
-										显示排行序号
-									</label>
+								<div class="row" style="margin-top:6px">
+									<div>
+										<label class="check">
+											<input
+												type="checkbox"
+												data-f="showRank"
+												data-id={s.id}
+												checked={!!s.show_rank}
+											/>
+											显示排行序号
+										</label>
+									</div>
+									<div>
+										<label class="check">
+											<input
+												type="checkbox"
+												data-f="showOverview"
+												data-id={s.id}
+												checked={!!s.show_overview}
+											/>
+											显示简介
+										</label>
+									</div>
+									<div>
+										<label class="check">
+											<input
+												type="checkbox"
+												data-f="isAnime"
+												data-id={s.id}
+												checked={!!s.is_anime}
+											/>
+											动漫标记
+										</label>
+									</div>
 								</div>
-								<div>
-									<label class="check">
-										<input
-											type="checkbox"
-											data-f="showOverview"
-											data-id={s.id}
-											checked={!!s.show_overview}
-										/>
-										显示简介
-									</label>
-								</div>
-								<div>
-									<label class="check">
-										<input
-											type="checkbox"
-											data-f="isAnime"
-											data-id={s.id}
-											checked={!!s.is_anime}
-										/>
-										动漫标记
-									</label>
-								</div>
-							</div>
-							<label>blockId（本地发布脚本输出）</label>
-							<input
-								class="mono"
-								data-f="blockId"
-								data-id={s.id}
-								placeholder="community-xxxxxxxxxxxx"
-							/>
-							<div class="hint">
-								本地执行 bun run scripts/blocks/&lt;name&gt;.ts 上传快照后,把
-								blockId 粘贴到这里。
-							</div>
-							<div style="margin-top:14px;display:flex;gap:10px">
-								<button
-									class="btn"
-									type="button"
-									data-act="approve"
+								<label>blockId（本地发布脚本输出）</label>
+								<input
+									class="mono"
+									data-f="blockId"
 									data-id={s.id}
-								>
-									校验并通过
+									placeholder="community-xxxxxxxxxxxx"
+								/>
+								<div class="hint">
+									本地执行 bun run scripts/blocks/&lt;name&gt;.ts 上传快照后,把
+									blockId 粘贴到这里。
+								</div>
+								<div style="margin-top:14px;display:flex;gap:10px">
+									<button
+										class="btn"
+										type="button"
+										data-act="approve"
+										data-id={s.id}
+									>
+										校验并通过
+									</button>
+									<button
+										class="btn danger"
+										type="button"
+										data-act="reject"
+										data-id={s.id}
+									>
+										驳回
+									</button>
+								</div>
+								<div class="msg" data-msg={s.id} />
+							</div>
+						),
+					)}
+				</div>
+			)}
+		</div>
+
+		<div class="hide" data-panel="homepages">
+			<p class="sub">用户从社区库打包的首页;通过后分享链接生效,驳回即删除。</p>
+			{homepages.length === 0 ? (
+				<div class="card">
+					<p class="meta">暂无待审首页。</p>
+				</div>
+			) : (
+				<div class="bllist">
+					{homepages.map((hp) => (
+						<div class="card" data-hp={hp.collectionId}>
+							<strong style="font-size:16px">{hp.title}</strong>
+							<div class="meta">
+								<span class="tag mono">{hp.collectionId}</span>
+								{hp.blockTitles.length} 个区块 · {hp.createdAt}
+							</div>
+							<div class="meta">{hp.blockTitles.join(" · ")}</div>
+							<div style="margin-top:12px;display:flex;gap:10px">
+								<button class="btn" type="button" data-hpok={hp.collectionId}>
+									通过
 								</button>
 								<button
 									class="btn danger"
 									type="button"
-									data-act="reject"
-									data-id={s.id}
+									data-hpdel={hp.collectionId}
 								>
-									驳回
+									驳回并删除
 								</button>
 							</div>
-							<div class="msg" data-msg={s.id} />
+							<div class="msg" data-hpmsg={hp.collectionId} />
 						</div>
-					),
-				)}
-			</div>
-		)}
-		</div>
-
-		<div class="hide" data-panel="homepages">
-		<p class="sub">
-			用户从社区库打包的首页;通过后分享链接生效,驳回即删除。
-		</p>
-		{homepages.length === 0 ? (
-			<div class="card">
-				<p class="meta">暂无待审首页。</p>
-			</div>
-		) : (
-			<div class="bllist">
-				{homepages.map((hp) => (
-					<div class="card" data-hp={hp.collectionId}>
-						<strong style="font-size:16px">{hp.title}</strong>
-						<div class="meta">
-							<span class="tag mono">{hp.collectionId}</span>
-							{hp.blockTitles.length} 个区块 · {hp.createdAt}
-						</div>
-						<div class="meta">{hp.blockTitles.join(" · ")}</div>
-						<div style="margin-top:12px;display:flex;gap:10px">
-							<button class="btn" type="button" data-hpok={hp.collectionId}>
-								通过
-							</button>
-							<button
-								class="btn danger"
-								type="button"
-								data-hpdel={hp.collectionId}
-							>
-								驳回并删除
-							</button>
-						</div>
-						<div class="msg" data-hpmsg={hp.collectionId} />
-					</div>
-				))}
-			</div>
-		)}
+					))}
+				</div>
+			)}
 		</div>
 
 		<div class="hide" data-panel="collections">
-		<p class="sub">
-			把已有榜单（社区或官方）组合成一个合集,客户端首页以一行胶囊卡片展示。
-		</p>
-		<div class="card">
-			<strong>新建合集</strong>
-			<label>标题</label>
-			<input id="ncTitle" placeholder="如 每日新番榜" maxlength={40} />
-			<div class="row">
-				<div>
-					<label>分类</label>
-					<select id="ncCategory">
-						{ADMIN_CATEGORY_OPTIONS.map((o) => (
-							<option value={o.value}>{o.label}</option>
-						))}
-					</select>
-				</div>
-				<div>
-					<label>模式</label>
-					<select id="ncMode">
-						<option value="custom">自定义</option>
-						<option value="weekday">按星期（今天优先）</option>
-					</select>
-				</div>
-			</div>
-			<label>
-				子榜单（每行一个: blockId | 标签 | 星期1-7,星期仅按星期模式需要）
-			</label>
-			<textarea
-				id="ncChildren"
-				class="mono"
-				style="min-height:120px"
-				placeholder={
-					"community-abc123 | 周一 | 1\ncommunity-def456 | 周二 | 2\ntrending-movies | 热门电影"
-				}
-			/>
-			<div style="margin-top:14px">
-				<button class="btn" id="ncCreateBtn" type="button">
-					创建并发布
-				</button>
-			</div>
-			<div class="msg" id="ncMsg" />
-		</div>
-		{collections.length > 0 ? (
-			<div class="bllist">
-				{collections.map((col) => (
-					<div class="card" data-col={col.blockId}>
-						<strong style="font-size:16px">{col.title}</strong>
-						<div class="meta">
-							<span class="tag">
-								{col.mode === "weekday" ? "按星期" : "自定义"}
-							</span>
-							<span class="tag mono">{col.blockId}</span>
-							安装 {col.installs}
-						</div>
-						<div class="meta">{col.childLabels.join(" · ")}</div>
-						<div style="margin-top:12px">
-							<button
-								class="btn danger"
-								type="button"
-								data-coldel={col.blockId}
-							>
-								删除
-							</button>
-						</div>
-						<div class="msg" data-colmsg={col.blockId} />
+			<p class="sub">
+				把已有榜单（社区或官方）组合成一个合集,客户端首页以一行胶囊卡片展示。
+			</p>
+			<div class="card">
+				<strong>新建合集</strong>
+				<label>标题</label>
+				<input id="ncTitle" placeholder="如 每日新番榜" maxlength={40} />
+				<div class="row">
+					<div>
+						<label>分类</label>
+						<select id="ncCategory">
+							{ADMIN_CATEGORY_OPTIONS.map((o) => (
+								<option value={o.value}>{o.label}</option>
+							))}
+						</select>
 					</div>
-				))}
+					<div>
+						<label>模式</label>
+						<select id="ncMode">
+							<option value="custom">自定义</option>
+							<option value="weekday">按星期（今天优先）</option>
+						</select>
+					</div>
+				</div>
+				<label>
+					子榜单（每行一个: blockId | 标签 | 星期1-7,星期仅按星期模式需要）
+				</label>
+				<textarea
+					id="ncChildren"
+					class="mono"
+					style="min-height:120px"
+					placeholder={
+						"community-abc123 | 周一 | 1\ncommunity-def456 | 周二 | 2\ntrending-movies | 热门电影"
+					}
+				/>
+				<div style="margin-top:14px">
+					<button class="btn" id="ncCreateBtn" type="button">
+						创建并发布
+					</button>
+				</div>
+				<div class="msg" id="ncMsg" />
 			</div>
-		) : null}
+			{collections.length > 0 ? (
+				<div class="bllist">
+					{collections.map((col) => (
+						<div class="card" data-col={col.blockId}>
+							<strong style="font-size:16px">{col.title}</strong>
+							<div class="meta">
+								<span class="tag">
+									{col.mode === "weekday" ? "按星期" : "自定义"}
+								</span>
+								<span class="tag mono">{col.blockId}</span>
+								安装 {col.installs}
+							</div>
+							<div class="colkids">
+								{col.children.map((ch) => (
+									<div class="colkid">
+										<span class={ch.image ? "thumb has" : "thumb"}>
+											{ch.image ? <img src={ch.image} alt="" /> : <i>无图</i>}
+										</span>
+										<span class="name">{ch.label}</span>
+										<button
+											class="btn sec mini"
+											type="button"
+											data-colimg={`${col.blockId}|${ch.id}`}
+										>
+											{ch.image ? "换图" : "传图"}
+										</button>
+										{ch.image ? (
+											<button
+												class="btn danger mini"
+												type="button"
+												data-colimgclear={`${col.blockId}|${ch.id}`}
+											>
+												清除
+											</button>
+										) : null}
+									</div>
+								))}
+							</div>
+							<div style="margin-top:12px">
+								<button
+									class="btn danger"
+									type="button"
+									data-coldel={col.blockId}
+								>
+									删除
+								</button>
+							</div>
+							<div class="msg" data-colmsg={col.blockId} />
+						</div>
+					))}
+				</div>
+			) : null}
 		</div>
 
 		<script
@@ -1255,21 +1318,28 @@ async function load(sec){
     sc.dataset.loaded='';sec.dataset.loaded='';sc.innerHTML='<div class="prev-empty">预览暂不可用</div>';
   }
 }
-// Tap a card -> the iOS client's detail screen (app/tmdb-info/detail.tsx).
 // Universal links never fire on same-domain taps, so try the custom scheme
-// first and fall back to the universal link if the app doesn't take over.
+// first and fall back to the web URL if the app doesn't take over.
 const DETAIL=${JSON.stringify(`${UNIVERSAL_LINK_BASE}${DETAIL_PATH}`)};
 const SCHEME=${JSON.stringify(`${APP_SCHEME}:/${DETAIL_PATH}`)};
-function openDetail(id,mt){
-  const q='?id='+encodeURIComponent(id)+'&type='+(mt||'movie');
+const IMPORT_WEB=${JSON.stringify(IMPORT_LINK_BASE)};
+const IMPORT_SCHEME=${JSON.stringify(`${APP_SCHEME}://import/blocks`)};
+function openApp(scheme,web){
   if(/iPad|iPhone|iPod/.test(navigator.userAgent)){
-    const t=setTimeout(()=>{location.href=DETAIL+q;},1200);
+    const t=setTimeout(()=>{location.href=web;},1200);
     addEventListener('pagehide',()=>clearTimeout(t),{once:true});
-    location.href=SCHEME+q;
+    location.href=scheme;
   }else{
-    location.href=DETAIL+q;
+    location.href=web;
   }
 }
+// Tap a card -> the iOS client's detail screen (app/tmdb-info/detail.tsx).
+function openDetail(id,mt){
+  const q='?id='+encodeURIComponent(id)+'&type='+(mt||'movie');
+  openApp(SCHEME+q,DETAIL+q);
+}
+// Open the app's block import flow (app/import/blocks.tsx).
+function openImport(query){openApp(IMPORT_SCHEME+'?'+query,IMPORT_WEB+'?'+query);}
 async function copyText(text){
   try{await navigator.clipboard.writeText(text);return true;}
   catch(e){
@@ -1297,10 +1367,95 @@ document.querySelectorAll('.blk').forEach(s=>{
     if(it&&it.dataset.tid)openDetail(it.dataset.tid,it.dataset.mt||fallbackMt);
   });
 });
+// Per-block install: open the app's import flow for that single block.
+document.querySelectorAll('.share[data-share]').forEach(btn=>{
+  btn.addEventListener('click',e=>{
+    e.stopPropagation();
+    openImport('blockId='+encodeURIComponent(btn.dataset.share));
+  });
+});
 `;
 }
 
-function exploreJs(imageBase: string): string {
+/**
+ * Collection builder for logged-in admins: pick charts on the explore page
+ * and publish a collection directly (no review queue). Only emitted when the
+ * matching admin-only DOM (makeGroupBtn/groupBtn/groupPanel) was rendered.
+ */
+const ADMIN_GROUP_JS = `
+// ── Admin collection builder: select charts, publish directly ───────
+const WD_LABELS=['周一','周二','周三','周四','周五','周六','周日'];
+let grpModeV='custom';
+function buildGroupRows(){
+  const rows=document.getElementById('grpRows');
+  rows.innerHTML='';
+  let idx=0;
+  selected.forEach(id=>{
+    const sec=document.querySelector('.blk[data-id="'+CSS.escape(id)+'"]');
+    const title=(sec&&sec.dataset.title)||id;
+    const row=document.createElement('div');row.className='grow';
+    if(sec&&sec.dataset.kind==='collection'){
+      row.innerHTML='<span class="gt">'+esc(title)+'（合集不可嵌套,已忽略）</span>';
+      rows.appendChild(row);return;
+    }
+    const i=idx++;
+    row.innerHTML='<span class="gt">'+esc(title)+'</span><input maxlength="14" data-gid="'+esc(id)+'" placeholder="标签">';
+    rows.appendChild(row);
+    row.querySelector('input').value=grpModeV==='weekday'?(WD_LABELS[i]||''):String(title).slice(0,14);
+  });
+}
+makeGroupBtn.onclick=()=>setSelMode(selKind==='group'?'':'group');
+groupBtn.onclick=()=>{
+  if(!requireSelection())return;
+  buildGroupRows();showPanel('group');
+};
+document.querySelectorAll('#grpMode .chip').forEach(c=>{
+  c.onclick=()=>{
+    document.querySelectorAll('#grpMode .chip').forEach(x=>x.classList.remove('on'));
+    c.classList.add('on');grpModeV=c.dataset.v;buildGroupRows();
+  };
+});
+// Majority category among the picked charts, for the published block.
+function groupCategory(){
+  const counts={};
+  selected.forEach(id=>{
+    const sec=document.querySelector('.blk[data-id="'+CSS.escape(id)+'"]');
+    const cat=sec&&sec.dataset.category;
+    if(cat)counts[cat]=(counts[cat]||0)+1;
+  });
+  let best='tv',n=0;
+  for(const k in counts)if(counts[k]>n){best=k;n=counts[k];}
+  return best;
+}
+document.getElementById('grpSubmitBtn').onclick=async()=>{
+  const title=document.getElementById('grpTitle').value.trim();
+  if(!title)return colShow('err','请填写合集标题');
+  const inputs=Array.from(document.querySelectorAll('#grpRows input[data-gid]'));
+  if(inputs.length<2)return colShow('err','合集至少需要 2 个榜单');
+  if(grpModeV==='weekday'&&inputs.length>7)return colShow('err','按星期模式最多 7 个榜单');
+  const children=inputs.map((inp,i)=>{
+    const ch={blockId:inp.dataset.gid,label:inp.value.trim()};
+    if(grpModeV==='weekday')ch.weekday=i+1;
+    return ch;
+  });
+  if(children.some(ch=>!ch.label))return colShow('err','请为每个榜单填写标签');
+  const btn=document.getElementById('grpSubmitBtn');
+  btn.disabled=true;btn.innerHTML='<span class="spin"></span> 发布中…';
+  colShow('','');
+  try{
+    const r=await fetch('/admin/collections/create',{method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({title,mode:grpModeV,category:groupCategory(),children})});
+    const j=await r.json();
+    if(!r.ok){colShow('err',j.error||'发布失败');btn.disabled=false;btn.textContent='创建并发布';return;}
+    colShow('ok','已发布 · '+j.blockId+'（刷新页面查看）');
+    showPanel('');
+    btn.disabled=false;btn.textContent='创建并发布';
+  }catch(e){colShow('err','网络错误');btn.disabled=false;btn.textContent='创建并发布';}
+};
+`;
+
+function exploreJs(imageBase: string, isAdmin: boolean): string {
 	return `${rendererJs(imageBase)}
 // Evict cache entries for blocks no longer on the page (all categories are
 // always rendered, so data-src + capsule data-csrc is the complete live set).
@@ -1363,33 +1518,33 @@ langSel.addEventListener('change',applyFilters);
 document.querySelectorAll('.hp-card').forEach(c=>{
   c.addEventListener('click',()=>{location.href='/blocks/homepages/'+c.dataset.hp;});
 });
-// ── Multi-select: 生成首页 (pack) or 生成合集 (group submission) ────
-const IMPORT_BASE=${JSON.stringify(IMPORT_LINK_BASE)};
+// ── Multi-select: 生成首页 (pack) or 生成合集 (admin only) ──────────
 let selMode=false;
 let selKind='';
 const selected=new Set();
 const selbar=document.getElementById('selbar');
-const makeGroupBtn=document.getElementById('makeGroupBtn');
 const makeHomeBtn=document.getElementById('makeHomeBtn');
-const groupBtn=document.getElementById('groupBtn');
 const packBtn=document.getElementById('packBtn');
 const colMsg=document.getElementById('colMsg');
 const colResult=document.getElementById('colResult');
 const packPanel=document.getElementById('packPanel');
+// Admin-only elements; null for regular visitors.
+const makeGroupBtn=document.getElementById('makeGroupBtn');
+const groupBtn=document.getElementById('groupBtn');
 const groupPanel=document.getElementById('groupPanel');
 function showPanel(which){
   packPanel.classList.toggle('hide',which!=='pack');
-  groupPanel.classList.toggle('hide',which!=='group');
+  if(groupPanel)groupPanel.classList.toggle('hide',which!=='group');
 }
 function setSelMode(kind){
   selKind=kind||'';
   selMode=!!selKind;
   document.body.classList.toggle('selecting',selMode);
   selbar.classList.toggle('hide',!selMode);
-  makeGroupBtn.classList.toggle('on',selKind==='group');
   makeHomeBtn.classList.toggle('on',selKind==='pack');
-  groupBtn.classList.toggle('hide',selKind!=='group');
   packBtn.classList.toggle('hide',selKind!=='pack');
+  if(makeGroupBtn)makeGroupBtn.classList.toggle('on',selKind==='group');
+  if(groupBtn)groupBtn.classList.toggle('hide',selKind!=='group');
   selected.clear();
   document.querySelectorAll('.blk.sel').forEach(s=>s.classList.remove('sel'));
   colMsg.className='msg';colMsg.textContent='';
@@ -1410,7 +1565,6 @@ function toggleSelect(sec){
   updateSelCount();
 }
 onBlkTap=(s)=>{if(selMode){toggleSelect(s);return true;}return false;};
-makeGroupBtn.onclick=()=>setSelMode(selKind==='group'?'':'group');
 makeHomeBtn.onclick=()=>setSelMode(selKind==='pack'?'':'pack');
 document.getElementById('selCancelBtn').onclick=()=>setSelMode('');
 function colShow(cls,text){colMsg.className='msg '+cls;colMsg.textContent=text;}
@@ -1442,81 +1596,19 @@ document.getElementById('copyColBtn').onclick=async()=>{
   const url=document.getElementById('colUrl').textContent;
   if(url&&await copyText(url))colShow('ok','已复制导入链接');
 };
-// ── Collection submission (a labelled group of charts, reviewed) ────
-const WD_LABELS=['周一','周二','周三','周四','周五','周六','周日'];
-let grpModeV='custom';
-function buildGroupRows(){
-  const rows=document.getElementById('grpRows');
-  rows.innerHTML='';
-  let idx=0;
-  selected.forEach(id=>{
-    const sec=document.querySelector('.blk[data-id="'+CSS.escape(id)+'"]');
-    const title=(sec&&sec.dataset.title)||id;
-    const row=document.createElement('div');row.className='grow';
-    if(sec&&sec.dataset.kind==='collection'){
-      row.innerHTML='<span class="gt">'+esc(title)+'（合集不可嵌套,已忽略）</span>';
-      rows.appendChild(row);return;
-    }
-    const i=idx++;
-    row.innerHTML='<span class="gt">'+esc(title)+'</span><input maxlength="14" data-gid="'+esc(id)+'" placeholder="标签">';
-    rows.appendChild(row);
-    row.querySelector('input').value=grpModeV==='weekday'?(WD_LABELS[i]||''):String(title).slice(0,14);
-  });
-}
-document.getElementById('groupBtn').onclick=()=>{
-  if(!requireSelection())return;
-  buildGroupRows();showPanel('group');
-};
-document.querySelectorAll('#grpMode .chip').forEach(c=>{
-  c.onclick=()=>{
-    document.querySelectorAll('#grpMode .chip').forEach(x=>x.classList.remove('on'));
-    c.classList.add('on');grpModeV=c.dataset.v;buildGroupRows();
-  };
-});
-document.getElementById('grpSubmitBtn').onclick=async()=>{
-  const title=document.getElementById('grpTitle').value.trim();
-  if(!title)return colShow('err','请填写合集标题');
-  const inputs=Array.from(document.querySelectorAll('#grpRows input[data-gid]'));
-  if(inputs.length<2)return colShow('err','合集至少需要 2 个榜单');
-  if(grpModeV==='weekday'&&inputs.length>7)return colShow('err','按星期模式最多 7 个榜单');
-  const children=inputs.map((inp,i)=>{
-    const ch={blockId:inp.dataset.gid,label:inp.value.trim()};
-    if(grpModeV==='weekday')ch.weekday=i+1;
-    return ch;
-  });
-  if(children.some(ch=>!ch.label))return colShow('err','请为每个榜单填写标签');
-  const btn=document.getElementById('grpSubmitBtn');
-  btn.disabled=true;btn.innerHTML='<span class="spin"></span> 提交中…';
-  colShow('','');
-  try{
-    const r=await fetch('/blocks/groups/submit',{method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({title,mode:grpModeV,children,
-        author:document.getElementById('grpAuthor').value.trim()})});
-    const j=await r.json();
-    if(!r.ok){colShow('err',j.error||'提交失败');btn.disabled=false;btn.textContent='提交审核';return;}
-    colShow('ok','已提交审核,通过后合集会出现在社区库。');
-    showPanel('');
-    btn.disabled=false;btn.textContent='提交审核';
-  }catch(e){colShow('err','网络错误');btn.disabled=false;btn.textContent='提交审核';}
-};
-// Per-block share: copy the single-block universal import link.
-document.querySelectorAll('.share[data-share]').forEach(btn=>{
-  btn.addEventListener('click',async e=>{
-    e.stopPropagation();
-    const url=IMPORT_BASE+'?blockId='+encodeURIComponent(btn.dataset.share);
-    if(await copyText(url)){
-      const old=btn.textContent;btn.textContent='已复制';
-      setTimeout(()=>{btn.textContent=old;},1500);
-    }
-  });
-});
+${isAdmin ? ADMIN_GROUP_JS : ""}
 `;
 }
 
-/** Homepage detail page: shared renderer + copy-install-link button. */
+/** Homepage detail page: shared renderer + install/copy actions. */
 function homepageJs(imageBase: string): string {
 	return `${rendererJs(imageBase)}
+// Same-domain anchor would just reload the page; go scheme-first instead.
+const hpInstall=document.getElementById('hpInstallBtn');
+if(hpInstall)hpInstall.addEventListener('click',e=>{
+  e.preventDefault();
+  openImport('collectionId='+encodeURIComponent(hpInstall.dataset.cid));
+});
 const hpCopy=document.getElementById('copyHpBtn');
 if(hpCopy)hpCopy.onclick=async()=>{
   if(await copyText(hpCopy.dataset.url)){
@@ -1677,6 +1769,49 @@ if(ncBtn)ncBtn.onclick=async()=>{
     ncBtn.disabled=false;ncBtn.textContent='创建并发布';
   }catch(e){show('err','网络错误');ncBtn.disabled=false;ncBtn.textContent='创建并发布';}
 };
+// ── Collection child logos: upload to R2, then patch the block JSON ──
+function colImgMsg(blockId,cls,text){
+  const msg=document.querySelector('[data-colmsg="'+blockId+'"]');
+  if(msg){msg.className='msg '+cls;msg.textContent=text;}
+}
+async function setChildImage(blockId,childId,image){
+  const r=await fetch('/admin/collections/'+blockId+'/child-image',{method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({childId,image})});
+  const j=await r.json();
+  if(!r.ok)throw new Error(j.error||'保存失败');
+}
+const colImgPicker=document.createElement('input');
+colImgPicker.type='file';colImgPicker.accept='image/png,image/jpeg,image/webp,image/svg+xml';
+let colImgTarget=null;
+colImgPicker.onchange=async()=>{
+  const file=colImgPicker.files&&colImgPicker.files[0];
+  colImgPicker.value='';
+  if(!file||!colImgTarget)return;
+  const [blockId,childId]=colImgTarget;
+  colImgMsg(blockId,'','上传中…');
+  try{
+    const up=await fetch('/admin/assets/upload',{method:'POST',
+      headers:{'Content-Type':file.type},body:file});
+    const uj=await up.json();
+    if(!up.ok)throw new Error(uj.error||'上传失败');
+    await setChildImage(blockId,childId,uj.url);
+    colImgMsg(blockId,'ok','已保存（刷新页面查看）');
+  }catch(e){colImgMsg(blockId,'err',e.message||'网络错误');}
+};
+document.querySelectorAll('[data-colimg]').forEach(b=>{
+  b.onclick=()=>{colImgTarget=b.dataset.colimg.split('|');colImgPicker.click();};
+});
+document.querySelectorAll('[data-colimgclear]').forEach(b=>{
+  b.onclick=async()=>{
+    const [blockId,childId]=b.dataset.colimgclear.split('|');
+    b.disabled=true;
+    try{
+      await setChildImage(blockId,childId,'');
+      colImgMsg(blockId,'ok','已清除（刷新页面查看）');
+    }catch(e){colImgMsg(blockId,'err',e.message||'网络错误');b.disabled=false;}
+  };
+});
 document.querySelectorAll('[data-coldel]').forEach(b=>{
   b.onclick=async()=>{
     if(!confirm('确认删除该合集?已导入的客户端不受影响。'))return;

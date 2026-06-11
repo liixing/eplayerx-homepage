@@ -27,6 +27,12 @@ database_name = "blocks"
 database_id = "e8ba17f1-93da-4903-8ee5-53e2ace245cf"
 migrations_dir = "migrations"
 
+# Existing crawler/snapshot bucket (served publicly via assets.eplayerx.com).
+# Bound so the admin panel can upload collection child logos directly.
+[[r2_buckets]]
+binding = "ASSETS"
+bucket_name = "crawler"
+
 # Uncomment to enable cron trigger (e.g. daily crawl at 08:00 UTC)
 # [triggers]
 # crons = ["0 8 * * *"]

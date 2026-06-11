@@ -55,6 +55,11 @@ export function publicDataUrl(blockId: string): string {
 	return `https://${R2_CUSTOM_DOMAIN}/${publicKey(blockId)}`;
 }
 
+/** Public URL of any object in the bucket (custom domain serves it as-is). */
+export function publicAssetUrl(key: string): string {
+	return `https://${R2_CUSTOM_DOMAIN}/${key}`;
+}
+
 function makeBlob(items: SnapshotItem[], title?: string): SnapshotBlob {
 	return {
 		type: "community_block",
@@ -158,6 +163,18 @@ export async function communityBlockExists(
 		.bind(blockId)
 		.first<{ one: number }>();
 	return !!row;
+}
+
+/** Rewrite a published block's frozen JSON (admin edits, e.g. child logos). */
+export async function updateCommunityBlockJson(
+	db: D1Database,
+	blockId: string,
+	blockJson: string,
+): Promise<void> {
+	await db
+		.prepare(`UPDATE community_blocks SET block_json = ? WHERE block_id = ?`)
+		.bind(blockJson, blockId)
+		.run();
 }
 
 /** Keep an approved block's item count in sync after a snapshot refresh. */
@@ -313,6 +330,8 @@ export interface CommunityBlockFilter {
 	language?: string;
 	/** Title substring search. */
 	q?: string;
+	/** "collection" keeps only collection-list blocks. */
+	kind?: "collection";
 }
 
 /** Build the WHERE clause + bind values for a community block filter. */
@@ -325,6 +344,10 @@ function communityWhere(filter: CommunityBlockFilter): {
 	if (filter.category) {
 		conditions.push("category = ?");
 		binds.push(filter.category);
+	}
+	if (filter.kind === "collection") {
+		// No preset column; the JSON value string is unique enough to match on.
+		conditions.push(`block_json LIKE '%"preset":"collection-list"%'`);
 	}
 	if (filter.language) {
 		conditions.push("language = ?");

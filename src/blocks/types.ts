@@ -108,6 +108,8 @@ export interface CollectionChildSpec {
 	label: string;
 	/** ISO weekday 1 (Mon) – 7 (Sun); weekday mode only. */
 	weekday?: number;
+	/** Optional logo/cover URL rendered instead of the text label. */
+	image?: string;
 }
 
 /** One frozen child chart inside a published collection block. */
@@ -115,6 +117,8 @@ export interface CollectionChild {
 	id: string;
 	label: string;
 	weekday?: number;
+	/** Optional logo/cover URL rendered instead of the text label. */
+	image?: string;
 	title: string;
 	mediaType?: MediaType;
 	preset: BlockPreset;
@@ -238,4 +242,6 @@ export interface BlockCollectionRow {
 /** Cloudflare Workers bindings available on the Hono context. */
 export interface BlocksBindings {
 	DB?: D1Database;
+	/** Admin-uploaded assets (collection child logos). */
+	ASSETS?: R2Bucket;
 }

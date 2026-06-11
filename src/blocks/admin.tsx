@@ -33,8 +33,10 @@ import {
 	listSubmissions,
 	markApproved,
 	markRejected,
+	publicAssetUrl,
 	publicKey,
 	updateCommunityBlockItemCount,
+	updateCommunityBlockJson,
 	upsertBlockSnapshot,
 } from "./storage.js";
 import {
@@ -73,7 +75,7 @@ function adminPassword(): string | undefined {
 	return process.env.BLOCKS_ADMIN_PASSWORD;
 }
 
-function isAdmin(c: Context): boolean {
+export function isAdmin(c: Context): boolean {
 	const pw = adminPassword();
 	return !!pw && getCookie(c, ADMIN_COOKIE) === pw;
 }
@@ -110,7 +112,11 @@ async function listPublishedCollections(
 			blockId: row.block_id,
 			title: row.title,
 			mode: block.groupMode,
-			childLabels: block.children.map((ch) => ch.label),
+			children: block.children.map((ch) => ({
+				id: ch.id,
+				label: ch.label,
+				image: ch.image,
+			})),
 			installs: row.installs,
 		});
 	}
@@ -155,10 +161,12 @@ app.post("/login", async (c) => {
 	const body = await c.req.parseBody();
 	const pw = adminPassword();
 	if (pw && body.password === pw) {
+		// Path "/" (not "/admin") so the explore page can detect the admin
+		// session and render admin-only tools (e.g. collection builder).
 		setCookie(c, ADMIN_COOKIE, pw, {
 			httpOnly: true,
 			sameSite: "Lax",
-			path: "/admin",
+			path: "/",
 			maxAge: 60 * 60 * 12,
 		});
 		return c.redirect("/admin");
@@ -311,6 +319,64 @@ app.post("/homepages/:collectionId/delete", async (c) => {
 		.replace(/[^a-zA-Z0-9_-]/g, "");
 	await deleteBlockCollection(getDb(c), collectionId);
 	return c.json({ ok: true });
+});
+
+const ASSET_TYPES: Record<string, string> = {
+	"image/png": "png",
+	"image/jpeg": "jpg",
+	"image/webp": "webp",
+	"image/svg+xml": "svg",
+};
+const MAX_ASSET_BYTES = 2 * 1024 * 1024;
+
+/** Admin-only: upload a logo into the shared crawler/snapshot bucket
+ * (`assets.eplayerx.com` serves it directly); returns the public URL. */
+app.post("/assets/upload", async (c) => {
+	if (!isAdmin(c)) return c.json({ error: "unauthorized" }, 401);
+	const bucket = c.env.ASSETS;
+	if (!bucket) return c.json({ error: "R2 bucket 未绑定（ASSETS）" }, 500);
+	const contentType = (c.req.header("Content-Type") || "").split(";")[0];
+	const ext = ASSET_TYPES[contentType];
+	if (!ext) return c.json({ error: "仅支持 png / jpg / webp / svg" }, 400);
+	const body = await c.req.arrayBuffer();
+	if (body.byteLength === 0) return c.json({ error: "空文件" }, 400);
+	if (body.byteLength > MAX_ASSET_BYTES) {
+		return c.json({ error: "图片需小于 2MB" }, 400);
+	}
+	// Same prefix convention as `blocks/public/` snapshots.
+	const key = `blocks/logos/${shortId()}.${ext}`;
+	await bucket.put(key, body, { httpMetadata: { contentType } });
+	return c.json({ ok: true, url: publicAssetUrl(key) });
+});
+
+/** Admin-only: set / clear one child's logo on a published collection. */
+app.post("/collections/:blockId/child-image", async (c) => {
+	if (!isAdmin(c)) return c.json({ error: "unauthorized" }, 401);
+	const blockId = c.req.param("blockId").replace(/[^a-zA-Z0-9_-]/g, "");
+	const body = (await c.req.json().catch(() => ({}))) as Record<
+		string,
+		unknown
+	>;
+	const childId = String(body.childId || "");
+	const image = String(body.image || "").trim();
+	if (image && !image.startsWith("https://")) {
+		return c.json({ error: "图片地址必须是 https URL" }, 400);
+	}
+	const db = getDb(c);
+	const row = await getCommunityBlock(db, blockId);
+	if (!row || !isCollectionBlockJson(row.block_json)) {
+		return c.json({ error: "合集不存在" }, 404);
+	}
+	const block = JSON.parse(row.block_json) as CollectionBlock;
+	const child = block.children.find((ch) => ch.id === childId);
+	if (!child) return c.json({ error: "子榜单不存在" }, 404);
+	if (image) {
+		child.image = image;
+	} else {
+		delete child.image;
+	}
+	await updateCommunityBlockJson(db, blockId, JSON.stringify(block));
+	return c.json({ ok: true, image: child.image ?? "" });
 });
 
 /** Admin-only: unpublish a collection (plain chart blocks are untouchable). */
