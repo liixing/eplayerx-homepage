@@ -39,6 +39,8 @@ export interface PublishItem {
 	altTitles?: string[];
 	/** Known TMDB id: skip title search and fetch details directly. */
 	tmdbId?: number;
+	/** Per-item media type override (e.g. a TV entry inside a movie list). */
+	mediaType?: MediaType;
 	/** Movie release year, used to disambiguate title search (e.g. remakes). */
 	year?: number;
 }
@@ -115,6 +117,22 @@ async function resolveToken(options: PublishBlockOptions): Promise<string> {
 		return fetchSubmitterToken(options.submissionId.trim());
 	}
 	throw new Error("Provide submissionId (preferred) or tmdbToken.");
+}
+
+/** Current display title of an already-registered block (D1 truth). New
+ *  blocks have no row yet; they get a title on the next republish. */
+async function fetchBlockTitle(blockId: string): Promise<string | undefined> {
+	const base = process.env.API_BASE_URL || "https://api.eplayerx.com";
+	try {
+		const res = await fetch(
+			new URL(`/blocks/import-payload?blockId=${blockId}`, base),
+		);
+		if (!res.ok) return undefined;
+		const { title } = (await res.json()) as { title?: string };
+		return title || undefined;
+	} catch {
+		return undefined;
+	}
 }
 
 /** Register the publish in D1 via the worker (admin console reads this). */
@@ -213,10 +231,11 @@ async function resolveItem(
 	useTmdbTitle: boolean,
 ): Promise<SnapshotItem | null> {
 	let tmdbData: TmdbSearchResult | null = null;
+	const itemMediaType = item.mediaType ?? mediaType;
 	if (item.tmdbId) {
 		tmdbData = await fetchDetailsById(
 			item.tmdbId,
-			mediaType,
+			itemMediaType,
 			searchOptions.language,
 			client,
 		);
@@ -226,7 +245,7 @@ async function resolveItem(
 			? { ...searchOptions, year: item.year }
 			: searchOptions;
 		for (const query of buildQueries(item)) {
-			tmdbData = await searchTMDB(query, mediaType, options, client);
+			tmdbData = await searchTMDB(query, itemMediaType, options, client);
 			if (tmdbData?.id) break;
 		}
 	}
@@ -234,7 +253,7 @@ async function resolveItem(
 	// retry once without the year filter before giving up.
 	if (!tmdbData?.id && item.year) {
 		for (const query of buildQueries(item)) {
-			tmdbData = await searchTMDB(query, mediaType, searchOptions, client);
+			tmdbData = await searchTMDB(query, itemMediaType, searchOptions, client);
 			if (tmdbData?.id) break;
 		}
 	}
@@ -242,7 +261,7 @@ async function resolveItem(
 
 	const { thumb, logo, noLogoPoster } = await fetchImageMeta(
 		tmdbData.id,
-		mediaType,
+		itemMediaType,
 		tmdbData.backdrop_path,
 		tmdbData.poster_path,
 		client,
@@ -259,7 +278,7 @@ async function resolveItem(
 		poster_path: tmdbData.poster_path ?? null,
 		backdrop_path: tmdbData.backdrop_path ?? null,
 		genre_ids: tmdbData.genre_ids ?? [],
-		media_type: mediaType,
+		media_type: itemMediaType,
 		release_date: tmdbData.release_date ?? null,
 		first_air_date: tmdbData.first_air_date ?? null,
 		overview: tmdbData.overview ?? null,
@@ -288,7 +307,7 @@ export async function publishBlock(
 	for (const entry of scraped) {
 		const item = await resolveItem(
 			entry,
-			options.mediaType,
+			entry.mediaType ?? options.mediaType,
 			searchOptions,
 			client,
 			options.useTmdbTitle ?? false,
@@ -307,7 +326,11 @@ export async function publishBlock(
 		throw new Error("No items resolved on TMDB; nothing uploaded.");
 	}
 
-	await putSnapshot(publicKey(blockId), items);
+	// The block's display title rides on the snapshot: installed clients pick
+	// up renames on their normal data refresh, and /blocks/data stays a pure
+	// R2 passthrough (no D1 lookup per request).
+	const title = await fetchBlockTitle(blockId);
+	await putSnapshot(publicKey(blockId), items, title);
 	const url = publicDataUrl(blockId);
 	await reportPublish(blockId, items.length);
 

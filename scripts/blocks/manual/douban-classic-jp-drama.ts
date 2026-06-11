@@ -5,7 +5,7 @@
  * Douban titles carry season suffixes, so the TMDB localized show title
  * is stored instead of the scraped one.
  *
- * Run: bun run scripts/blocks/monthly/douban-classic-jp-drama.ts
+ * Run: bun run scripts/blocks/manual/douban-classic-jp-drama.ts
  */
 
 import { publishBlock } from "../../../src/blocks/publish.js";

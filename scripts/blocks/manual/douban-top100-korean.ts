@@ -18,6 +18,8 @@ const KNOWN_IDS: Record<string, number> = {
 	出租车司机: 437068,
 	// zh-CN search misses; TMDB title is "Woman of Fire '82" (화녀 '82).
 	"火女(82版)": 120629,
+	// Short zh-CN title drifts to The Dark Knight (2008).
+	蝙蝠: 22536,
 };
 
 await publishBlock({

@@ -2,9 +2,9 @@
  * Douban doulist "血腥屠夫：杀人狂电影" (douban.com/doulist/140335114).
  * Submission: 血腥屠夫：杀人狂电影 (zh-CN, movie, poster-list) by @鱼鱼.
  *
- * The doulist is still maintained by its curator, so it refreshes monthly.
+ * The doulist changes rarely; rerun by hand when the curator updates it.
  *
- * Run: bun run scripts/blocks/monthly/douban-slasher-doulist.ts
+ * Run: bun run scripts/blocks/manual/douban-slasher-doulist.ts
  */
 
 import { publishBlock } from "../../../src/blocks/publish.js";

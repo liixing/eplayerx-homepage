@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import adminApp from "./blocks/admin.js";
-import blocksApp from "./blocks/index.js";
+import blocksApp, { importLandingApp } from "./blocks/index.js";
 import crawlerApp from "./crawler/index.js";
 import homeApp from "./home/index.js";
 import tmdbApp from "./tmdb/index.js";
@@ -26,6 +26,8 @@ app.use("/tmdb/*", publicCors);
 app.use("/crawler/*", publicCors);
 app.use("/blocks/community", publicCors);
 app.use("/blocks/data/*", publicCors);
+app.use("/blocks/import-payload", publicCors);
+app.use("/blocks/collections/*", publicCors);
 
 const welcomeStrings = [
 	"Hello Hono!",
@@ -48,6 +50,9 @@ app.route("/home", homeApp);
 
 // Mount EplayerX Blocks (community block builder)
 app.route("/blocks", blocksApp);
+
+// Browser fallback for the block-import universal link
+app.route("/import", importLandingApp);
 
 // Mount EplayerX Blocks admin console (password gated)
 app.route("/admin", adminApp);

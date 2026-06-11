@@ -2,9 +2,9 @@
  * Douban doulist "高分国产动画电影" (douban.com/doulist/149670450).
  * Submission: 豆瓣：高分国产动画电影 (zh-CN, movie, poster-list).
  *
- * The doulist is still maintained by its curator, so it refreshes monthly.
+ * The doulist changes rarely; rerun by hand when the curator updates it.
  *
- * Run: bun run scripts/blocks/monthly/douban-cn-animation-movies.ts
+ * Run: bun run scripts/blocks/manual/douban-cn-animation-movies.ts
  */
 
 import { publishBlock } from "../../../src/blocks/publish.js";

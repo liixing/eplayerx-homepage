@@ -10,12 +10,25 @@
 
 import { Hono } from "hono";
 import { createDefaultHomeConfig } from "../home/config.js";
+import {
+	absoluteSourcePath,
+	IMAGE_BASE,
+	officialHomeBlocksById,
+	PUBLIC_API_BASE,
+	parseCollectionInput,
+	resolveCollectionChildren,
+} from "./collections.js";
 import { getDb, ServiceUnavailable, shortId } from "./runtime.js";
 import { validateToken } from "./scraper.js";
 import {
 	countCommunityBlocks,
+	getBlockCollection,
+	getCommunityBlocksByIds,
+	incrementCollectionInstalls,
 	incrementInstalls,
+	insertBlockCollection,
 	insertSubmission,
+	listApprovedBlockCollections,
 	listCommunityBlocks,
 	listCommunityLanguages,
 	publicDataUrl,
@@ -24,20 +37,30 @@ import {
 	type BlockCategory,
 	type BlockPreset,
 	type BlocksBindings,
+	COLLECTION_PRESET,
+	type CollectionBlock,
 	type CommunityBlockRow,
 	DEFAULT_LANGUAGE,
 	type DisplayBlock,
 	type HomeBlock,
+	type ImportableBlock,
+	type ImportableCollectionBlock,
+	type ImportableEntry,
 	type MediaType,
 	type SnapshotBlob,
 	TMDB_LANGUAGES,
 } from "./types.js";
-import { ExplorePage, SubmitPage } from "./views.js";
+import {
+	type ExploreCategory,
+	ExplorePage,
+	HomepageDetailPage,
+	type HomepageSummary,
+	ImportLandingPage,
+	SubmitPage,
+} from "./views.js";
 
 const app = new Hono<{ Bindings: BlocksBindings }>();
 
-const IMAGE_BASE =
-	process.env.TMDB_IMAGE_BASE_URL || "https://image.tmdb.org/t/p";
 const VALID_PRESETS: BlockPreset[] = ["thumb-list", "poster-list", "hero-list"];
 const VALID_CATEGORIES: BlockCategory[] = ["movie", "tv", "anime"];
 const MEDIA_LIST_PRESETS = new Set(VALID_PRESETS);
@@ -46,8 +69,6 @@ const VALID_LANGUAGES = new Set(TMDB_LANGUAGES.map((l) => l.code));
 const MAX_SOURCE_LEN = 100_000;
 const PREVIEW_LIMIT = 20;
 
-const PUBLIC_API_BASE =
-	process.env.PUBLIC_API_BASE_URL || "https://api.eplayerx.com";
 const R2_PUBLIC_BASE = `https://${process.env.R2_CUSTOM_DOMAIN || "assets.eplayerx.com"}`;
 const CRAWLER_POPULAR_PREFIX = "/crawler/popular/";
 
@@ -72,8 +93,72 @@ function previewSrcFromSource(
 		params.set(key, String(value));
 	}
 	const qs = params.toString();
-	const path = source.path.startsWith("/") ? source.path : `/${source.path}`;
-	return qs ? `${PUBLIC_API_BASE}${path}?${qs}` : `${PUBLIC_API_BASE}${path}`;
+	// Collection children carry absolute (frozen) URLs already.
+	const base = source.path.startsWith("http")
+		? source.path
+		: `${PUBLIC_API_BASE}${source.path.startsWith("/") ? source.path : `/${source.path}`}`;
+	return qs ? `${base}?${qs}` : base;
+}
+
+/**
+ * Preview URL for one collection child. Community children point back at
+ * this worker (so we can cap the payload); everything else passes through.
+ */
+function childPreviewSrc(
+	source: { path: string; query?: Record<string, unknown> },
+	limit = 6,
+): string {
+	const match = source.path.match(/\/blocks\/data\/([a-zA-Z0-9_-]+)$/);
+	if (match) return `/blocks/data/${match[1]}?limit=${limit}`;
+	return previewSrcFromSource(source) ?? source.path;
+}
+
+/** Frozen pack entry -> display block for the homepage detail page. */
+function importableToDisplay(entry: ImportableEntry): DisplayBlock {
+	if (entry.preset === COLLECTION_PRESET) {
+		const col = entry as ImportableCollectionBlock;
+		const children = col.children ?? [];
+		return {
+			id: col.id,
+			title: col.title,
+			category: col.category ?? "tv",
+			preset: COLLECTION_PRESET,
+			showRank: false,
+			showOverview: false,
+			previewSrc: children[0] ? childPreviewSrc(children[0].source) : "",
+			official: false,
+			itemCount: col.itemCount,
+			author: col.author,
+			language: col.language,
+			collectionMode: col.groupMode,
+			collectionChildren: children.map((ch) => ({
+				id: ch.id,
+				label: ch.label,
+				...(ch.weekday ? { weekday: ch.weekday } : {}),
+				previewSrc: childPreviewSrc(ch.source),
+			})),
+		};
+	}
+	const hb = entry as ImportableBlock;
+	return {
+		id: hb.id,
+		title: hb.title,
+		category:
+			hb.category ??
+			(hb.metadata?.isAnime
+				? "anime"
+				: hb.mediaType === "movie"
+					? "movie"
+					: "tv"),
+		preset: hb.preset as BlockPreset,
+		showRank: !!hb.showRank,
+		showOverview: !!hb.showOverview,
+		previewSrc: childPreviewSrc(hb.source, PREVIEW_LIMIT),
+		official: false,
+		itemCount: hb.itemCount,
+		author: hb.author,
+		language: hb.language,
+	};
 }
 
 /** Built-in default home blocks, surfaced in the library as official entries. */
@@ -104,23 +189,31 @@ function officialBlocks(language: string): DisplayBlock[] {
 			showOverview: !!b.showOverview,
 			previewSrc,
 			official: true,
+			language,
 		});
 	}
 	return blocks;
 }
 
 function communityToDisplay(row: CommunityBlockRow): DisplayBlock {
-	let preset: BlockPreset = "thumb-list";
+	let preset: DisplayBlock["preset"] = "thumb-list";
 	let showRank = false;
 	let showOverview = false;
+	let collection: CollectionBlock | null = null;
 	try {
-		const hb = JSON.parse(row.block_json) as HomeBlock;
-		if (VALID_PRESETS.includes(hb.preset)) preset = hb.preset;
-		showRank = !!hb.showRank;
-		showOverview = !!hb.showOverview;
+		const hb = JSON.parse(row.block_json) as HomeBlock | CollectionBlock;
+		if (hb.preset === COLLECTION_PRESET) {
+			collection = hb as CollectionBlock;
+			preset = COLLECTION_PRESET;
+		} else if (VALID_PRESETS.includes(hb.preset as BlockPreset)) {
+			preset = hb.preset;
+			showRank = !!(hb as HomeBlock).showRank;
+			showOverview = !!(hb as HomeBlock).showOverview;
+		}
 	} catch {
 		// fall back to defaults on malformed JSON
 	}
+	const children = collection?.children ?? [];
 	return {
 		id: row.block_id,
 		title: row.title,
@@ -129,30 +222,70 @@ function communityToDisplay(row: CommunityBlockRow): DisplayBlock {
 		showRank,
 		showOverview,
 		// Preview only needs the first items; the full snapshot may be huge.
-		previewSrc: `/blocks/data/${row.block_id}?limit=${PREVIEW_LIMIT}`,
+		previewSrc: collection
+			? children[0]
+				? childPreviewSrc(children[0].source)
+				: ""
+			: `/blocks/data/${row.block_id}?limit=${PREVIEW_LIMIT}`,
 		official: false,
 		itemCount: row.item_count,
 		installs: row.installs,
 		author: row.author,
+		language: row.language,
+		...(collection
+			? {
+					collectionMode: collection.groupMode,
+					collectionChildren: children.map((ch) => ({
+						id: ch.id,
+						label: ch.label,
+						...(ch.weekday ? { weekday: ch.weekday } : {}),
+						previewSrc: childPreviewSrc(ch.source),
+					})),
+				}
+			: {}),
 	};
 }
 
 // MARK: - Community library (home)
 
+const EXPLORE_CATEGORIES = new Set([
+	"movie",
+	"tv",
+	"anime",
+	"collection",
+	"homepage",
+]);
+
 app.get("/", async (c) => {
 	const raw = c.req.query("category");
-	const category: BlockCategory | "all" = VALID_CATEGORIES.includes(
-		raw as BlockCategory,
-	)
-		? (raw as BlockCategory)
-		: "all";
+	const category = (
+		EXPLORE_CATEGORIES.has(raw ?? "") ? raw : "all"
+	) as ExploreCategory;
 	const language = c.req.query("language") || "zh-CN";
 
-	// Render every category up-front; the tabs filter client-side (instant, no
+	// Render every category up-front; the filter works client-side (instant, no
 	// reload, previews fetched once and kept in the DOM).
 	let community: CommunityBlockRow[] = [];
+	let languages: string[] = [];
+	let homepages: HomepageSummary[] = [];
 	try {
-		community = await listCommunityBlocks(getDb(c));
+		const db = getDb(c);
+		const [rows, langs, pages] = await Promise.all([
+			listCommunityBlocks(db),
+			listCommunityLanguages(db),
+			listApprovedBlockCollections(db),
+		]);
+		community = rows;
+		languages = langs;
+		homepages = pages.map((row) => ({
+			collectionId: row.collection_id,
+			title: row.title,
+			blockCount: row.block_count,
+			installs: row.installs,
+			blockTitles: (JSON.parse(row.blocks_json) as { title: string }[]).map(
+				(b) => b.title,
+			),
+		}));
 	} catch {
 		community = [];
 	}
@@ -163,8 +296,44 @@ app.get("/", async (c) => {
 	];
 
 	return c.html(
-		<ExplorePage blocks={blocks} imageBase={IMAGE_BASE} category={category} />,
+		<ExplorePage
+			blocks={blocks}
+			imageBase={IMAGE_BASE}
+			category={category}
+			languages={languages}
+			homepages={homepages}
+		/>,
 	);
+});
+
+/** Published homepage detail: every contained block, with an install link. */
+app.get("/homepages/:collectionId", async (c) => {
+	const collectionId = c.req
+		.param("collectionId")
+		.replace(/[^a-zA-Z0-9_-]/g, "");
+	try {
+		const row = await getBlockCollection(getDb(c), collectionId);
+		if (!row || row.status !== "approved") return c.notFound();
+		const entries = JSON.parse(row.blocks_json) as ImportableEntry[];
+		return c.html(
+			<HomepageDetailPage
+				homepage={{
+					collectionId: row.collection_id,
+					title: row.title,
+					blockCount: row.block_count,
+					installs: row.installs,
+					blockTitles: entries.map((b) => b.title),
+				}}
+				blocks={entries.map(importableToDisplay)}
+				imageBase={IMAGE_BASE}
+			/>,
+		);
+	} catch (error) {
+		if (error instanceof ServiceUnavailable) {
+			return c.text("服务暂不可用", 503);
+		}
+		throw error;
+	}
 });
 
 app.get("/submit", (c) => c.html(<SubmitPage />));
@@ -226,6 +395,56 @@ app.post("/submit", async (c) => {
 	return c.json({ ok: true });
 });
 
+/**
+ * User-submitted collection (a named group of existing charts). Goes through
+ * the same review queue as chart submissions; the admin publishes it as a
+ * `collection-list` community block on approval.
+ */
+app.post("/groups/submit", async (c) => {
+	const body = await c.req.json().catch(() => null);
+	const parsed = parseCollectionInput(body);
+	if ("error" in parsed) return c.json({ error: parsed.error }, 400);
+	const { input } = parsed;
+	const language = VALID_LANGUAGES.has(String(body?.language))
+		? String(body.language)
+		: DEFAULT_LANGUAGE;
+	const author = body?.author ? String(body.author).slice(0, 40) : null;
+
+	try {
+		const db = getDb(c);
+		// Validate every child resolves before queueing for review.
+		const resolved = await resolveCollectionChildren(
+			db,
+			input.children,
+			language,
+		);
+		if (resolved.children.length !== input.children.length) {
+			return c.json({ error: "包含不存在或不支持的榜单" }, 400);
+		}
+		await insertSubmission(db, {
+			id: shortId(),
+			category: resolved.category,
+			mediaType: resolved.children[0]?.mediaType === "movie" ? "movie" : "tv",
+			isAnime: resolved.category === "anime",
+			title: input.title,
+			preset: COLLECTION_PRESET,
+			showRank: false,
+			showOverview: false,
+			language,
+			source: JSON.stringify({ mode: input.mode, children: input.children }),
+			tmdbToken: null,
+			author,
+			createdAt: new Date().toISOString(),
+		});
+	} catch (error) {
+		if (error instanceof ServiceUnavailable) {
+			return c.json({ error: error.message }, 503);
+		}
+		throw error;
+	}
+	return c.json({ ok: true });
+});
+
 // MARK: - Consumption API (for the client)
 
 app.get("/community", async (c) => {
@@ -274,7 +493,8 @@ app.get("/data/:blockId", async (c) => {
 	const blockId = c.req.param("blockId").replace(/[^a-zA-Z0-9_-]/g, "");
 	const limit = Number.parseInt(c.req.query("limit") || "", 10);
 	const response = await fetch(publicDataUrl(blockId));
-	// Without a limit (the iOS client) stream the snapshot through untouched.
+	// Without a limit (the iOS client) stream the snapshot through untouched;
+	// the blob carries the block's display title since publish time.
 	if (!response.ok || !Number.isFinite(limit) || limit <= 0) {
 		return new Response(response.body, {
 			status: response.status,
@@ -289,6 +509,187 @@ app.get("/data/:blockId", async (c) => {
 	return c.json({ ...blob, count: data.length, data });
 });
 
+// MARK: - Block collections (shareable bundles, imported via universal link)
+
+const IMPORT_LINK_BASE =
+	process.env.IMPORT_LINK_BASE_URL || "https://eplayerx.com/import/blocks";
+const MAX_COLLECTION_TITLE_LEN = 40;
+const MAX_COLLECTION_BLOCKS = 30;
+
+/** Community block row -> importable payload with an absolute data URL. */
+function importableFromCommunity(row: CommunityBlockRow): ImportableBlock {
+	const block = JSON.parse(row.block_json) as HomeBlock | CollectionBlock;
+	// Collection children already carry absolute URLs — pass through as-is.
+	if (block.preset === COLLECTION_PRESET) {
+		return {
+			...(block as CollectionBlock),
+			category: row.category,
+			author: row.author,
+			itemCount: row.item_count,
+			language: row.language,
+		} as unknown as ImportableBlock;
+	}
+	const hb = block as HomeBlock;
+	return {
+		...hb,
+		source: { ...hb.source, path: absoluteSourcePath(hb.source.path) },
+		category: row.category,
+		author: row.author,
+		itemCount: row.item_count,
+		language: row.language,
+	};
+}
+
+/** Official default block -> importable payload (same wire shape). */
+function importableFromOfficial(
+	block: HomeBlock & { metadata?: { isAnime?: boolean } },
+): ImportableBlock | null {
+	if (!block.source?.path) return null;
+	return {
+		...block,
+		source: { ...block.source, path: absoluteSourcePath(block.source.path) },
+		category: block.metadata?.isAnime
+			? "anime"
+			: block.mediaType === "movie"
+				? "movie"
+				: "tv",
+	};
+}
+
+/** Resolve mixed community/official block ids into importable payloads. */
+async function resolveImportableBlocks(
+	db: D1Database,
+	blockIds: string[],
+	language: string,
+): Promise<ImportableBlock[]> {
+	const community = await getCommunityBlocksByIds(db, blockIds);
+	const official = officialHomeBlocksById(language);
+	const blocks: ImportableBlock[] = [];
+	for (const id of blockIds) {
+		const row = community.get(id);
+		if (row) {
+			blocks.push(importableFromCommunity(row));
+			continue;
+		}
+		const officialBlock = official.get(id);
+		if (officialBlock) {
+			const importable = importableFromOfficial(officialBlock);
+			if (importable) blocks.push(importable);
+		}
+	}
+	return blocks;
+}
+
+app.post("/collections", async (c) => {
+	const body = await c.req.json().catch(() => null);
+	const title = String(body?.title || "")
+		.trim()
+		.slice(0, MAX_COLLECTION_TITLE_LEN);
+	const rawIds: unknown[] = Array.isArray(body?.blockIds) ? body.blockIds : [];
+	const language = VALID_LANGUAGES.has(String(body?.language))
+		? String(body.language)
+		: DEFAULT_LANGUAGE;
+	// Dedupe while preserving the user's pick order.
+	const blockIds: string[] = [
+		...new Set(rawIds.map((id) => String(id))),
+	].filter((id) => /^[a-zA-Z0-9_-]+$/.test(id));
+
+	if (!title) return c.json({ error: "请填写首页标题" }, 400);
+	if (blockIds.length === 0)
+		return c.json({ error: "请至少选择一个区块" }, 400);
+	if (blockIds.length > MAX_COLLECTION_BLOCKS) {
+		return c.json({ error: `最多选择 ${MAX_COLLECTION_BLOCKS} 个区块` }, 400);
+	}
+
+	try {
+		const db = getDb(c);
+		const blocks = await resolveImportableBlocks(db, blockIds, language);
+		if (blocks.length === 0) {
+			return c.json({ error: "所选区块不存在" }, 400);
+		}
+		const collectionId = shortId();
+		// Homepages go through admin review; the import link 404s until then.
+		await insertBlockCollection(db, {
+			collectionId,
+			title,
+			blocksJson: JSON.stringify(blocks),
+			blockCount: blocks.length,
+			createdAt: new Date().toISOString(),
+			status: "pending",
+		});
+		return c.json({
+			ok: true,
+			pending: true,
+			collectionId,
+			blockCount: blocks.length,
+			importUrl: `${IMPORT_LINK_BASE}?collectionId=${collectionId}`,
+		});
+	} catch (error) {
+		if (error instanceof ServiceUnavailable) {
+			return c.json({ error: error.message }, 503);
+		}
+		throw error;
+	}
+});
+
+/**
+ * Unified import payload for the client. The universal link
+ * `https://eplayerx.com/import/blocks?collectionId=..` (or `?blockId=..`)
+ * opens the app, which fetches this endpoint with the same query params.
+ */
+app.get("/import-payload", async (c) => {
+	const collectionId = (c.req.query("collectionId") || "").replace(
+		/[^a-zA-Z0-9_-]/g,
+		"",
+	);
+	const blockId = (c.req.query("blockId") || "").replace(/[^a-zA-Z0-9_-]/g, "");
+	const language = c.req.query("language") || DEFAULT_LANGUAGE;
+
+	try {
+		const db = getDb(c);
+		if (collectionId) {
+			const row = await getBlockCollection(db, collectionId);
+			if (!row || row.status !== "approved") {
+				return c.json({ error: "首页不存在或未通过审核" }, 404);
+			}
+			return c.json({
+				type: "block_import",
+				id: row.collection_id,
+				title: row.title,
+				blocks: JSON.parse(row.blocks_json) as ImportableBlock[],
+			});
+		}
+		if (blockId) {
+			const blocks = await resolveImportableBlocks(db, [blockId], language);
+			if (blocks.length === 0) return c.json({ error: "区块不存在" }, 404);
+			return c.json({
+				type: "block_import",
+				id: blockId,
+				title: blocks[0].title,
+				blocks,
+			});
+		}
+		return c.json({ error: "缺少 collectionId 或 blockId" }, 400);
+	} catch (error) {
+		if (error instanceof ServiceUnavailable) {
+			return c.json({ error: "服务暂不可用" }, 503);
+		}
+		throw error;
+	}
+});
+
+app.post("/collections/:collectionId/install", async (c) => {
+	const collectionId = c.req
+		.param("collectionId")
+		.replace(/[^a-zA-Z0-9_-]/g, "");
+	try {
+		await incrementCollectionInstalls(getDb(c), collectionId);
+	} catch {
+		// best-effort metric
+	}
+	return c.json({ ok: true });
+});
+
 app.post("/:blockId/install", async (c) => {
 	const blockId = c.req.param("blockId").replace(/[^a-zA-Z0-9_-]/g, "");
 	try {
@@ -297,6 +698,60 @@ app.post("/:blockId/install", async (c) => {
 		// best-effort metric
 	}
 	return c.json({ ok: true });
+});
+
+/**
+ * Mounted at `/import` on the root app. `GET /import/blocks` is the browser
+ * fallback for the universal link: devices with the app installed open the
+ * app instead, everyone else sees a preview + App Store link.
+ */
+export const importLandingApp = new Hono<{ Bindings: BlocksBindings }>();
+
+importLandingApp.get("/blocks", async (c) => {
+	const collectionId = (c.req.query("collectionId") || "").replace(
+		/[^a-zA-Z0-9_-]/g,
+		"",
+	);
+	const blockId = (c.req.query("blockId") || "").replace(/[^a-zA-Z0-9_-]/g, "");
+	try {
+		const db = getDb(c);
+		let title = "";
+		let blockTitles: string[] = [];
+		if (collectionId) {
+			const row = await getBlockCollection(db, collectionId);
+			if (!row || row.status !== "approved") return c.notFound();
+			title = row.title;
+			blockTitles = (JSON.parse(row.blocks_json) as ImportableBlock[]).map(
+				(b) => b.title,
+			);
+		} else if (blockId) {
+			const blocks = await resolveImportableBlocks(
+				db,
+				[blockId],
+				DEFAULT_LANGUAGE,
+			);
+			if (blocks.length === 0) return c.notFound();
+			title = blocks[0].title;
+			blockTitles = blocks.map((b) => b.title);
+		} else {
+			return c.notFound();
+		}
+		const query = collectionId
+			? `collectionId=${collectionId}`
+			: `blockId=${blockId}`;
+		return c.html(
+			<ImportLandingPage
+				title={title}
+				blockTitles={blockTitles}
+				importUrl={`${IMPORT_LINK_BASE}?${query}`}
+			/>,
+		);
+	} catch (error) {
+		if (error instanceof ServiceUnavailable) {
+			return c.text("服务暂不可用", 503);
+		}
+		throw error;
+	}
 });
 
 export default app;

@@ -4,9 +4,9 @@
  * Submission: 惊悚片 (zh-CN, movie, thumb-list).
  *
  * The full list runs ~1,600 films; only the first 3 pages (300 items, list
- * order) are kept so the monthly TMDB enrichment stays within CI budget.
+ * order) are kept so each TMDB enrichment run stays within CI budget.
  *
- * Run: bun run scripts/blocks/monthly/letterboxd-what-is-reality.ts
+ * Run: bun run scripts/blocks/manual/letterboxd-what-is-reality.ts
  */
 
 import { publishBlock } from "../../../src/blocks/publish.js";

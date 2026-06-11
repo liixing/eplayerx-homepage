@@ -3,7 +3,9 @@
  * (letterboxd.com/oscars/list/oscar-winning-films-best-picture), newest first.
  * Submission: 奥斯卡最佳影片 (zh-CN, movie, hero-list) by @letterboxd.
  *
- * Run: bun run scripts/blocks/monthly/letterboxd-oscar-best-picture.ts
+ * The list only changes once a year; rerun by hand after the Oscars.
+ *
+ * Run: bun run scripts/blocks/manual/letterboxd-oscar-best-picture.ts
  */
 
 import { publishBlock } from "../../../src/blocks/publish.js";

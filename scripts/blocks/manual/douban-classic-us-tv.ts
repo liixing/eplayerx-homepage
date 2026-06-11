@@ -5,7 +5,7 @@
  * Douban titles carry season suffixes ("老友记 第一季"), so the TMDB
  * localized show title is stored instead of the scraped one.
  *
- * Run: bun run scripts/blocks/monthly/douban-classic-us-tv.ts
+ * Run: bun run scripts/blocks/manual/douban-classic-us-tv.ts
  */
 
 import { publishBlock } from "../../../src/blocks/publish.js";

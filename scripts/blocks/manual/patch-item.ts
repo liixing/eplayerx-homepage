@@ -24,17 +24,24 @@ const TMDB_REQUEST_DELAY_MS = 300;
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const USAGE =
-	"Usage: bun run scripts/blocks/manual/patch-item.ts <blockId> <oldTmdbId:newTmdbId>... [movie|tv] [language]";
+	"Usage: bun run scripts/blocks/manual/patch-item.ts <blockId> <oldTmdbId:newTmdbId|+tmdbId[@rank]>... [movie|tv] [language]";
 
 const [blockId, ...rest] = process.argv.slice(2);
 let mediaType: MediaType = "movie";
 let language = "zh-CN";
 const pairs: [number, number][] = [];
+const additions: { tmdbId: number; rank?: number }[] = [];
 const bareIds: number[] = [];
 
 for (const arg of rest) {
 	if (arg === "movie" || arg === "tv") {
 		mediaType = arg;
+	} else if (/^\+\d+(?:@\d+)?$/.test(arg)) {
+		const [tmdbId, rank] = arg.slice(1).split("@");
+		additions.push({
+			tmdbId: Number.parseInt(tmdbId, 10),
+			...(rank ? { rank: Number.parseInt(rank, 10) } : {}),
+		});
 	} else if (/^\d+:\d+$/.test(arg)) {
 		const [oldId, newId] = arg.split(":");
 		pairs.push([Number.parseInt(oldId, 10), Number.parseInt(newId, 10)]);
@@ -49,7 +56,7 @@ if (pairs.length === 0 && bareIds.length === 2) {
 	pairs.push([bareIds[0], bareIds[1]]);
 }
 
-if (!blockId || pairs.length === 0) {
+if (!blockId || (pairs.length === 0 && additions.length === 0)) {
 	console.error(USAGE);
 	process.exit(1);
 }
@@ -100,12 +107,24 @@ async function buildItem(newTmdbId: number): Promise<SnapshotItem> {
 }
 
 const key = publicKey(blockId);
-const items = await getSnapshot(key);
+const blob = await getSnapshot(key);
+const items = blob.data ?? [];
 
 // Validate all targets exist before any TMDB fetch, so the run is all-or-nothing.
 for (const [oldTmdbId] of pairs) {
 	if (!items.some((item) => item.tmdbId === oldTmdbId)) {
 		throw new Error(`tmdbId ${oldTmdbId} not found in ${blockId}`);
+	}
+}
+for (const addition of additions) {
+	if (items.some((item) => item.tmdbId === addition.tmdbId)) {
+		throw new Error(`tmdbId ${addition.tmdbId} already exists in ${blockId}`);
+	}
+	if (
+		addition.rank !== undefined &&
+		(addition.rank < 1 || addition.rank > items.length + 1)
+	) {
+		throw new Error(`rank ${addition.rank} is out of range for ${blockId}`);
 	}
 }
 
@@ -119,5 +138,14 @@ for (const [oldTmdbId, newTmdbId] of pairs) {
 	await delay(TMDB_REQUEST_DELAY_MS);
 }
 
-await putSnapshot(key, items);
+for (const addition of additions) {
+	const replacement = await buildItem(addition.tmdbId);
+	const index = addition.rank === undefined ? items.length : addition.rank - 1;
+	console.log(`➕ #${index + 1} ${replacement.title} (${replacement.tmdbId})`);
+	items.splice(index, 0, replacement);
+	await delay(TMDB_REQUEST_DELAY_MS);
+}
+
+// Preserve the display title the snapshot already carries.
+await putSnapshot(key, items, blob.title);
 console.log(`💾 ${blockId} updated (${items.length} items)`);

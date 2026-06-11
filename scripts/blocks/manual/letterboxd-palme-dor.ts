@@ -4,7 +4,9 @@
  * newest winner first.
  * Submission: 戛纳金棕榈 (zh-CN, movie, thumb-list) by @letterboxd.
  *
- * Run: bun run scripts/blocks/monthly/letterboxd-palme-dor.ts
+ * The list only changes once a year; rerun by hand after Cannes.
+ *
+ * Run: bun run scripts/blocks/manual/letterboxd-palme-dor.ts
  */
 
 import { publishBlock } from "../../../src/blocks/publish.js";

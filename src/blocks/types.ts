@@ -73,6 +73,9 @@ export interface SnapshotBlob {
 	type: "community_block";
 	count: number;
 	lastUpdated: string;
+	/** Block display title, written into the blob at publish time so
+	 *  installed clients pick up renames on their normal data refresh. */
+	title?: string;
 	data: SnapshotItem[];
 }
 
@@ -91,6 +94,54 @@ export interface HomeBlock {
 	metadata?: { isAnime?: boolean };
 }
 
+// MARK: - Collections (a named group of charts rendered as one home section)
+
+/** Preset id for collection blocks; old clients skip unknown presets. */
+export const COLLECTION_PRESET = "collection-list";
+
+/** weekday: children carry weekday 1-7 and the client puts today first. */
+export type CollectionMode = "weekday" | "custom";
+
+/** What a builder picks per child before the collection is frozen. */
+export interface CollectionChildSpec {
+	blockId: string;
+	label: string;
+	/** ISO weekday 1 (Mon) – 7 (Sun); weekday mode only. */
+	weekday?: number;
+}
+
+/** One frozen child chart inside a published collection block. */
+export interface CollectionChild {
+	id: string;
+	label: string;
+	weekday?: number;
+	title: string;
+	mediaType?: MediaType;
+	preset: BlockPreset;
+	showRank?: boolean;
+	showOverview?: boolean;
+	source: {
+		path: string;
+		itemEnvelope?: string;
+		query?: Record<string, string | number | boolean>;
+		pagination?: { pageParam?: string; startPage?: number };
+	};
+	metadata?: { isAnime?: boolean };
+}
+
+/**
+ * Collection block stored in `community_blocks.block_json`. Shares the
+ * HomeBlock wire envelope (id/title/preset) but carries children instead of
+ * a top-level source.
+ */
+export interface CollectionBlock {
+	id: string;
+	title: string;
+	preset: typeof COLLECTION_PRESET;
+	groupMode: CollectionMode;
+	children: CollectionChild[];
+}
+
 export interface SubmissionRow {
 	id: string;
 	status: SubmissionStatus;
@@ -98,7 +149,7 @@ export interface SubmissionRow {
 	media_type: MediaType;
 	is_anime: number;
 	title: string;
-	preset: BlockPreset;
+	preset: BlockPreset | typeof COLLECTION_PRESET;
 	show_rank: number;
 	show_overview: number;
 	language: string;
@@ -117,15 +168,25 @@ export interface DisplayBlock {
 	id: string;
 	title: string;
 	category: BlockCategory;
-	preset: BlockPreset;
+	preset: BlockPreset | typeof COLLECTION_PRESET;
 	showRank: boolean;
 	showOverview: boolean;
-	/** URL the preview row fetches for artwork. */
+	/** URL the preview row fetches for artwork (first child for collections). */
 	previewSrc: string;
 	official: boolean;
 	itemCount?: number;
 	installs?: number;
 	author?: string | null;
+	/** TMDB output language; drives the explore-page language filter. */
+	language?: string;
+	/** Collection blocks only: capsule cards rendered instead of a media row. */
+	collectionMode?: CollectionMode;
+	collectionChildren?: {
+		id: string;
+		label: string;
+		weekday?: number;
+		previewSrc: string;
+	}[];
 }
 
 export interface CommunityBlockRow {
@@ -139,6 +200,39 @@ export interface CommunityBlockRow {
 	author: string | null;
 	language: string;
 	created_at: string;
+}
+
+/**
+ * One block inside an import payload: the client-consumable HomeBlock plus
+ * the browse metadata the client persists alongside the install (same shape
+ * as the entries returned by `GET /blocks/community`).
+ */
+export interface ImportableBlock extends HomeBlock {
+	category?: BlockCategory;
+	author?: string | null;
+	itemCount?: number;
+	language?: string;
+}
+
+export interface ImportableCollectionBlock extends CollectionBlock {
+	category?: BlockCategory;
+	author?: string | null;
+	itemCount?: number;
+	language?: string;
+}
+
+/** One entry in an import payload / pack: plain chart or collection. */
+export type ImportableEntry = ImportableBlock | ImportableCollectionBlock;
+
+export interface BlockCollectionRow {
+	collection_id: string;
+	title: string;
+	blocks_json: string;
+	block_count: number;
+	installs: number;
+	created_at: string;
+	/** "pending" until an admin approves; the import link 404s before that. */
+	status: "pending" | "approved";
 }
 
 /** Cloudflare Workers bindings available on the Hono context. */

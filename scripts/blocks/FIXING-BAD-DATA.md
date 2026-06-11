@@ -56,7 +56,7 @@ const KNOWN_IDS: Record<string, number> = {
 };
 ```
 
-没有 `KNOWN_IDS` 的脚本，参考 `scripts/blocks/monthly/letterboxd-palme-dor.ts` 加一个，
+没有 `KNOWN_IDS` 的脚本，参考 `scripts/blocks/manual/letterboxd-palme-dor.ts` 加一个，
 在 `fetchItems` 返回前 `map` 上 `tmdbId`（`publish.ts` 会跳过搜索直接按 id 取详情）。
 
 ### 5. 验证

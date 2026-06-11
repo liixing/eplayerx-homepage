@@ -13,6 +13,7 @@ import {
 } from "@aws-sdk/client-s3";
 import type {
 	BlockCategory,
+	BlockCollectionRow,
 	CommunityBlockRow,
 	MediaType,
 	SnapshotBlob,
@@ -54,11 +55,12 @@ export function publicDataUrl(blockId: string): string {
 	return `https://${R2_CUSTOM_DOMAIN}/${publicKey(blockId)}`;
 }
 
-function makeBlob(items: SnapshotItem[]): SnapshotBlob {
+function makeBlob(items: SnapshotItem[], title?: string): SnapshotBlob {
 	return {
 		type: "community_block",
 		count: items.length,
 		lastUpdated: new Date().toISOString(),
+		...(title ? { title } : {}),
 		data: items,
 	};
 }
@@ -66,6 +68,7 @@ function makeBlob(items: SnapshotItem[]): SnapshotBlob {
 export async function putSnapshot(
 	key: string,
 	items: SnapshotItem[],
+	title?: string,
 ): Promise<void> {
 	if (!R2_BUCKET_NAME) {
 		throw new Error("R2_BUCKET_NAME is not configured");
@@ -74,7 +77,7 @@ export async function putSnapshot(
 		new PutObjectCommand({
 			Bucket: R2_BUCKET_NAME,
 			Key: key,
-			Body: JSON.stringify(makeBlob(items)),
+			Body: JSON.stringify(makeBlob(items, title)),
 			ContentType: "application/json",
 		}),
 	);
@@ -93,7 +96,7 @@ async function streamToString(body: unknown): Promise<string> {
 }
 
 /** Read a public snapshot straight from the bucket (no CDN). */
-export async function getSnapshot(key: string): Promise<SnapshotItem[]> {
+export async function getSnapshot(key: string): Promise<SnapshotBlob> {
 	if (!R2_BUCKET_NAME) {
 		throw new Error("R2_BUCKET_NAME is not configured");
 	}
@@ -101,8 +104,7 @@ export async function getSnapshot(key: string): Promise<SnapshotItem[]> {
 		new GetObjectCommand({ Bucket: R2_BUCKET_NAME, Key: key }),
 	);
 	const text = await streamToString(result.Body);
-	const blob = JSON.parse(text) as SnapshotBlob;
-	return blob.data ?? [];
+	return JSON.parse(text) as SnapshotBlob;
 }
 
 // MARK: - D1 queries
@@ -181,7 +183,8 @@ export interface InsertSubmissionInput {
 	showOverview: boolean;
 	language: string;
 	source: string;
-	tmdbToken: string;
+	/** Null for collection submissions — nothing to scrape. */
+	tmdbToken: string | null;
 	author: string | null;
 	createdAt: string;
 }
@@ -377,6 +380,26 @@ export async function listCommunityLanguages(
 	return (result.results ?? []).map((r) => r.language);
 }
 
+export async function getCommunityBlock(
+	db: D1Database,
+	blockId: string,
+): Promise<CommunityBlockRow | null> {
+	return db
+		.prepare(`SELECT * FROM community_blocks WHERE block_id = ?`)
+		.bind(blockId)
+		.first<CommunityBlockRow>();
+}
+
+export async function deleteCommunityBlock(
+	db: D1Database,
+	blockId: string,
+): Promise<void> {
+	await db
+		.prepare(`DELETE FROM community_blocks WHERE block_id = ?`)
+		.bind(blockId)
+		.run();
+}
+
 export async function incrementInstalls(
 	db: D1Database,
 	blockId: string,
@@ -386,5 +409,121 @@ export async function incrementInstalls(
 			`UPDATE community_blocks SET installs = installs + 1 WHERE block_id = ?`,
 		)
 		.bind(blockId)
+		.run();
+}
+
+/** Fetch several community blocks by id, preserving the requested order. */
+export async function getCommunityBlocksByIds(
+	db: D1Database,
+	blockIds: string[],
+): Promise<Map<string, CommunityBlockRow>> {
+	if (blockIds.length === 0) return new Map();
+	const placeholders = blockIds.map(() => "?").join(", ");
+	const result = await db
+		.prepare(
+			`SELECT * FROM community_blocks WHERE block_id IN (${placeholders})`,
+		)
+		.bind(...blockIds)
+		.all<CommunityBlockRow>();
+	return new Map((result.results ?? []).map((row) => [row.block_id, row]));
+}
+
+// MARK: - Block collections
+
+export async function insertBlockCollection(
+	db: D1Database,
+	input: {
+		collectionId: string;
+		title: string;
+		blocksJson: string;
+		blockCount: number;
+		createdAt: string;
+		status: "pending" | "approved";
+	},
+): Promise<void> {
+	await db
+		.prepare(
+			`INSERT INTO block_collections
+        (collection_id, title, blocks_json, block_count, installs, created_at, status)
+       VALUES (?, ?, ?, ?, 0, ?, ?)`,
+		)
+		.bind(
+			input.collectionId,
+			input.title,
+			input.blocksJson,
+			input.blockCount,
+			input.createdAt,
+			input.status,
+		)
+		.run();
+}
+
+/** Homepages awaiting review, oldest first (admin queue). */
+export async function listPendingBlockCollections(
+	db: D1Database,
+): Promise<BlockCollectionRow[]> {
+	const result = await db
+		.prepare(
+			`SELECT * FROM block_collections WHERE status = 'pending' ORDER BY created_at ASC LIMIT 200`,
+		)
+		.all<BlockCollectionRow>();
+	return result.results ?? [];
+}
+
+/** Published homepages for the explore page, most installed first. */
+export async function listApprovedBlockCollections(
+	db: D1Database,
+	limit = 100,
+): Promise<BlockCollectionRow[]> {
+	const result = await db
+		.prepare(
+			`SELECT * FROM block_collections WHERE status = 'approved' ORDER BY installs DESC, created_at DESC LIMIT ?`,
+		)
+		.bind(limit)
+		.all<BlockCollectionRow>();
+	return result.results ?? [];
+}
+
+export async function approveBlockCollection(
+	db: D1Database,
+	collectionId: string,
+): Promise<void> {
+	await db
+		.prepare(
+			`UPDATE block_collections SET status = 'approved' WHERE collection_id = ?`,
+		)
+		.bind(collectionId)
+		.run();
+}
+
+export async function deleteBlockCollection(
+	db: D1Database,
+	collectionId: string,
+): Promise<void> {
+	await db
+		.prepare(`DELETE FROM block_collections WHERE collection_id = ?`)
+		.bind(collectionId)
+		.run();
+}
+
+export async function getBlockCollection(
+	db: D1Database,
+	collectionId: string,
+): Promise<BlockCollectionRow | null> {
+	return db
+		.prepare(`SELECT * FROM block_collections WHERE collection_id = ?`)
+		.bind(collectionId)
+		.first<BlockCollectionRow>();
+}
+
+export async function incrementCollectionInstalls(
+	db: D1Database,
+	collectionId: string,
+): Promise<void> {
+	await db
+		.prepare(
+			`UPDATE block_collections SET installs = installs + 1 WHERE collection_id = ?`,
+		)
+		.bind(collectionId)
 		.run();
 }

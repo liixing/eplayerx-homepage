@@ -98,6 +98,61 @@ code,.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
 .spin{width:16px;height:16px;border:2px solid rgba(6,42,32,.35);border-top-color:#062a20;border-radius:50%;animation:sp .7s linear infinite;display:inline-block}
 @keyframes sp{to{transform:rotate(360deg)}}
 .meta{color:var(--mut);font-size:13px;margin-top:6px}
+/* Collection builder (multi-select + bottom bar) */
+.blk .pick{display:none;width:22px;height:22px;border-radius:50%;border:2px solid var(--mut);flex:0 0 auto;align-items:center;justify-content:center;font-size:13px;color:#062a20;line-height:1}
+body.selecting .blk .pick{display:inline-flex}
+.blk.sel .pick{background:var(--grad);border-color:transparent;font-weight:700}
+.blk.sel .pick::before{content:"✓"}
+body.selecting .blk{cursor:pointer}
+body.selecting .blk.sel .blk-head .bt{color:var(--acc)}
+.selbar{position:fixed;left:0;right:0;bottom:0;z-index:20;background:rgba(8,10,15,.88);backdrop-filter:blur(14px);border-top:1px solid var(--line);padding:14px 20px calc(14px + env(safe-area-inset-bottom))}
+.selbar .inner{max-width:900px;margin:0 auto;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.selbar input{flex:1;min-width:160px;width:auto}
+.selbar .selcount{color:var(--mut);font-size:13px;white-space:nowrap}
+.selbar .msg{flex-basis:100%;margin:0}
+.colresult{flex-basis:100%;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.colresult .srcbox{flex:1;min-width:200px;margin-top:0}
+body.selecting{padding-bottom:90px}
+.blk .share{flex:0 0 auto;background:none;border:1px solid var(--line);color:var(--mut);border-radius:999px;padding:3px 10px;font-size:12px;cursor:pointer}
+.blk .share:hover{color:var(--fg);border-color:var(--mut)}
+body.selecting .blk .share{display:none}
+/* Type dropdown + search + language filter + builder buttons */
+.filters{display:flex;gap:10px;margin:0 0 18px;flex-wrap:wrap;animation:up .55s .2s cubic-bezier(.22,.68,.3,1) both}
+.filters input{flex:1;min-width:180px}
+.filters select{width:auto;min-width:110px}
+.filters .mkbtn{flex:0 0 auto;background:var(--card2);border:1px solid var(--line);color:var(--fg);border-radius:12px;padding:0 16px;font-size:14px;cursor:pointer;font-family:inherit;transition:border-color .15s,background .15s}
+.filters .mkbtn:hover{border-color:var(--acc)}
+.filters .mkbtn.on{background:var(--grad);color:#062a20;border-color:transparent;font-weight:600}
+/* Homepage cards (published packs) + detail page */
+.hp-card{cursor:pointer}
+.hp-card:hover .bt{color:var(--acc)}
+.hp-chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.hp-chips .hc{background:var(--card2);border:1px solid var(--line);border-radius:999px;padding:5px 13px;font-size:13px;color:var(--mut);white-space:nowrap}
+.hp-chips .hc.more{color:var(--acc)}
+.hp-actions{display:flex;gap:10px;margin:4px 0 26px;flex-wrap:wrap;align-items:center;animation:up .55s .2s cubic-bezier(.22,.68,.3,1) both}
+.hp-actions .msg{margin:0}
+/* Collection rows: capsule cards with fanned poster stacks */
+.scroller.caps{gap:10px;padding:6px 0 10px}
+.capsule{display:inline-flex;align-items:center;gap:10px;flex:0 0 auto;background:var(--card2);border:1px solid var(--line);border-radius:999px;padding:6px 18px 6px 16px;cursor:pointer;color:var(--fg);font-family:inherit;transition:border-color .15s,background .15s,transform .12s}
+.capsule:hover{border-color:#3a4456}
+.capsule:active{transform:scale(.96)}
+.capsule.on{border-color:rgba(22,224,212,.6);background:linear-gradient(120deg,rgba(75,224,143,.16),rgba(22,224,212,.16))}
+/* Deck-style stack: back posters shrink and peek out as thin slivers. */
+.capsule .stack{position:relative;width:46px;height:46px;flex:0 0 auto}
+.capsule .stack img,.capsule .stack .ph{position:absolute;width:32px;object-fit:cover;border-radius:6px;box-shadow:0 2px 8px rgba(0,0,0,.5);background:#222b3a;inset:auto}
+.capsule .stack .s1{height:46px;left:0;top:0;z-index:3}
+.capsule .stack .s2{height:38px;left:7px;top:4px;z-index:2;filter:brightness(.55)}
+.capsule .stack .s3{height:30px;left:14px;top:8px;z-index:1;filter:brightness(.35)}
+.capsule .clabel{font-size:15px;font-weight:600;white-space:nowrap}
+.capsule .cbadge{font-size:11px;color:#062a20;background:var(--grad);border-radius:999px;padding:1px 7px;font-weight:700;margin-left:-4px}
+.colprev{min-height:0}
+/* Collection submit panel inside the selection bar */
+.grouppanel{flex-basis:100%;border-top:1px solid var(--line);padding-top:12px;margin-top:4px}
+.grouppanel .grow{display:flex;gap:10px;align-items:center;margin-bottom:8px}
+.grouppanel .grow .gt{flex:1;min-width:0;color:var(--mut);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.grouppanel .grow input{flex:0 0 150px}
+.grouppanel .gfoot{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:10px}
+.grouppanel .gfoot input{flex:1;min-width:140px}
 .bllist{display:flex;flex-direction:column;gap:16px}
 .bllist .card{margin-bottom:0;transition:transform .15s,border-color .15s}
 .bllist .card:hover{border-color:#33405a}
@@ -137,6 +192,9 @@ const APP_STORE_ID = "6747369377";
 const DETAIL_PATH = "/tmdb-info/detail";
 const UNIVERSAL_LINK_BASE = "https://eplayerx.com";
 const APP_SCHEME = "eplayerx";
+// Universal-link entry for importing blocks/collections into the client.
+// Must stay outside `/blocks*`, which the AASA file keeps in the browser.
+const IMPORT_LINK_BASE = `${UNIVERSAL_LINK_BASE}/import/blocks`;
 
 type NavKey = "explore" | "submit" | "none";
 
@@ -184,17 +242,42 @@ const Layout = ({ title, active, children }: LayoutProps) => (
 
 // MARK: - Community library (home)
 
-const CATEGORY_TABS: { id: BlockCategory | "all"; label: string }[] = [
+/** Explore type filter: media categories plus collections and homepages. */
+export type ExploreCategory =
+	| "all"
+	| BlockCategory
+	| "collection"
+	| "homepage";
+
+const EXPLORE_FILTERS: { id: ExploreCategory; label: string }[] = [
 	{ id: "all", label: "全部" },
 	{ id: "movie", label: "电影" },
 	{ id: "tv", label: "电视剧" },
 	{ id: "anime", label: "动漫" },
+	{ id: "collection", label: "合集" },
+	{ id: "homepage", label: "首页" },
 ];
+
+/** Published homepage summary, shown as a card on the explore page. */
+export interface HomepageSummary {
+	collectionId: string;
+	title: string;
+	blockCount: number;
+	installs: number;
+	blockTitles: string[];
+}
 
 interface ExploreProps {
 	blocks: DisplayBlock[];
 	imageBase: string;
-	category: BlockCategory | "all";
+	category: ExploreCategory;
+	/** Distinct community languages, for the filter menu. */
+	languages: string[];
+	homepages: HomepageSummary[];
+}
+
+function languageLabel(code: string): string {
+	return TMDB_LANGUAGES.find((l) => l.code === code)?.label ?? code;
 }
 
 /** Server-rendered shimmer placeholders, replaced by real artwork once data loads. */
@@ -220,21 +303,158 @@ const SkeletonRow = ({ preset }: { preset: DisplayBlock["preset"] }) => {
 	);
 };
 
-export const ExplorePage = ({ blocks, imageBase, category }: ExploreProps) => (
+/** Whether a section starts hidden for the server-rendered filter value. */
+function blockHidden(b: DisplayBlock, category: ExploreCategory): boolean {
+	if (category === "all") return false;
+	if (category === "homepage") return true;
+	if (category === "collection") return !b.collectionChildren;
+	return b.category !== category;
+}
+
+/** One block row: header + preview strip (chart) or capsules (collection). */
+const BlockSection = ({
+	b,
+	hidden,
+}: {
+	b: DisplayBlock;
+	hidden?: boolean;
+}) => (
+	<section
+		class={`blk${hidden ? " hide" : ""}`}
+		data-id={b.id}
+		data-category={b.category}
+		data-src={b.previewSrc}
+		data-preset={b.preset}
+		data-rank={b.showRank ? "1" : "0"}
+		data-ov={b.showOverview ? "1" : "0"}
+		data-title={b.title}
+		data-author={b.author ?? ""}
+		data-lang={b.language ?? ""}
+		data-kind={b.collectionChildren ? "collection" : "chart"}
+		data-mode={b.collectionMode ?? ""}
+	>
+		<div class="blk-head">
+			<span class="pick" />
+			<span class="bt">{b.title}</span>
+			<span class="chev">›</span>
+			{b.collectionChildren ? (
+				<span class="tag tag-official">合集</span>
+			) : b.official ? (
+				<span class="tag tag-official">官方</span>
+			) : (
+				<span class="tag">社区</span>
+			)}
+			<span class="meta-inline">
+				{b.collectionChildren
+					? `${b.collectionChildren.length} 个榜单 · 安装 ${b.installs ?? 0}`
+					: b.official
+						? ""
+						: `${b.itemCount ?? 0} 项 · 安装 ${b.installs ?? 0}`}
+				{b.author ? ` · @${b.author}` : ""}
+			</span>
+			<button class="share" type="button" data-share={b.id}>
+				分享
+			</button>
+		</div>
+		{b.collectionChildren ? (
+			<CollectionRow b={b} />
+		) : (
+			<div class="scroller">
+				<SkeletonRow preset={b.preset as "thumb-list"} />
+			</div>
+		)}
+	</section>
+);
+
+/** Compact homepage card: title + block-title chips; opens the detail page. */
+const HomepageCard = ({
+	hp,
+	hidden,
+}: {
+	hp: HomepageSummary;
+	hidden: boolean;
+}) => (
+	<section
+		class={`blk hp-card${hidden ? " hide" : ""}`}
+		data-hp={hp.collectionId}
+		data-title={hp.title}
+	>
+		<div class="blk-head">
+			<span class="bt">{hp.title}</span>
+			<span class="chev">›</span>
+			<span class="tag tag-official">首页</span>
+			<span class="meta-inline">
+				{hp.blockCount} 个区块 · 安装 {hp.installs}
+			</span>
+		</div>
+		<div class="hp-chips">
+			{hp.blockTitles.slice(0, 6).map((t) => (
+				<span class="hc">{t}</span>
+			))}
+			{hp.blockTitles.length > 6 ? (
+				<span class="hc more">+{hp.blockTitles.length - 6}</span>
+			) : null}
+		</div>
+	</section>
+);
+
+/** Capsule cards for a collection row (poster stacks filled in by JS). */
+const CollectionRow = ({ b }: { b: DisplayBlock }) => (
+	<>
+		<div class="scroller caps">
+			{(b.collectionChildren ?? []).map((ch) => (
+				<button
+					type="button"
+					class="capsule"
+					data-cid={ch.id}
+					data-csrc={ch.previewSrc}
+					data-wd={ch.weekday ?? ""}
+				>
+					<span class="stack">
+						<span class="ph s1" />
+						<span class="ph s2" />
+						<span class="ph s3" />
+					</span>
+					<span class="clabel">{ch.label}</span>
+				</button>
+			))}
+		</div>
+		<div class="scroller colprev" data-colprev />
+	</>
+);
+
+export const ExplorePage = ({
+	blocks,
+	imageBase,
+	category,
+	languages,
+	homepages,
+}: ExploreProps) => (
 	<Layout title="社区库" active="explore">
 		<h1 class="gradtext">社区 Blocks</h1>
 		<p class="sub">官方默认板块与社区共建板块,挑你喜欢的加进客户端首页。</p>
 
-		<div class="tabs">
-			{CATEGORY_TABS.map((t) => (
-				<button
-					type="button"
-					class={`tab${category === t.id ? " on" : ""}`}
-					data-cat={t.id}
-				>
-					{t.label}
-				</button>
-			))}
+		<div class="filters">
+			<select id="catSel">
+				{EXPLORE_FILTERS.map((t) => (
+					<option value={t.id} selected={category === t.id}>
+						{t.label}
+					</option>
+				))}
+			</select>
+			<input id="q" type="search" placeholder="搜索标题 / 作者" />
+			<select id="langSel">
+				<option value="">全部语言</option>
+				{languages.map((code) => (
+					<option value={code}>{languageLabel(code)}</option>
+				))}
+			</select>
+			<button type="button" class="mkbtn" id="makeGroupBtn">
+				生成合集
+			</button>
+			<button type="button" class="mkbtn" id="makeHomeBtn">
+				生成首页
+			</button>
 		</div>
 
 		{blocks.length === 0 ? (
@@ -242,38 +462,86 @@ export const ExplorePage = ({ blocks, imageBase, category }: ExploreProps) => (
 				<p class="meta">这个分类还没有板块,去投稿一个吧。</p>
 			</div>
 		) : (
-			blocks.map((b) => (
-				<section
-					class={`blk${
-						category !== "all" && b.category !== category ? " hide" : ""
-					}`}
-					data-category={b.category}
-					data-src={b.previewSrc}
-					data-preset={b.preset}
-					data-rank={b.showRank ? "1" : "0"}
-					data-ov={b.showOverview ? "1" : "0"}
-				>
-					<div class="blk-head">
-						<span class="bt">{b.title}</span>
-						<span class="chev">›</span>
-						{b.official ? (
-							<span class="tag tag-official">官方</span>
-						) : (
-							<span class="tag">社区</span>
-						)}
-						<span class="meta-inline">
-							{b.official
-								? ""
-								: `${b.itemCount ?? 0} 项 · 安装 ${b.installs ?? 0}`}
-							{b.author ? ` · @${b.author}` : ""}
-						</span>
-					</div>
-					<div class="scroller">
-						<SkeletonRow preset={b.preset} />
-					</div>
-				</section>
-			))
+			blocks.map((b) => <BlockSection b={b} hidden={blockHidden(b, category)} />)
 		)}
+		{homepages.map((hp) => (
+			<HomepageCard hp={hp} hidden={category !== "homepage"} />
+		))}
+		<div
+			class={`card${category === "homepage" && homepages.length === 0 ? "" : " hide"}`}
+			id="hpEmpty"
+		>
+			<p class="meta">还没有已发布的首页,选中几个区块点“生成首页”试试。</p>
+		</div>
+
+		<div class="selbar hide" id="selbar">
+			<div class="inner">
+				<span class="selcount" id="selCount">
+					已选 0
+				</span>
+				<button class="btn" id="groupBtn" type="button">
+					投稿合集
+				</button>
+				<button class="btn sec" id="packBtn" type="button">
+					生成首页
+				</button>
+				<button class="btn sec" id="selCancelBtn" type="button">
+					取消
+				</button>
+				<div class="msg" id="colMsg" />
+
+				<div class="grouppanel hide" id="packPanel">
+					<div class="gfoot">
+						<input
+							id="packTitle"
+							placeholder="首页标题,如 周末片单"
+							maxlength={40}
+						/>
+						<button class="btn" id="makePackBtn" type="button">
+							提交审核
+						</button>
+					</div>
+					<div class="hint">
+						把选中的区块打包成一个新首页;提交后由管理员审核,通过后分享链接在
+						iPhone 上打开即可一键导入。
+					</div>
+					<div class="colresult hide" id="colResult">
+						<div class="srcbox mono" id="colUrl" />
+						<button class="btn sec" id="copyColBtn" type="button">
+							复制链接
+						</button>
+					</div>
+				</div>
+
+				<div class="grouppanel hide" id="groupPanel">
+					<div class="gfoot" style="margin:0 0 10px">
+						<input
+							id="grpTitle"
+							placeholder="合集标题,如 每日新番榜"
+							maxlength={40}
+						/>
+						<div class="chips" id="grpMode">
+							<div class="chip on" data-v="custom">
+								自定义
+							</div>
+							<div class="chip" data-v="weekday">
+								按星期
+							</div>
+						</div>
+					</div>
+					<div id="grpRows" />
+					<div class="gfoot">
+						<input id="grpAuthor" placeholder="署名（可选）" maxlength={40} />
+						<button class="btn" id="grpSubmitBtn" type="button">
+							提交审核
+						</button>
+					</div>
+					<div class="hint">
+						合集会以一行胶囊卡片展示在首页;提交后由管理员审核,通过即上架社区库。
+					</div>
+				</div>
+			</div>
+		</div>
 		<script
 			dangerouslySetInnerHTML={{
 				__html: raw(exploreJs(imageBase)) as unknown as string,
@@ -281,6 +549,49 @@ export const ExplorePage = ({ blocks, imageBase, category }: ExploreProps) => (
 		/>
 	</Layout>
 );
+
+// MARK: - Homepage detail
+
+interface HomepageDetailProps {
+	homepage: HomepageSummary;
+	blocks: DisplayBlock[];
+	imageBase: string;
+}
+
+/** Full view of a published homepage: every block, plus an install link. */
+export const HomepageDetailPage = ({
+	homepage,
+	blocks,
+	imageBase,
+}: HomepageDetailProps) => {
+	const importUrl = `${IMPORT_LINK_BASE}?collectionId=${homepage.collectionId}`;
+	return (
+		<Layout title={homepage.title} active="explore">
+			<h1 class="gradtext">{homepage.title}</h1>
+			<p class="sub">
+				{homepage.blockCount} 个区块 · 安装 {homepage.installs}
+				。在 iPhone 上安装后会作为一个新首页出现在客户端。
+			</p>
+			<div class="hp-actions">
+				<a class="btn" href={importUrl}>
+					安装到 App
+				</a>
+				<button class="btn sec" id="copyHpBtn" type="button" data-url={importUrl}>
+					复制链接
+				</button>
+				<span class="msg" id="hpMsg" />
+			</div>
+			{blocks.map((b) => (
+				<BlockSection b={b} />
+			))}
+			<script
+				dangerouslySetInnerHTML={{
+					__html: raw(homepageJs(imageBase)) as unknown as string,
+				}}
+			/>
+		</Layout>
+	);
+};
 
 // MARK: - Submit
 
@@ -401,6 +712,44 @@ export const SubmitPage = () => (
 
 // MARK: - Admin
 
+interface ImportLandingProps {
+	title: string;
+	blockTitles: string[];
+	importUrl: string;
+}
+
+/**
+ * Browser fallback for the universal link. Phones with the app installed
+ * never see this page (the link opens the app directly); everyone else gets
+ * a preview plus the App Store link, with the Smart App Banner on iOS.
+ */
+export const ImportLandingPage = ({
+	title,
+	blockTitles,
+	importUrl,
+}: ImportLandingProps) => (
+	<Layout title={title} active="none">
+		<h1 class="gradtext">{title}</h1>
+		<p class="sub">
+			{blockTitles.length} 个区块 · 在 iPhone 上打开本页即可导入 EplayerX
+			并生成新首页。
+		</p>
+		<div class="card">
+			{blockTitles.map((blockTitle) => (
+				<p class="meta">· {blockTitle}</p>
+			))}
+		</div>
+		<p style="display:flex;gap:10px;flex-wrap:wrap">
+			<a class="btn" href={importUrl}>
+				在 App 中导入
+			</a>
+			<a class="btn sec" href={`https://apps.apple.com/app/id${APP_STORE_ID}`}>
+				下载 EplayerX
+			</a>
+		</p>
+	</Layout>
+);
+
 export const AdminLoginPage = ({ error }: { error?: boolean }) => (
 	<Layout title="审核" active="none">
 		<h1 class="gradtext">审核登录</h1>
@@ -419,8 +768,27 @@ export const AdminLoginPage = ({ error }: { error?: boolean }) => (
 	</Layout>
 );
 
+/** Published collection summary for the admin panel. */
+export interface AdminCollectionRow {
+	blockId: string;
+	title: string;
+	mode: "weekday" | "custom";
+	childLabels: string[];
+	installs: number;
+}
+
+/** Shared homepage awaiting review (block pack submitted from the web). */
+export interface AdminHomepageRow {
+	collectionId: string;
+	title: string;
+	blockTitles: string[];
+	createdAt: string;
+}
+
 interface AdminPageProps {
 	pending: SubmissionRow[];
+	collections: AdminCollectionRow[];
+	homepages: AdminHomepageRow[];
 }
 
 const ADMIN_CATEGORY_OPTIONS: { value: BlockCategory; label: string }[] = [
@@ -435,12 +803,68 @@ const ADMIN_PRESET_OPTIONS = [
 	{ value: "hero-list", label: "大图流" },
 ] as const;
 
-export const AdminPage = ({ pending }: AdminPageProps) => (
+/** Pending collection submission: no snapshot/blockId, just review + publish. */
+const PendingCollectionCard = ({ s }: { s: SubmissionRow }) => (
+	<div class="card" data-id={s.id} data-kind="collection">
+		<div>
+			<strong style="font-size:16px">{s.title}</strong>
+			<div class="meta">
+				<span class="tag tag-official">合集</span>
+				<span class="tag">{s.category}</span>
+				<span class="tag">{s.language}</span>
+				{s.author ? ` · @${s.author}` : ""}
+			</div>
+			<div class="meta">{s.created_at}</div>
+		</div>
+		<div class="srcbox mono">{s.source_spec}</div>
+		<label>名称</label>
+		<input data-f="title" data-id={s.id} value={s.title} />
+		<label>分类</label>
+		<select data-f="category" data-id={s.id}>
+			{ADMIN_CATEGORY_OPTIONS.map((o) => (
+				<option value={o.value} selected={s.category === o.value}>
+					{o.label}
+				</option>
+			))}
+		</select>
+		<div class="hint">
+			通过后自动生成 blockId 并发布为 collection-list 区块,无需跑发布脚本。
+		</div>
+		<div style="margin-top:14px;display:flex;gap:10px">
+			<button class="btn" type="button" data-act="approve" data-id={s.id}>
+				通过并发布
+			</button>
+			<button class="btn danger" type="button" data-act="reject" data-id={s.id}>
+				驳回
+			</button>
+		</div>
+		<div class="msg" data-msg={s.id} />
+	</div>
+);
+
+export const AdminPage = ({
+	pending,
+	collections,
+	homepages,
+}: AdminPageProps) => (
 	<Layout title="审核" active="none">
-		<h1 class="gradtext">待审投稿（{pending.length}）</h1>
+		<h1 class="gradtext">管理后台</h1>
+		<div class="tabs" id="adminTabs">
+			<button class="tab on" type="button" data-tab="pending">
+				待审投稿（{pending.length}）
+			</button>
+			<button class="tab" type="button" data-tab="homepages">
+				待审首页（{homepages.length}）
+			</button>
+			<button class="tab" type="button" data-tab="collections">
+				合集管理（{collections.length}）
+			</button>
+		</div>
+
+		<div data-panel="pending">
 		<p class="sub">
 			先在本地跑发布脚本（scripts/blocks/）抓取并上传 R2,再把输出的 blockId
-			填进来;参数可按需修改,点“校验并通过”即发布。
+			填进来;参数可按需修改,点“校验并通过”即发布。合集投稿无需脚本,直接通过。
 		</p>
 		{pending.length === 0 ? (
 			<div class="card">
@@ -448,127 +872,244 @@ export const AdminPage = ({ pending }: AdminPageProps) => (
 			</div>
 		) : (
 			<div class="bllist">
-				{pending.map((s) => (
-					<div class="card" data-id={s.id}>
-						<div>
-							<strong style="font-size:16px">{s.title}</strong>
-							<div class="meta">
-								<span class="tag">{s.category}</span>
-								<span class="tag">{s.preset}</span>
-								<span class="tag">{s.language}</span>
-								{s.show_rank ? " · 排行" : ""}
-								{s.show_overview ? " · 简介" : ""}
-								{s.author ? ` · @${s.author}` : ""}
-							</div>
-							<div class="meta">{s.created_at}</div>
-						</div>
-						<div class="srcbox mono">{s.source_spec}</div>
-						<label>投稿 ID（发布脚本里填 submissionId,token 会自动读取）</label>
-						<div class="srcbox mono">{s.id}</div>
-						<label>名称</label>
-						<input data-f="title" data-id={s.id} value={s.title} />
-						<div class="row">
+				{pending.map((s) =>
+					s.preset === "collection-list" ? (
+						<PendingCollectionCard s={s} />
+					) : (
+						<div class="card" data-id={s.id}>
 							<div>
-								<label>分类</label>
-								<select data-f="category" data-id={s.id}>
-									{ADMIN_CATEGORY_OPTIONS.map((o) => (
-										<option value={o.value} selected={s.category === o.value}>
-											{o.label}
+								<strong style="font-size:16px">{s.title}</strong>
+								<div class="meta">
+									<span class="tag">{s.category}</span>
+									<span class="tag">{s.preset}</span>
+									<span class="tag">{s.language}</span>
+									{s.show_rank ? " · 排行" : ""}
+									{s.show_overview ? " · 简介" : ""}
+									{s.author ? ` · @${s.author}` : ""}
+								</div>
+								<div class="meta">{s.created_at}</div>
+							</div>
+							<div class="srcbox mono">{s.source_spec}</div>
+							<label>
+								投稿 ID（发布脚本里填 submissionId,token 会自动读取）
+							</label>
+							<div class="srcbox mono">{s.id}</div>
+							<label>名称</label>
+							<input data-f="title" data-id={s.id} value={s.title} />
+							<div class="row">
+								<div>
+									<label>分类</label>
+									<select data-f="category" data-id={s.id}>
+										{ADMIN_CATEGORY_OPTIONS.map((o) => (
+											<option value={o.value} selected={s.category === o.value}>
+												{o.label}
+											</option>
+										))}
+									</select>
+								</div>
+								<div>
+									<label>媒体类型</label>
+									<select data-f="mediaType" data-id={s.id}>
+										<option value="movie" selected={s.media_type === "movie"}>
+											movie
 										</option>
-									))}
-								</select>
-							</div>
-							<div>
-								<label>媒体类型</label>
-								<select data-f="mediaType" data-id={s.id}>
-									<option value="movie" selected={s.media_type === "movie"}>
-										movie
-									</option>
-									<option value="tv" selected={s.media_type === "tv"}>
-										tv
-									</option>
-								</select>
-							</div>
-							<div>
-								<label>展示样式</label>
-								<select data-f="preset" data-id={s.id}>
-									{ADMIN_PRESET_OPTIONS.map((o) => (
-										<option value={o.value} selected={s.preset === o.value}>
-											{o.label}
+										<option value="tv" selected={s.media_type === "tv"}>
+											tv
 										</option>
-									))}
-								</select>
+									</select>
+								</div>
+								<div>
+									<label>展示样式</label>
+									<select data-f="preset" data-id={s.id}>
+										{ADMIN_PRESET_OPTIONS.map((o) => (
+											<option value={o.value} selected={s.preset === o.value}>
+												{o.label}
+											</option>
+										))}
+									</select>
+								</div>
 							</div>
-						</div>
-						<div class="row" style="margin-top:6px">
-							<div>
-								<label class="check">
-									<input
-										type="checkbox"
-										data-f="showRank"
-										data-id={s.id}
-										checked={!!s.show_rank}
-									/>
-									显示排行序号
-								</label>
+							<div class="row" style="margin-top:6px">
+								<div>
+									<label class="check">
+										<input
+											type="checkbox"
+											data-f="showRank"
+											data-id={s.id}
+											checked={!!s.show_rank}
+										/>
+										显示排行序号
+									</label>
+								</div>
+								<div>
+									<label class="check">
+										<input
+											type="checkbox"
+											data-f="showOverview"
+											data-id={s.id}
+											checked={!!s.show_overview}
+										/>
+										显示简介
+									</label>
+								</div>
+								<div>
+									<label class="check">
+										<input
+											type="checkbox"
+											data-f="isAnime"
+											data-id={s.id}
+											checked={!!s.is_anime}
+										/>
+										动漫标记
+									</label>
+								</div>
 							</div>
-							<div>
-								<label class="check">
-									<input
-										type="checkbox"
-										data-f="showOverview"
-										data-id={s.id}
-										checked={!!s.show_overview}
-									/>
-									显示简介
-								</label>
-							</div>
-							<div>
-								<label class="check">
-									<input
-										type="checkbox"
-										data-f="isAnime"
-										data-id={s.id}
-										checked={!!s.is_anime}
-									/>
-									动漫标记
-								</label>
-							</div>
-						</div>
-						<label>blockId（本地发布脚本输出）</label>
-						<input
-							class="mono"
-							data-f="blockId"
-							data-id={s.id}
-							placeholder="community-xxxxxxxxxxxx"
-						/>
-						<div class="hint">
-							本地执行 bun run scripts/blocks/&lt;name&gt;.ts 上传快照后,把
-							blockId 粘贴到这里。
-						</div>
-						<div style="margin-top:14px;display:flex;gap:10px">
-							<button
-								class="btn"
-								type="button"
-								data-act="approve"
+							<label>blockId（本地发布脚本输出）</label>
+							<input
+								class="mono"
+								data-f="blockId"
 								data-id={s.id}
-							>
-								校验并通过
+								placeholder="community-xxxxxxxxxxxx"
+							/>
+							<div class="hint">
+								本地执行 bun run scripts/blocks/&lt;name&gt;.ts 上传快照后,把
+								blockId 粘贴到这里。
+							</div>
+							<div style="margin-top:14px;display:flex;gap:10px">
+								<button
+									class="btn"
+									type="button"
+									data-act="approve"
+									data-id={s.id}
+								>
+									校验并通过
+								</button>
+								<button
+									class="btn danger"
+									type="button"
+									data-act="reject"
+									data-id={s.id}
+								>
+									驳回
+								</button>
+							</div>
+							<div class="msg" data-msg={s.id} />
+						</div>
+					),
+				)}
+			</div>
+		)}
+		</div>
+
+		<div class="hide" data-panel="homepages">
+		<p class="sub">
+			用户从社区库打包的首页;通过后分享链接生效,驳回即删除。
+		</p>
+		{homepages.length === 0 ? (
+			<div class="card">
+				<p class="meta">暂无待审首页。</p>
+			</div>
+		) : (
+			<div class="bllist">
+				{homepages.map((hp) => (
+					<div class="card" data-hp={hp.collectionId}>
+						<strong style="font-size:16px">{hp.title}</strong>
+						<div class="meta">
+							<span class="tag mono">{hp.collectionId}</span>
+							{hp.blockTitles.length} 个区块 · {hp.createdAt}
+						</div>
+						<div class="meta">{hp.blockTitles.join(" · ")}</div>
+						<div style="margin-top:12px;display:flex;gap:10px">
+							<button class="btn" type="button" data-hpok={hp.collectionId}>
+								通过
 							</button>
 							<button
 								class="btn danger"
 								type="button"
-								data-act="reject"
-								data-id={s.id}
+								data-hpdel={hp.collectionId}
 							>
-								驳回
+								驳回并删除
 							</button>
 						</div>
-						<div class="msg" data-msg={s.id} />
+						<div class="msg" data-hpmsg={hp.collectionId} />
 					</div>
 				))}
 			</div>
 		)}
+		</div>
+
+		<div class="hide" data-panel="collections">
+		<p class="sub">
+			把已有榜单（社区或官方）组合成一个合集,客户端首页以一行胶囊卡片展示。
+		</p>
+		<div class="card">
+			<strong>新建合集</strong>
+			<label>标题</label>
+			<input id="ncTitle" placeholder="如 每日新番榜" maxlength={40} />
+			<div class="row">
+				<div>
+					<label>分类</label>
+					<select id="ncCategory">
+						{ADMIN_CATEGORY_OPTIONS.map((o) => (
+							<option value={o.value}>{o.label}</option>
+						))}
+					</select>
+				</div>
+				<div>
+					<label>模式</label>
+					<select id="ncMode">
+						<option value="custom">自定义</option>
+						<option value="weekday">按星期（今天优先）</option>
+					</select>
+				</div>
+			</div>
+			<label>
+				子榜单（每行一个: blockId | 标签 | 星期1-7,星期仅按星期模式需要）
+			</label>
+			<textarea
+				id="ncChildren"
+				class="mono"
+				style="min-height:120px"
+				placeholder={
+					"community-abc123 | 周一 | 1\ncommunity-def456 | 周二 | 2\ntrending-movies | 热门电影"
+				}
+			/>
+			<div style="margin-top:14px">
+				<button class="btn" id="ncCreateBtn" type="button">
+					创建并发布
+				</button>
+			</div>
+			<div class="msg" id="ncMsg" />
+		</div>
+		{collections.length > 0 ? (
+			<div class="bllist">
+				{collections.map((col) => (
+					<div class="card" data-col={col.blockId}>
+						<strong style="font-size:16px">{col.title}</strong>
+						<div class="meta">
+							<span class="tag">
+								{col.mode === "weekday" ? "按星期" : "自定义"}
+							</span>
+							<span class="tag mono">{col.blockId}</span>
+							安装 {col.installs}
+						</div>
+						<div class="meta">{col.childLabels.join(" · ")}</div>
+						<div style="margin-top:12px">
+							<button
+								class="btn danger"
+								type="button"
+								data-coldel={col.blockId}
+							>
+								删除
+							</button>
+						</div>
+						<div class="msg" data-colmsg={col.blockId} />
+					</div>
+				))}
+			</div>
+		) : null}
+		</div>
+
 		<script
 			dangerouslySetInnerHTML={{ __html: raw(ADMIN_JS) as unknown as string }}
 		/>
@@ -577,7 +1118,8 @@ export const AdminPage = ({ pending }: AdminPageProps) => (
 
 // MARK: - Client scripts
 
-function exploreJs(imageBase: string): string {
+/** Shared preview renderer used by the explore and homepage-detail pages. */
+function rendererJs(imageBase: string): string {
 	return `
 const IMG=${JSON.stringify(imageBase)};
 function pickList(j){
@@ -638,10 +1180,63 @@ function render(sc,items,preset,rank,ov,animate){
   });
   sc.classList.add('in');
 }
+// Cached-first fetch used by collection capsules and their preview strips.
+async function fetchItems(src){
+  const cached=readCache(src);
+  if(cached)return cached;
+  try{
+    const r=await fetch(src);if(!r.ok)return [];
+    const items=pickList(await r.json()).slice(0,20).map(slim);
+    if(items.length)try{localStorage.setItem(CK+src,JSON.stringify(items));}catch(e){}
+    return items;
+  }catch(e){return [];}
+}
+function weekdayToday(){return ((new Date().getDay()+6)%7)+1;}
+// Collection rows: fan the first posters of each child into the capsule
+// stacks; weekday collections rotate so today's chart comes first.
+async function loadCollection(sec){
+  const caps=sec.querySelector('.scroller.caps');if(!caps)return;
+  if(sec.dataset.mode==='weekday'){
+    const today=weekdayToday();
+    const cards=Array.from(caps.querySelectorAll('.capsule'));
+    const key=c=>c.dataset.wd?(((+c.dataset.wd)-today+7)%7):99;
+    cards.sort((a,b)=>key(a)-key(b)).forEach(c=>caps.appendChild(c));
+    const first=cards.find(c=>+c.dataset.wd===today);
+    if(first&&!first.querySelector('.cbadge')){
+      const badge=document.createElement('span');
+      badge.className='cbadge';badge.textContent='今天';
+      first.appendChild(badge);
+    }
+  }
+  caps.classList.add('in');
+  caps.querySelectorAll('.capsule').forEach(async c=>{
+    const items=await fetchItems(c.dataset.csrc);
+    const posters=items.map(it=>img(it.poster_path||it.thumb||it.backdrop_path,'w154')).filter(Boolean).slice(0,3);
+    posters.forEach((u,i)=>{
+      const ph=c.querySelector('.ph.s'+(i+1));if(!ph)return;
+      const im=document.createElement('img');
+      im.className='s'+(i+1);im.loading='lazy';im.src=u;
+      ph.replaceWith(im);
+    });
+  });
+}
+// Tap a capsule -> load that chart into the preview strip below the row.
+async function toggleCapsule(sec,cap){
+  const prev=sec.querySelector('[data-colprev]');if(!prev)return;
+  const wasOn=cap.classList.contains('on');
+  sec.querySelectorAll('.capsule.on').forEach(c=>c.classList.remove('on'));
+  if(wasOn){prev.innerHTML='';prev.classList.remove('in');return;}
+  cap.classList.add('on');
+  const items=await fetchItems(cap.dataset.csrc);
+  if(!cap.classList.contains('on'))return;
+  if(!items.length){prev.innerHTML='<div class="prev-empty">预览暂不可用</div>';return;}
+  render(prev,items.slice(0,12),'poster-list',false,false,true);
+}
 // Stale-while-revalidate: paint the cached preview instantly (no skeleton),
 // then fetch in the background and only repaint when the data changed.
 async function load(sec){
   if(sec.dataset.loaded)return;sec.dataset.loaded='1';
+  if(sec.dataset.kind==='collection'){loadCollection(sec);return;}
   const sc=sec.querySelector('.scroller');
   const src=sec.dataset.src;const preset=sec.dataset.preset||'thumb-list';
   const rank=sec.dataset.rank==='1';const ov=sec.dataset.ov==='1';
@@ -660,36 +1255,6 @@ async function load(sec){
     sc.dataset.loaded='';sec.dataset.loaded='';sc.innerHTML='<div class="prev-empty">预览暂不可用</div>';
   }
 }
-// Evict cache entries for blocks no longer on the page (all categories are
-// always rendered, so data-src is the complete live set).
-try{
-  const live=new Set(Array.from(document.querySelectorAll('.blk')).map(s=>CK+s.dataset.src));
-  for(let i=localStorage.length-1;i>=0;i--){
-    const k=localStorage.key(i);
-    if(k&&k.indexOf(CK)===0&&!live.has(k))localStorage.removeItem(k);
-  }
-}catch(e){}
-// Lazy-load on scroll; hidden (display:none) sections only load once their tab
-// is selected and they enter the viewport.
-const io=new IntersectionObserver((es)=>{es.forEach(e=>{if(e.isIntersecting)load(e.target);});},{rootMargin:'400px'});
-document.querySelectorAll('.blk').forEach(s=>io.observe(s));
-// Reveal-on-scroll: fires again when a hidden section is re-shown by the tabs.
-const rio=new IntersectionObserver((es)=>{es.forEach(e=>{if(e.isIntersecting)e.target.classList.add('vis');});},{threshold:.08});
-document.querySelectorAll('.blk').forEach(s=>rio.observe(s));
-function applyCategory(cat){
-  document.querySelectorAll('.tabs .tab').forEach(t=>t.classList.toggle('on',t.dataset.cat===cat));
-  document.querySelectorAll('.blk').forEach(s=>{
-    const hide=cat!=='all'&&s.dataset.category!==cat;
-    // Drop 'vis' when hiding so the reveal animation replays on re-show.
-    if(hide)s.classList.remove('vis');
-    s.classList.toggle('hide',hide);
-  });
-  // Keep the tab in the URL so a refresh restores it (server renders ?category=).
-  const u=new URL(location.href);
-  if(cat==='all')u.searchParams.delete('category');else u.searchParams.set('category',cat);
-  history.replaceState(null,'',u);
-}
-document.querySelectorAll('.tabs .tab').forEach(t=>{t.onclick=()=>applyCategory(t.dataset.cat);});
 // Tap a card -> the iOS client's detail screen (app/tmdb-info/detail.tsx).
 // Universal links never fire on same-domain taps, so try the custom scheme
 // first and fall back to the universal link if the app doesn't take over.
@@ -705,13 +1270,260 @@ function openDetail(id,mt){
     location.href=DETAIL+q;
   }
 }
+async function copyText(text){
+  try{await navigator.clipboard.writeText(text);return true;}
+  catch(e){
+    const ta=document.createElement('textarea');ta.value=text;
+    document.body.appendChild(ta);ta.select();
+    let ok=false;try{ok=document.execCommand('copy');}catch(e2){}
+    ta.remove();return ok;
+  }
+}
+// Page hook: return true to consume a section tap (used by selection mode).
+let onBlkTap=null;
+// Lazy-load on scroll; hidden (display:none) sections only load once their
+// filter shows them and they enter the viewport.
+const io=new IntersectionObserver((es)=>{es.forEach(e=>{if(e.isIntersecting)load(e.target);});},{rootMargin:'400px'});
+// Reveal-on-scroll: fires again when a hidden section is re-shown.
+const rio=new IntersectionObserver((es)=>{es.forEach(e=>{if(e.isIntersecting)e.target.classList.add('vis');});},{threshold:.08});
 document.querySelectorAll('.blk').forEach(s=>{
+  io.observe(s);rio.observe(s);
   const fallbackMt=s.dataset.category==='movie'?'movie':'tv';
   s.addEventListener('click',e=>{
+    if(onBlkTap&&onBlkTap(s,e))return;
+    const cap=e.target.closest('.capsule');
+    if(cap){toggleCapsule(s,cap);return;}
     const it=e.target.closest('.it');
     if(it&&it.dataset.tid)openDetail(it.dataset.tid,it.dataset.mt||fallbackMt);
   });
 });
+`;
+}
+
+function exploreJs(imageBase: string): string {
+	return `${rendererJs(imageBase)}
+// Evict cache entries for blocks no longer on the page (all categories are
+// always rendered, so data-src + capsule data-csrc is the complete live set).
+try{
+  const live=new Set();
+  document.querySelectorAll('.blk[data-src]').forEach(s=>{if(s.dataset.src)live.add(CK+s.dataset.src);});
+  document.querySelectorAll('.capsule[data-csrc]').forEach(c=>live.add(CK+c.dataset.csrc));
+  for(let i=localStorage.length-1;i>=0;i--){
+    const k=localStorage.key(i);
+    if(k&&k.indexOf(CK)===0&&!live.has(k))localStorage.removeItem(k);
+  }
+}catch(e){}
+// Type dropdown + free-text search + language filter, combined client-side.
+const qInput=document.getElementById('q');
+const langSel=document.getElementById('langSel');
+const catSel=document.getElementById('catSel');
+let curCat=catSel.value||'all';
+function applyFilters(){
+  const q=(qInput.value||'').trim().toLowerCase();
+  const lang=langSel.value;
+  const isHome=curCat==='homepage';
+  let hpShown=0;
+  document.querySelectorAll('.blk').forEach(s=>{
+    let show;
+    if(s.classList.contains('hp-card')){
+      const qOk=!q||(s.dataset.title||'').toLowerCase().indexOf(q)>=0;
+      show=isHome&&qOk&&!selMode;
+      if(show)hpShown++;
+    }else{
+      let catOk;
+      if(isHome)catOk=false;
+      else if(curCat==='collection')catOk=s.dataset.kind==='collection';
+      else catOk=curCat==='all'||s.dataset.category===curCat;
+      // Collections cannot be nested: hide them while building a collection.
+      if(selKind==='group'&&s.dataset.kind==='collection')catOk=false;
+      const langOk=!lang||s.dataset.lang===lang;
+      const text=((s.dataset.title||'')+' '+(s.dataset.author||'')).toLowerCase();
+      const qOk=!q||text.indexOf(q)>=0;
+      show=catOk&&langOk&&qOk;
+    }
+    // Drop 'vis' when hiding so the reveal animation replays on re-show.
+    if(!show)s.classList.remove('vis');
+    s.classList.toggle('hide',!show);
+  });
+  const hint=document.getElementById('hpEmpty');
+  if(hint)hint.classList.toggle('hide',!(isHome&&hpShown===0&&!selMode));
+}
+function applyCategory(cat){
+  curCat=cat;catSel.value=cat;
+  applyFilters();
+  // Keep the filter in the URL so a refresh restores it (server renders ?category=).
+  const u=new URL(location.href);
+  if(cat==='all')u.searchParams.delete('category');else u.searchParams.set('category',cat);
+  history.replaceState(null,'',u);
+}
+catSel.addEventListener('change',()=>applyCategory(catSel.value));
+qInput.addEventListener('input',applyFilters);
+langSel.addEventListener('change',applyFilters);
+// Homepage cards open the detail page (full block list + install).
+document.querySelectorAll('.hp-card').forEach(c=>{
+  c.addEventListener('click',()=>{location.href='/blocks/homepages/'+c.dataset.hp;});
+});
+// ── Multi-select: 生成首页 (pack) or 生成合集 (group submission) ────
+const IMPORT_BASE=${JSON.stringify(IMPORT_LINK_BASE)};
+let selMode=false;
+let selKind='';
+const selected=new Set();
+const selbar=document.getElementById('selbar');
+const makeGroupBtn=document.getElementById('makeGroupBtn');
+const makeHomeBtn=document.getElementById('makeHomeBtn');
+const groupBtn=document.getElementById('groupBtn');
+const packBtn=document.getElementById('packBtn');
+const colMsg=document.getElementById('colMsg');
+const colResult=document.getElementById('colResult');
+const packPanel=document.getElementById('packPanel');
+const groupPanel=document.getElementById('groupPanel');
+function showPanel(which){
+  packPanel.classList.toggle('hide',which!=='pack');
+  groupPanel.classList.toggle('hide',which!=='group');
+}
+function setSelMode(kind){
+  selKind=kind||'';
+  selMode=!!selKind;
+  document.body.classList.toggle('selecting',selMode);
+  selbar.classList.toggle('hide',!selMode);
+  makeGroupBtn.classList.toggle('on',selKind==='group');
+  makeHomeBtn.classList.toggle('on',selKind==='pack');
+  groupBtn.classList.toggle('hide',selKind!=='group');
+  packBtn.classList.toggle('hide',selKind!=='pack');
+  selected.clear();
+  document.querySelectorAll('.blk.sel').forEach(s=>s.classList.remove('sel'));
+  colMsg.className='msg';colMsg.textContent='';
+  colResult.classList.add('hide');
+  showPanel('');
+  updateSelCount();
+  // Selection happens over the block list, so leave homepage/collection-only views.
+  if(selMode&&(curCat==='homepage'||(selKind==='group'&&curCat==='collection')))applyCategory('all');
+  else applyFilters();
+}
+function updateSelCount(){
+  document.getElementById('selCount').textContent='已选 '+selected.size;
+}
+function toggleSelect(sec){
+  const id=sec.dataset.id;if(!id)return;
+  if(selected.has(id)){selected.delete(id);sec.classList.remove('sel');}
+  else{selected.add(id);sec.classList.add('sel');}
+  updateSelCount();
+}
+onBlkTap=(s)=>{if(selMode){toggleSelect(s);return true;}return false;};
+makeGroupBtn.onclick=()=>setSelMode(selKind==='group'?'':'group');
+makeHomeBtn.onclick=()=>setSelMode(selKind==='pack'?'':'pack');
+document.getElementById('selCancelBtn').onclick=()=>setSelMode('');
+function colShow(cls,text){colMsg.className='msg '+cls;colMsg.textContent=text;}
+function requireSelection(){
+  if(selected.size===0){colShow('err','请先选择区块');return false;}
+  colShow('','');return true;
+}
+document.getElementById('packBtn').onclick=()=>{if(requireSelection())showPanel('pack');};
+document.getElementById('makePackBtn').onclick=async()=>{
+  const title=document.getElementById('packTitle').value.trim();
+  if(!title)return colShow('err','请填写首页标题');
+  if(selected.size===0)return colShow('err','请先选择区块');
+  const btn=document.getElementById('makePackBtn');
+  btn.disabled=true;btn.innerHTML='<span class="spin"></span> 提交中…';
+  colShow('','');
+  try{
+    const r=await fetch('/blocks/collections',{method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({title,blockIds:Array.from(selected)})});
+    const j=await r.json();
+    if(!r.ok){colShow('err',j.error||'提交失败');btn.disabled=false;btn.textContent='提交审核';return;}
+    document.getElementById('colUrl').textContent=j.importUrl;
+    colResult.classList.remove('hide');
+    colShow('ok','已提交审核,通过后此链接即可在 iPhone 上打开导入。');
+    btn.disabled=false;btn.textContent='提交审核';
+  }catch(e){colShow('err','网络错误');btn.disabled=false;btn.textContent='提交审核';}
+};
+document.getElementById('copyColBtn').onclick=async()=>{
+  const url=document.getElementById('colUrl').textContent;
+  if(url&&await copyText(url))colShow('ok','已复制导入链接');
+};
+// ── Collection submission (a labelled group of charts, reviewed) ────
+const WD_LABELS=['周一','周二','周三','周四','周五','周六','周日'];
+let grpModeV='custom';
+function buildGroupRows(){
+  const rows=document.getElementById('grpRows');
+  rows.innerHTML='';
+  let idx=0;
+  selected.forEach(id=>{
+    const sec=document.querySelector('.blk[data-id="'+CSS.escape(id)+'"]');
+    const title=(sec&&sec.dataset.title)||id;
+    const row=document.createElement('div');row.className='grow';
+    if(sec&&sec.dataset.kind==='collection'){
+      row.innerHTML='<span class="gt">'+esc(title)+'（合集不可嵌套,已忽略）</span>';
+      rows.appendChild(row);return;
+    }
+    const i=idx++;
+    row.innerHTML='<span class="gt">'+esc(title)+'</span><input maxlength="14" data-gid="'+esc(id)+'" placeholder="标签">';
+    rows.appendChild(row);
+    row.querySelector('input').value=grpModeV==='weekday'?(WD_LABELS[i]||''):String(title).slice(0,14);
+  });
+}
+document.getElementById('groupBtn').onclick=()=>{
+  if(!requireSelection())return;
+  buildGroupRows();showPanel('group');
+};
+document.querySelectorAll('#grpMode .chip').forEach(c=>{
+  c.onclick=()=>{
+    document.querySelectorAll('#grpMode .chip').forEach(x=>x.classList.remove('on'));
+    c.classList.add('on');grpModeV=c.dataset.v;buildGroupRows();
+  };
+});
+document.getElementById('grpSubmitBtn').onclick=async()=>{
+  const title=document.getElementById('grpTitle').value.trim();
+  if(!title)return colShow('err','请填写合集标题');
+  const inputs=Array.from(document.querySelectorAll('#grpRows input[data-gid]'));
+  if(inputs.length<2)return colShow('err','合集至少需要 2 个榜单');
+  if(grpModeV==='weekday'&&inputs.length>7)return colShow('err','按星期模式最多 7 个榜单');
+  const children=inputs.map((inp,i)=>{
+    const ch={blockId:inp.dataset.gid,label:inp.value.trim()};
+    if(grpModeV==='weekday')ch.weekday=i+1;
+    return ch;
+  });
+  if(children.some(ch=>!ch.label))return colShow('err','请为每个榜单填写标签');
+  const btn=document.getElementById('grpSubmitBtn');
+  btn.disabled=true;btn.innerHTML='<span class="spin"></span> 提交中…';
+  colShow('','');
+  try{
+    const r=await fetch('/blocks/groups/submit',{method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({title,mode:grpModeV,children,
+        author:document.getElementById('grpAuthor').value.trim()})});
+    const j=await r.json();
+    if(!r.ok){colShow('err',j.error||'提交失败');btn.disabled=false;btn.textContent='提交审核';return;}
+    colShow('ok','已提交审核,通过后合集会出现在社区库。');
+    showPanel('');
+    btn.disabled=false;btn.textContent='提交审核';
+  }catch(e){colShow('err','网络错误');btn.disabled=false;btn.textContent='提交审核';}
+};
+// Per-block share: copy the single-block universal import link.
+document.querySelectorAll('.share[data-share]').forEach(btn=>{
+  btn.addEventListener('click',async e=>{
+    e.stopPropagation();
+    const url=IMPORT_BASE+'?blockId='+encodeURIComponent(btn.dataset.share);
+    if(await copyText(url)){
+      const old=btn.textContent;btn.textContent='已复制';
+      setTimeout(()=>{btn.textContent=old;},1500);
+    }
+  });
+});
+`;
+}
+
+/** Homepage detail page: shared renderer + copy-install-link button. */
+function homepageJs(imageBase: string): string {
+	return `${rendererJs(imageBase)}
+const hpCopy=document.getElementById('copyHpBtn');
+if(hpCopy)hpCopy.onclick=async()=>{
+  if(await copyText(hpCopy.dataset.url)){
+    const msg=document.getElementById('hpMsg');
+    msg.className='msg ok';msg.textContent='已复制导入链接';
+  }
+};
 `;
 }
 
@@ -784,6 +1596,15 @@ $('#submitBtn').onclick=async()=>{
 `;
 
 const ADMIN_JS = `
+// ── Section tabs (persisted in the URL hash) ────────────────────────
+const adminTabs=document.querySelectorAll('#adminTabs .tab');
+function showTab(name){
+  if(!document.querySelector('[data-panel="'+name+'"]'))name='pending';
+  adminTabs.forEach(t=>t.classList.toggle('on',t.dataset.tab===name));
+  document.querySelectorAll('[data-panel]').forEach(p=>p.classList.toggle('hide',p.dataset.panel!==name));
+}
+adminTabs.forEach(t=>{t.onclick=()=>{history.replaceState(null,'','#'+t.dataset.tab);showTab(t.dataset.tab);};});
+if(location.hash)showTab(location.hash.slice(1));
 function field(id,name){return document.querySelector('[data-f="'+name+'"][data-id="'+id+'"]');}
 function fieldVal(id,name){const el=field(id,name);return el?el.value.trim():'';}
 function fieldChecked(id,name){const el=field(id,name);return el?el.checked:false;}
@@ -794,7 +1615,11 @@ document.querySelectorAll('[data-act]').forEach(b=>{
     let reason='';
     if(act==='reject'){reason=prompt('驳回理由?')||'';}
     const payload={reason};
-    if(act==='approve'){
+    const isCollection=b.closest('.card').dataset.kind==='collection';
+    if(act==='approve'&&isCollection){
+      payload.title=fieldVal(id,'title');
+      payload.category=fieldVal(id,'category');
+    }else if(act==='approve'){
       payload.blockId=fieldVal(id,'blockId');
       if(!payload.blockId){msg.className='msg err';msg.textContent='请填写 blockId（先本地运行发布脚本）';return;}
       payload.title=fieldVal(id,'title');
@@ -821,6 +1646,73 @@ document.querySelectorAll('[data-act]').forEach(b=>{
     }catch(e){msg.className='msg err';msg.textContent='网络错误';
       card.querySelectorAll('[data-act]').forEach(x=>x.disabled=false);
       if(act==='approve')b.textContent='校验并通过';}
+  };
+});
+// ── Collections: admin create + delete ──────────────────────────────
+const ncBtn=document.getElementById('ncCreateBtn');
+if(ncBtn)ncBtn.onclick=async()=>{
+  const msg=document.getElementById('ncMsg');
+  function show(cls,text){msg.className='msg '+cls;msg.textContent=text;}
+  const title=document.getElementById('ncTitle').value.trim();
+  const mode=document.getElementById('ncMode').value;
+  const category=document.getElementById('ncCategory').value;
+  const lines=document.getElementById('ncChildren').value.split('\\n').map(l=>l.trim()).filter(Boolean);
+  if(!title)return show('err','请填写标题');
+  if(lines.length<2)return show('err','至少需要 2 个子榜单');
+  const children=[];
+  for(const line of lines){
+    const parts=line.split('|').map(p=>p.trim());
+    if(!parts[0])return show('err','存在空的 blockId 行');
+    children.push({blockId:parts[0],label:parts[1]||parts[0],
+      ...(parts[2]?{weekday:Number(parts[2])}:{})});
+  }
+  ncBtn.disabled=true;ncBtn.innerHTML='<span class="spin"></span> 创建中…';
+  try{
+    const r=await fetch('/admin/collections/create',{method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({title,mode,category,children})});
+    const j=await r.json();
+    if(!r.ok){show('err',j.error||'创建失败');ncBtn.disabled=false;ncBtn.textContent='创建并发布';return;}
+    show('ok','已发布 · '+j.blockId+'（刷新页面查看）');
+    ncBtn.disabled=false;ncBtn.textContent='创建并发布';
+  }catch(e){show('err','网络错误');ncBtn.disabled=false;ncBtn.textContent='创建并发布';}
+};
+document.querySelectorAll('[data-coldel]').forEach(b=>{
+  b.onclick=async()=>{
+    if(!confirm('确认删除该合集?已导入的客户端不受影响。'))return;
+    const id=b.dataset.coldel;
+    const msg=document.querySelector('[data-colmsg="'+id+'"]');
+    b.disabled=true;
+    try{
+      const r=await fetch('/admin/collections/'+id+'/delete',{method:'POST'});
+      const j=await r.json();
+      if(!r.ok){msg.className='msg err';msg.textContent=j.error||'删除失败';b.disabled=false;return;}
+      b.closest('.card').style.opacity='.4';
+      msg.className='msg ok';msg.textContent='已删除';
+    }catch(e){msg.className='msg err';msg.textContent='网络错误';b.disabled=false;}
+  };
+});
+// ── Shared homepages: approve / reject ──────────────────────────────
+async function hpAction(id,action,okText){
+  const msg=document.querySelector('[data-hpmsg="'+id+'"]');
+  const card=document.querySelector('[data-hp="'+id+'"]');
+  card.querySelectorAll('button').forEach(x=>x.disabled=true);
+  try{
+    const r=await fetch('/admin/homepages/'+id+'/'+action,{method:'POST'});
+    const j=await r.json();
+    if(!r.ok){msg.className='msg err';msg.textContent=j.error||'操作失败';
+      card.querySelectorAll('button').forEach(x=>x.disabled=false);return;}
+    card.style.opacity='.45';
+    msg.className='msg ok';msg.textContent=okText;
+  }catch(e){msg.className='msg err';msg.textContent='网络错误';
+    card.querySelectorAll('button').forEach(x=>x.disabled=false);}
+}
+document.querySelectorAll('[data-hpok]').forEach(b=>{
+  b.onclick=()=>hpAction(b.dataset.hpok,'approve','已通过,分享链接已生效');
+});
+document.querySelectorAll('[data-hpdel]').forEach(b=>{
+  b.onclick=()=>{
+    if(confirm('确认驳回并删除该首页?'))hpAction(b.dataset.hpdel,'delete','已删除');
   };
 });
 `;
