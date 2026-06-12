@@ -61,7 +61,10 @@ type GenreKey =
   | "animation"
   | "crime"
   | "documentary"
-  | "kids";
+  | "kids"
+  | "scifi"
+  | "romance"
+  | "war";
 
 interface DiscoverGenreItem {
   id: string;
@@ -247,17 +250,44 @@ const GENRE_TRANSLATIONS: Record<GenreKey, Record<Locale, string>> = {
     es: "Niños y Familia",
     ar: "أطفال وعائلة",
   },
+  scifi: {
+    en: "Sci-Fi",
+    zh: "科幻",
+    "zh-Hant": "科幻",
+    ja: "SF",
+    es: "Ciencia Ficción",
+    ar: "خيال علمي",
+  },
+  romance: {
+    en: "Romance",
+    zh: "爱情",
+    "zh-Hant": "愛情",
+    ja: "ロマンス",
+    es: "Romance",
+    ar: "رومانسية",
+  },
+  war: {
+    en: "War",
+    zh: "战争",
+    "zh-Hant": "戰爭",
+    ja: "戦争",
+    es: "Bélico",
+    ar: "حرب",
+  },
 };
 
 const GENRE_ITEMS: { id: string; key: GenreKey; imageName: string }[] = [
-  { id: "18", key: "drama", imageName: "Drama.png" },
-  { id: "35", key: "comedy", imageName: "Comedy.png" },
-  { id: "9648,53", key: "thriller", imageName: "Thriller.png" },
-  { id: "28", key: "action", imageName: "Action.png" },
-  { id: "16", key: "animation", imageName: "Animation.png" },
-  { id: "80", key: "crime", imageName: "Crime.png" },
-  { id: "99", key: "documentary", imageName: "Documentary.png" },
-  { id: "10751", key: "kids", imageName: "Kid.png" },
+  { id: "18", key: "drama", imageName: "Drama-1.png" },
+  { id: "35", key: "comedy", imageName: "Comedy-1.png" },
+  { id: "9648,53", key: "thriller", imageName: "Thriller-1.png" },
+  { id: "28", key: "action", imageName: "Action-1.png" },
+  { id: "878", key: "scifi", imageName: "Sci-fi-1.png" },
+  { id: "16", key: "animation", imageName: "Animation-1.png" },
+  { id: "80", key: "crime", imageName: "Crime-1.png" },
+  { id: "10749", key: "romance", imageName: "Romance-1.png" },
+  { id: "10752", key: "war", imageName: "War-1.png" },
+  { id: "99", key: "documentary", imageName: "Documentary-1.png" },
+  { id: "10751", key: "kids", imageName: "Kid-1.png" },
 ];
 
 function createTmdbListRoute(

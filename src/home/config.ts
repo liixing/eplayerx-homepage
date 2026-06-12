@@ -37,6 +37,7 @@ type TmdbListRoute = {
     language?: string;
     network?: string;
     networkName?: string;
+    originCountry?: string;
   };
 };
 
@@ -249,6 +250,11 @@ const TMDB_LIST_ROUTE_PARAMS: Partial<Record<string, TmdbListRouteParams>> = {
     category: "top-rated",
     type: "tv",
   },
+  "tmdb-popular-taiwanese-tv-shows": {
+    category: "discover",
+    type: "tv",
+    originCountry: "TW",
+  },
 };
 
 function resolveLocale(language: string): Locale {
@@ -414,13 +420,26 @@ function createDefaultBlockTemplates(
       },
     },
     {
-      id: "hami-popular-taiwanese-tv-shows",
+      id: "tmdb-popular-taiwanese-tv-shows",
       mediaType: "tv",
       titleKey: "home.popular_taiwanese_tv_shows",
       preset: "thumb-list",
       source: {
-        path: "/crawler/popular/hami/taiwanese-tv",
-        itemEnvelope: "data",
+        path: "/tmdb/discover/tv",
+        query: {
+          with_original_language: "zh",
+          with_origin_country: "TW",
+          sort_by: "popularity.desc",
+          "first_air_date.gte": "2021-01-01",
+          "vote_count.gte": 5,
+          language,
+          page: 1,
+        },
+        itemEnvelope: "results",
+        pagination: {
+          pageParam: "page",
+          startPage: 1,
+        },
       },
     },
     {
