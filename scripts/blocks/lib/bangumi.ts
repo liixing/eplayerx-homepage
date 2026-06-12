@@ -80,25 +80,42 @@ interface CalendarDay {
 	items?: BgmSubject[];
 }
 
+/** One run may publish all 7 weekdays; fetch the calendar only once. */
+let calendarPromise: Promise<CalendarDay[]> | null = null;
+
+function fetchCalendar(): Promise<CalendarDay[]> {
+	calendarPromise ??= (async () => {
+		const res = await fetch(`${API_BASE}/calendar`, { headers: HEADERS });
+		if (!res.ok) {
+			throw new Error(`Bangumi calendar error: ${res.status}`);
+		}
+		return (await res.json()) as CalendarDay[];
+	})();
+	return calendarPromise;
+}
+
+/** Airing anime for one weekday (Bangumi ids: Mon=1 ... Sun=7). */
+export async function fetchBangumiCalendarDay(
+	weekdayId: number,
+	knownIds: KnownIds = {},
+): Promise<PublishItem[]> {
+	const days = await fetchCalendar();
+	const day = days.find((d) => d.weekday?.id === weekdayId);
+	if (!day?.items?.length) {
+		throw new Error(`Bangumi calendar has no items for weekday ${weekdayId}`);
+	}
+	return day.items
+		.map((subject) => toPublishItem(subject, knownIds))
+		.filter((item): item is PublishItem => item !== null);
+}
+
 /** Today's airing anime (Asia/Shanghai), in Bangumi calendar order. */
 export async function fetchBangumiTodayCalendar(
 	knownIds: KnownIds = {},
 ): Promise<PublishItem[]> {
-	const res = await fetch(`${API_BASE}/calendar`, { headers: HEADERS });
-	if (!res.ok) {
-		throw new Error(`Bangumi calendar error: ${res.status}`);
-	}
-	const days = (await res.json()) as CalendarDay[];
-	// Bangumi weekday ids: Mon=1 ... Sun=7.
 	const now = new Date(
 		new Date().toLocaleString("en-US", { timeZone: "Asia/Shanghai" }),
 	);
 	const weekdayId = now.getDay() === 0 ? 7 : now.getDay();
-	const today = days.find((d) => d.weekday?.id === weekdayId);
-	if (!today?.items?.length) {
-		throw new Error(`Bangumi calendar has no items for weekday ${weekdayId}`);
-	}
-	return today.items
-		.map((subject) => toPublishItem(subject, knownIds))
-		.filter((item): item is PublishItem => item !== null);
+	return fetchBangumiCalendarDay(weekdayId, knownIds);
 }
