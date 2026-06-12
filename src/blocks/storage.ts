@@ -299,6 +299,8 @@ export interface InsertCommunityBlockInput {
 	author: string | null;
 	language: string;
 	createdAt: string;
+	/** Collection-only chart: registered for collection building, not listed. */
+	hidden?: boolean;
 }
 
 export async function insertCommunityBlock(
@@ -308,8 +310,8 @@ export async function insertCommunityBlock(
 	await db
 		.prepare(
 			`INSERT INTO community_blocks
-        (block_id, category, title, block_json, data_key, item_count, installs, author, language, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?)`,
+        (block_id, category, title, block_json, data_key, item_count, installs, author, language, created_at, hidden)
+       VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)`,
 		)
 		.bind(
 			input.blockId,
@@ -321,6 +323,7 @@ export async function insertCommunityBlock(
 			input.author,
 			input.language,
 			input.createdAt,
+			input.hidden ? 1 : 0,
 		)
 		.run();
 }
@@ -334,12 +337,13 @@ export interface CommunityBlockFilter {
 	kind?: "collection";
 }
 
-/** Build the WHERE clause + bind values for a community block filter. */
+/** Build the WHERE clause + bind values for a community block filter.
+ *  Hidden (collection-only) charts never reach public listings. */
 function communityWhere(filter: CommunityBlockFilter): {
 	clause: string;
 	binds: (string | number)[];
 } {
-	const conditions: string[] = [];
+	const conditions: string[] = ["hidden = 0"];
 	const binds: (string | number)[] = [];
 	if (filter.category) {
 		conditions.push("category = ?");
@@ -397,7 +401,7 @@ export async function listCommunityLanguages(
 ): Promise<string[]> {
 	const result = await db
 		.prepare(
-			`SELECT DISTINCT language FROM community_blocks WHERE language != '' ORDER BY language`,
+			`SELECT DISTINCT language FROM community_blocks WHERE language != '' AND hidden = 0 ORDER BY language`,
 		)
 		.all<{ language: string }>();
 	return (result.results ?? []).map((r) => r.language);

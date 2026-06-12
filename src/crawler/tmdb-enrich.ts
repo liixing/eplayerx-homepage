@@ -127,7 +127,7 @@ export async function fetchImageMeta(
 	const fallback: ImageMeta = {
 		thumb: backdropPath || posterPath || null,
 		logo: null,
-		noLogoPoster: null,
+		noLogoPoster: posterPath ?? null,
 	};
 
 	try {
@@ -167,8 +167,12 @@ export async function fetchImageMeta(
 		}
 
 		const posters = (images?.posters ?? []) as ImageEntry[];
+		// No textless poster available: fall back to the regular poster so
+		// clients always have portrait art instead of a null slot.
 		const noLogoPoster =
-			bestByVote(posters.filter((p) => !p.iso_639_1))?.file_path ?? null;
+			bestByVote(posters.filter((p) => !p.iso_639_1))?.file_path ??
+			posterPath ??
+			null;
 
 		return { thumb, logo, noLogoPoster };
 	} catch (error) {

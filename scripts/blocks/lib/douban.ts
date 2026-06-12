@@ -34,6 +34,11 @@ export function toPublishItem(row: DoubanRowBase): PublishItem | null {
 	const year = Number.parseInt(subtitle.slice(0, 4), 10);
 	return {
 		title: row.title,
+		// Mixed doulists carry both films and shows; the row type keeps each
+		// item searching the right TMDB index regardless of block-level default.
+		...(row.type === "tv" || row.type === "movie"
+			? { mediaType: row.type }
+			: {}),
 		...(Number.isFinite(year) ? { year } : {}),
 	};
 }
@@ -89,11 +94,19 @@ interface DoulistResponse {
 	items?: DoubanRowBase[];
 }
 
-/** Movie entries of a public doulist, in list order. */
+export interface DoulistOptions {
+	max?: number;
+	/** Douban row types to keep; movie-only by default (legacy film lists). */
+	types?: ReadonlyArray<"movie" | "tv">;
+}
+
+/** Entries of a public doulist, in list order. */
 export async function fetchDoulistItems(
 	doulistId: string,
-	max = 300,
+	options: DoulistOptions = {},
 ): Promise<PublishItem[]> {
+	const { max = 300, types = ["movie"] } = options;
+	const keep = new Set<string>(types);
 	const rows = await fetchPaged(
 		(start) =>
 			`${REXXAR_BASE}/doulist/${doulistId}/items?start=${start}&count=${PAGE_SIZE}`,
@@ -102,7 +115,7 @@ export async function fetchDoulistItems(
 		max,
 	);
 	return rows
-		.filter((row) => row.type === "movie")
+		.filter((row) => keep.has(row.type ?? ""))
 		.map(toPublishItem)
 		.filter((item): item is PublishItem => item !== null);
 }

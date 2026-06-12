@@ -204,6 +204,8 @@ export interface CommunityBlockRow {
 	author: string | null;
 	language: string;
 	created_at: string;
+	/** 1 = collection-only chart, excluded from public library listings. */
+	hidden: number;
 }
 
 /**

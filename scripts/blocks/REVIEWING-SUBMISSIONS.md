@@ -129,6 +129,36 @@ curl -s -X POST "https://api.eplayerx.com/admin/<投稿ID>/approve" \
 - 必须先跑完第 3 步：approve 会校验 D1 `block_snapshots` 里有该 blockId 的发布记录。
 - 驳回用 `POST /admin/<投稿ID>/reject`，body 可带 `{"reason":"..."}`。
 
+## 4.5 周更表合集（一个投稿 → 7 个隐藏 block + 1 个合集）
+
+巴哈姆特周更表 / MyAnimeList周更表 这类「按星期」合集，子榜单不在社区库单独
+显示，只露出合集本身。流程：
+
+1. 脚本发布 7 个快照（blockId 如 `community-<源>-monday`..`-sunday`，
+   submissionId 共用同一个投稿即可，见 `weekly/mal-weekdays.ts`）。
+2. 用 `POST /admin/api/register-hidden` 把每个子榜单注册为隐藏 block
+   （Bearer 密码或 admin cookie 均可）：
+
+```bash
+curl -s -X POST "https://api.eplayerx.com/admin/api/register-hidden" \
+  -H "Authorization: Bearer $PASS" -H "Content-Type: application/json" \
+  -d '{"blockId":"community-mal-monday","title":"MAL周一新番","category":"anime",
+       "mediaType":"tv","preset":"poster-list","isAnime":true,"language":"zh-CN"}'
+```
+
+3. 用 `POST /admin/collections/create`（cookie 认证）创建按星期合集，
+   children 填 7 个子 blockId + 周一..周日 label + weekday 1-7。
+4. 投稿没有直接对应的 approve blockId，用 SQL 标记通过即可：
+
+```bash
+bunx wrangler d1 execute blocks --remote --command \
+  "UPDATE submissions SET status='approved', block_id='<col-id>', item_count=<N>,
+   reviewed_at='<ISO时间>' WHERE id='<投稿ID>'"
+```
+
+隐藏 block 永久保留在 D1（`community_blocks.hidden = 1`），公开列表自动排除；
+以后重建/调整合集无需任何临时操作，CI 周更也会自动同步其 item_count。
+
 ## 5. 验证
 
 ```bash

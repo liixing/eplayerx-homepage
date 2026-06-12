@@ -178,8 +178,12 @@ async function enrichItem(
 			)?.file_path ?? null;
 
 		const posters = images.posters ?? [];
+		// No textless poster available: fall back to the regular poster so
+		// clients always have portrait art instead of a null slot.
 		const noLogoPoster =
-			bestByVote(posters.filter((p) => !p.iso_639_1))?.file_path ?? null;
+			bestByVote(posters.filter((p) => !p.iso_639_1))?.file_path ??
+			item.poster_path ??
+			null;
 
 		return { ...item, thumb, logo, noLogoPoster };
 	} catch {

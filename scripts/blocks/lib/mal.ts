@@ -26,6 +26,77 @@ function decodeEntities(text: string): string {
 		.replace(/&amp;/g, "&");
 }
 
+const SCHEDULE_URL = "https://myanimelist.net/anime/season/schedule";
+
+export type MalWeekday =
+	| "Monday"
+	| "Tuesday"
+	| "Wednesday"
+	| "Thursday"
+	| "Friday"
+	| "Saturday"
+	| "Sunday";
+
+/** One run publishes all 7 days; fetch the schedule page only once. */
+let schedulePagePromise: Promise<string> | null = null;
+
+function fetchSchedulePage(): Promise<string> {
+	schedulePagePromise ??= (async () => {
+		const res = await fetch(SCHEDULE_URL, { headers: HEADERS });
+		if (!res.ok) {
+			throw new Error(`MAL schedule page error: ${res.status}`);
+		}
+		return res.text();
+	})();
+	return schedulePagePromise;
+}
+
+export interface MalScheduleOptions {
+	/** Long-tail kids/short entries rarely resolve on TMDB; cap per day. */
+	maxItems?: number;
+	/** TMDB ids pinned where romaji search fails. */
+	knownIds?: Record<string, number>;
+}
+
+/**
+ * Broadcast list for one weekday section of the seasonal schedule page.
+ * Entries are sorted by MAL member count so the day's hottest shows lead.
+ */
+export async function fetchMalScheduleItems(
+	day: MalWeekday,
+	options: MalScheduleOptions = {},
+): Promise<PublishItem[]> {
+	const { maxItems = 20, knownIds = {} } = options;
+	const html = await fetchSchedulePage();
+
+	// Day sections are delimited by <div class="anime-header">Monday</div>.
+	const sections = html.split(/class="anime-header"[^>]*>([^<]+)</);
+	const index = sections.findIndex((part) => part.trim() === day);
+	if (index < 0 || index + 1 >= sections.length) {
+		throw new Error(`MAL schedule: day section not found: ${day}`);
+	}
+
+	const entries: { title: string; members: number }[] = [];
+	for (const chunk of sections[index + 1]
+		.split('class="js-anime-category-producer')
+		.slice(1)) {
+		// MAL genre ids 12 (Hentai) / 49 (Erotica): adult entries stay out.
+		if (/\/anime\/genre\/(?:12|49)\//.test(chunk)) continue;
+		const title = chunk.match(/class="h2_anime_title">\s*<a[^>]*>([^<]+)<\/a>/);
+		if (!title) continue;
+		const members = chunk.match(/class="js-members"[^>]*>(\d+)</);
+		entries.push({
+			title: decodeEntities(title[1].trim()),
+			members: members ? Number(members[1]) : 0,
+		});
+	}
+
+	entries.sort((a, b) => b.members - a.members);
+	return entries
+		.slice(0, maxItems)
+		.map(({ title }) => ({ title, tmdbId: knownIds[title] }));
+}
+
 export interface MalRankingOptions {
 	/** topanime.php `type` query, e.g. "bypopularity"; omit for the top rating list. */
 	type?: string;
@@ -54,9 +125,7 @@ export async function fetchMalRankingItems(
 		for (const row of html.split('<tr class="ranking-list">').slice(1)) {
 			// The text link has the bare class; the poster link has extra classes.
 			const title = row.match(/class="hoverinfo_trigger">([^<]+)</);
-			const rowType = row.match(
-				/class="information di-ib mt4">\s*([A-Za-z]+)/,
-			);
+			const rowType = row.match(/class="information di-ib mt4">\s*([A-Za-z]+)/);
 			if (!title || !rowType || !SERIES_TYPES.has(rowType[1])) continue;
 			const name = decodeEntities(title[1].trim());
 			items.push({ title: name, tmdbId: knownIds[name] });

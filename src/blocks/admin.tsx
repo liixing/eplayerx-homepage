@@ -229,6 +229,75 @@ app.post("/api/report", async (c) => {
 	return c.json({ ok: true, blockId, itemCount });
 });
 
+interface RegisterHiddenBody {
+	blockId?: string;
+	title?: string;
+	category?: string;
+	mediaType?: string;
+	preset?: string;
+	showRank?: boolean;
+	showOverview?: boolean;
+	isAnime?: boolean;
+	language?: string;
+	author?: string;
+}
+
+/** Register a published snapshot as a hidden, collection-only chart (no
+ * submission needed). Hidden charts never list in the public library; they
+ * stay in D1 so weekday collections can be built and rebuilt anytime. */
+app.post("/api/register-hidden", async (c) => {
+	if (!isAdmin(c) && !isAdminBearer(c)) {
+		return c.json({ error: "unauthorized" }, 401);
+	}
+	const body = (await c.req.json().catch(() => ({}))) as RegisterHiddenBody;
+	const blockId = String(body.blockId ?? "").trim();
+	const title = String(body.title ?? "").trim();
+	if (!/^[a-zA-Z0-9_-]+$/.test(blockId)) {
+		return c.json({ error: "请填写合法的 blockId（字母/数字/-/_）" }, 400);
+	}
+	if (!title) return c.json({ error: "请填写名称" }, 400);
+
+	const db = getDb(c);
+	if (await communityBlockExists(db, blockId)) {
+		return c.json({ error: "blockId 已存在。" }, 400);
+	}
+	const snapshot = await getBlockSnapshot(db, blockId);
+	if (!snapshot || snapshot.item_count === 0) {
+		return c.json(
+			{ error: "未找到该 blockId 的发布记录，请先运行发布脚本。" },
+			400,
+		);
+	}
+
+	const category = pickEnum(body.category, CATEGORIES, "tv" as BlockCategory);
+	const mediaType = pickEnum(body.mediaType, MEDIA_TYPES, "tv" as MediaType);
+	const preset = pickEnum(body.preset, PRESETS, "poster-list" as BlockPreset);
+	const isAnime = body.isAnime === true;
+	const block: HomeBlock = {
+		id: blockId,
+		title,
+		mediaType,
+		preset,
+		showRank: body.showRank === true,
+		showOverview: body.showOverview === true,
+		source: { path: `/blocks/data/${blockId}`, itemEnvelope: "data" },
+		...(isAnime ? { metadata: { isAnime: true } } : {}),
+	};
+	await insertCommunityBlock(db, {
+		blockId,
+		category,
+		title,
+		blockJson: JSON.stringify(block),
+		dataKey: publicKey(blockId),
+		itemCount: snapshot.item_count,
+		author: String(body.author ?? "").slice(0, 40) || null,
+		language: String(body.language || DEFAULT_LANGUAGE),
+		createdAt: new Date().toISOString(),
+		hidden: true,
+	});
+	return c.json({ ok: true, blockId, itemCount: snapshot.item_count });
+});
+
 /** Freeze + publish a collection as a `collection-list` community block. */
 async function publishCollection(
 	db: D1Database,
