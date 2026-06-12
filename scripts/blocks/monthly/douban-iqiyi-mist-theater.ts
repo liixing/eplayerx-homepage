@@ -1,9 +1,9 @@
 /**
  * Douban doulist "迷雾剧场（爱奇艺）" (douban.com/doulist/128396349), the iQIYI
- * suspense-drama theater lineup, refreshed weekly as new seasons premiere.
+ * suspense-drama theater lineup, refreshed monthly as new seasons premiere.
  * Submission: 迷雾剧场（爱奇艺） (zh-CN, tv, thumb-list) by @爱奇艺.
  *
- * Run: bun run scripts/blocks/weekly/douban-iqiyi-mist-theater.ts
+ * Run: bun run scripts/blocks/monthly/douban-iqiyi-mist-theater.ts
  */
 
 import { publishBlock } from "../../../src/blocks/publish.js";

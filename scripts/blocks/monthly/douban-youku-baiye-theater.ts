@@ -1,9 +1,9 @@
 /**
  * Douban doulist "白夜剧场（优酷）" (douban.com/doulist/159320021), the Youku
- * suspense-drama theater lineup, refreshed weekly as new seasons premiere.
+ * suspense-drama theater lineup, refreshed monthly as new seasons premiere.
  * Submission: 白夜剧场（优酷） (zh-CN, tv, poster-list) by @优酷.
  *
- * Run: bun run scripts/blocks/weekly/douban-youku-baiye-theater.ts
+ * Run: bun run scripts/blocks/monthly/douban-youku-baiye-theater.ts
  */
 
 import { publishBlock } from "../../../src/blocks/publish.js";
