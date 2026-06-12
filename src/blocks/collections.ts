@@ -29,7 +29,7 @@ const MEDIA_LIST_PRESETS = new Set<BlockPreset>([
 	"hero-list",
 ]);
 
-export const MAX_COLLECTION_CHILDREN = 14;
+export const MAX_COLLECTION_CHILDREN = 20;
 const MAX_LABEL_LEN = 14;
 const MAX_TITLE_LEN = 40;
 
