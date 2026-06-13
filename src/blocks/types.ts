@@ -101,6 +101,7 @@ export const COLLECTION_PRESET = "collection-list";
 
 /** weekday: children carry weekday 1-7 and the client puts today first. */
 export type CollectionMode = "weekday" | "custom";
+export type CollectionStyle = "rank" | "banner" | "image";
 
 /** What a builder picks per child before the collection is frozen. */
 export interface CollectionChildSpec {
@@ -144,6 +145,7 @@ export interface CollectionBlock {
 	preset: typeof COLLECTION_PRESET;
 	groupMode: CollectionMode;
 	children: CollectionChild[];
+	style?: CollectionStyle;
 }
 
 export interface SubmissionRow {
@@ -185,10 +187,12 @@ export interface DisplayBlock {
 	language?: string;
 	/** Collection blocks only: capsule cards rendered instead of a media row. */
 	collectionMode?: CollectionMode;
+	collectionStyle?: CollectionStyle;
 	collectionChildren?: {
 		id: string;
 		label: string;
 		weekday?: number;
+		image?: string;
 		previewSrc: string;
 	}[];
 }
@@ -237,8 +241,11 @@ export interface BlockCollectionRow {
 	block_count: number;
 	installs: number;
 	created_at: string;
-	/** "pending" until an admin approves; the import link 404s before that. */
+	/** New iOS shares are approved immediately; pending remains for old rows. */
 	status: "pending" | "approved";
+	author_name: string | null;
+	preview_image_url: string | null;
+	description: string | null;
 }
 
 /** Cloudflare Workers bindings available on the Hono context. */

@@ -466,13 +466,15 @@ export async function insertBlockCollection(
 		blockCount: number;
 		createdAt: string;
 		status: "pending" | "approved";
+		authorName?: string | null;
+		description?: string | null;
 	},
 ): Promise<void> {
 	await db
 		.prepare(
 			`INSERT INTO block_collections
-        (collection_id, title, blocks_json, block_count, installs, created_at, status)
-       VALUES (?, ?, ?, ?, 0, ?, ?)`,
+        (collection_id, title, blocks_json, block_count, installs, created_at, status, author_name, preview_image_url, description)
+       VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?, ?)`,
 		)
 		.bind(
 			input.collectionId,
@@ -481,20 +483,11 @@ export async function insertBlockCollection(
 			input.blockCount,
 			input.createdAt,
 			input.status,
+			input.authorName ?? null,
+			null,
+			input.description ?? null,
 		)
 		.run();
-}
-
-/** Homepages awaiting review, oldest first (admin queue). */
-export async function listPendingBlockCollections(
-	db: D1Database,
-): Promise<BlockCollectionRow[]> {
-	const result = await db
-		.prepare(
-			`SELECT * FROM block_collections WHERE status = 'pending' ORDER BY created_at ASC LIMIT 200`,
-		)
-		.all<BlockCollectionRow>();
-	return result.results ?? [];
 }
 
 /** Published homepages for the explore page, most installed first. */
@@ -509,28 +502,6 @@ export async function listApprovedBlockCollections(
 		.bind(limit)
 		.all<BlockCollectionRow>();
 	return result.results ?? [];
-}
-
-export async function approveBlockCollection(
-	db: D1Database,
-	collectionId: string,
-): Promise<void> {
-	await db
-		.prepare(
-			`UPDATE block_collections SET status = 'approved' WHERE collection_id = ?`,
-		)
-		.bind(collectionId)
-		.run();
-}
-
-export async function deleteBlockCollection(
-	db: D1Database,
-	collectionId: string,
-): Promise<void> {
-	await db
-		.prepare(`DELETE FROM block_collections WHERE collection_id = ?`)
-		.bind(collectionId)
-		.run();
 }
 
 export async function getBlockCollection(

@@ -112,6 +112,24 @@ function childPreviewSrc(
 	return previewSrcFromSource(source) ?? source.path;
 }
 
+function presetForSharedStyle(
+	preset: string | undefined,
+	style: unknown,
+): BlockPreset {
+	switch (style) {
+		case "poster":
+			return "poster-list";
+		case "thumb":
+			return "thumb-list";
+		case "hero":
+			return "hero-list";
+		default:
+			return VALID_PRESETS.includes(preset as BlockPreset)
+				? (preset as BlockPreset)
+				: "thumb-list";
+	}
+}
+
 /** Frozen pack entry -> display block for the homepage detail page. */
 function importableToDisplay(entry: ImportableEntry): DisplayBlock {
 	if (entry.preset === COLLECTION_PRESET) {
@@ -130,26 +148,48 @@ function importableToDisplay(entry: ImportableEntry): DisplayBlock {
 			author: col.author,
 			language: col.language,
 			collectionMode: col.groupMode,
+			collectionStyle: col.style,
 			collectionChildren: children.map((ch) => ({
 				id: ch.id,
 				label: ch.label,
 				...(ch.weekday ? { weekday: ch.weekday } : {}),
+				...(ch.image ? { image: ch.image } : {}),
 				previewSrc: childPreviewSrc(ch.source),
 			})),
 		};
 	}
-	const hb = entry as ImportableBlock;
+	const hb = entry as ImportableBlock & {
+		source?: ImportableBlock["source"];
+		preset?: string;
+		style?: string;
+	};
+	const category =
+		hb.category ??
+		(hb.metadata?.isAnime
+			? "anime"
+			: hb.mediaType === "movie"
+				? "movie"
+				: "tv");
+	if (SPECIAL_SHARED_PRESETS.has(hb.preset ?? "") || !hb.source?.path) {
+		return {
+			id: hb.id,
+			title: hb.title,
+			category,
+			preset: "thumb-list",
+			showRank: false,
+			showOverview: false,
+			previewSrc: "",
+			official: false,
+			itemCount: hb.itemCount,
+			author: hb.author,
+			language: hb.language,
+		};
+	}
 	return {
 		id: hb.id,
 		title: hb.title,
-		category:
-			hb.category ??
-			(hb.metadata?.isAnime
-				? "anime"
-				: hb.mediaType === "movie"
-					? "movie"
-					: "tv"),
-		preset: hb.preset as BlockPreset,
+		category,
+		preset: presetForSharedStyle(hb.preset, hb.style),
 		showRank: !!hb.showRank,
 		showOverview: !!hb.showOverview,
 		previewSrc: childPreviewSrc(hb.source, PREVIEW_LIMIT),
@@ -234,10 +274,12 @@ function communityToDisplay(row: CommunityBlockRow): DisplayBlock {
 		...(collection
 			? {
 					collectionMode: collection.groupMode,
+					collectionStyle: collection.style,
 					collectionChildren: children.map((ch) => ({
 						id: ch.id,
 						label: ch.label,
 						...(ch.weekday ? { weekday: ch.weekday } : {}),
+						...(ch.image ? { image: ch.image } : {}),
 						previewSrc: childPreviewSrc(ch.source),
 					})),
 				}
@@ -276,15 +318,7 @@ app.get("/", async (c) => {
 		]);
 		community = rows;
 		languages = langs;
-		homepages = pages.map((row) => ({
-			collectionId: row.collection_id,
-			title: row.title,
-			blockCount: row.block_count,
-			installs: row.installs,
-			blockTitles: (JSON.parse(row.blocks_json) as { title: string }[]).map(
-				(b) => b.title,
-			),
-		}));
+		homepages = pages.map(homepageSummaryFromRow);
 	} catch {
 		community = [];
 	}
@@ -314,14 +348,11 @@ app.get("/homepages/:collectionId", async (c) => {
 	try {
 		const row = await getBlockCollection(getDb(c), collectionId);
 		if (!row || row.status !== "approved") return c.notFound();
-		const entries = JSON.parse(row.blocks_json) as ImportableEntry[];
+		const entries = parseCollectionEntries(row.blocks_json);
 		return c.html(
 			<HomepageDetailPage
 				homepage={{
-					collectionId: row.collection_id,
-					title: row.title,
-					blockCount: row.block_count,
-					installs: row.installs,
+					...homepageSummaryFromRow(row),
 					blockTitles: entries.map((b) => b.title),
 				}}
 				blocks={entries.map(importableToDisplay)}
@@ -340,15 +371,7 @@ app.get("/homepages/:collectionId", async (c) => {
 app.get("/homepages", async (c) => {
 	try {
 		const rows = await listApprovedBlockCollections(getDb(c));
-		const homepages = rows.map((row) => ({
-			collectionId: row.collection_id,
-			title: row.title,
-			blockCount: row.block_count,
-			installs: row.installs,
-			blockTitles: (JSON.parse(row.blocks_json) as { title: string }[]).map(
-				(b) => b.title,
-			),
-		}));
+		const homepages = rows.map(homepageSummaryFromRow);
 		return c.json({ version: 1, homepages });
 	} catch (error) {
 		if (error instanceof ServiceUnavailable) {
@@ -490,6 +513,100 @@ const IMPORT_LINK_BASE =
 	process.env.IMPORT_LINK_BASE_URL || "https://eplayerx.com/import/blocks";
 const MAX_COLLECTION_TITLE_LEN = 40;
 const MAX_COLLECTION_BLOCKS = 30;
+const VALID_SHARED_STYLES = new Set([
+	"poster",
+	"thumb",
+	"hero",
+	"rank",
+	"banner",
+	"image",
+]);
+const SPECIAL_SHARED_PRESETS = new Set([
+	"genres-list",
+	"languages-list",
+	"networks-list",
+]);
+
+function parseCollectionEntries(blocksJson: string): ImportableEntry[] {
+	const parsed = JSON.parse(blocksJson) as
+		| ImportableEntry[]
+		| { blocks?: ImportableEntry[] };
+	if (Array.isArray(parsed)) return parsed;
+	return Array.isArray(parsed.blocks) ? parsed.blocks : [];
+}
+
+function collectionBlockTitles(blocksJson: string): string[] {
+	return parseCollectionEntries(blocksJson).map((block) => block.title);
+}
+
+function sanitizeAuthorName(body: Record<string, unknown> | null): string | null {
+	if (!body) return null;
+	const raw = typeof body.authorName === "string" ? body.authorName.trim() : "";
+	return raw.slice(0, 40) || null;
+}
+
+function sanitizeDescription(body: Record<string, unknown> | null): string | null {
+	if (!body) return null;
+	const raw = typeof body.description === "string" ? body.description.trim() : "";
+	return raw.slice(0, 160) || null;
+}
+
+function homepageSummaryFromRow(row: {
+	collection_id: string;
+	title: string;
+	block_count: number;
+	installs: number;
+	blocks_json: string;
+	author_name?: string | null;
+	description?: string | null;
+}): HomepageSummary {
+	return {
+		collectionId: row.collection_id,
+		title: row.title,
+		blockCount: row.block_count,
+		installs: row.installs,
+		blockTitles: collectionBlockTitles(row.blocks_json),
+		authorName: row.author_name ?? null,
+		description: row.description ?? null,
+	};
+}
+
+function sanitizeSharedBlock(raw: unknown): ImportableEntry | null {
+	if (!raw || typeof raw !== "object") return null;
+	const block = { ...(raw as Record<string, unknown>) };
+	const id = typeof block.id === "string" ? block.id.trim() : "";
+	const title = typeof block.title === "string" ? block.title.trim() : "";
+	const preset = typeof block.preset === "string" ? block.preset : "";
+	if (!id || !title) return null;
+	if (!/^[a-zA-Z0-9_~.-]+$/.test(id)) return null;
+	block.id = id;
+	block.title = title;
+	if (typeof block.style === "string") {
+		if (!VALID_SHARED_STYLES.has(block.style)) delete block.style;
+	} else {
+		delete block.style;
+	}
+	if (preset === COLLECTION_PRESET) {
+		if (!Array.isArray(block.children) || block.children.length === 0) {
+			return null;
+		}
+		const children = block.children.filter((child) => {
+			if (!child || typeof child !== "object") return false;
+			const source = (child as { source?: { path?: unknown } }).source;
+			return typeof source?.path === "string" && source.path.length > 0;
+		});
+		if (children.length === 0) return null;
+		block.children = children;
+		return block as unknown as ImportableCollectionBlock;
+	}
+	if (SPECIAL_SHARED_PRESETS.has(preset)) {
+		return block as unknown as ImportableEntry;
+	}
+	if (!VALID_PRESETS.includes(preset as BlockPreset)) return null;
+	const source = block.source as { path?: unknown } | undefined;
+	if (!source || typeof source.path !== "string" || !source.path) return null;
+	return block as unknown as ImportableBlock;
+}
 
 /** Community block row -> importable payload with an absolute data URL. */
 function importableFromCommunity(row: CommunityBlockRow): ImportableBlock {
@@ -556,55 +673,50 @@ async function resolveImportableBlocks(
 }
 
 app.post("/collections", async (c) => {
-	const body = await c.req.json().catch(() => null);
+	return c.json(
+		{ error: "网页端首页创建已关闭，请在 iOS 客户端分享首页。" },
+		410,
+	);
+});
+
+app.post("/collections/share", async (c) => {
+	const body = (await c.req.json().catch(() => null)) as Record<
+		string,
+		unknown
+	> | null;
 	const title = String(body?.title || "")
 		.trim()
 		.slice(0, MAX_COLLECTION_TITLE_LEN);
-	const rawIds: unknown[] = Array.isArray(body?.blockIds) ? body.blockIds : [];
-	const language = VALID_LANGUAGES.has(String(body?.language))
-		? String(body.language)
-		: DEFAULT_LANGUAGE;
-	// Dedupe while preserving the user's pick order.
-	const blockIds: string[] = [
-		...new Set(rawIds.map((id) => String(id))),
-	].filter((id) => /^[a-zA-Z0-9_-]+$/.test(id));
+	const rawBlocks: unknown[] = Array.isArray(body?.blocks) ? body.blocks : [];
+	const blocks = rawBlocks
+		.map(sanitizeSharedBlock)
+		.filter((block): block is ImportableEntry => block !== null);
 
 	if (!title) return c.json({ error: "请填写首页标题" }, 400);
-	if (blockIds.length === 0)
+	if (blocks.length === 0) {
 		return c.json({ error: "请至少选择一个区块" }, 400);
-	if (blockIds.length > MAX_COLLECTION_BLOCKS) {
-		return c.json({ error: `最多选择 ${MAX_COLLECTION_BLOCKS} 个区块` }, 400);
+	}
+	if (blocks.length > MAX_COLLECTION_BLOCKS) {
+		return c.json({ error: `最多分享 ${MAX_COLLECTION_BLOCKS} 个区块` }, 400);
 	}
 
-	try {
-		const db = getDb(c);
-		const blocks = await resolveImportableBlocks(db, blockIds, language);
-		if (blocks.length === 0) {
-			return c.json({ error: "所选区块不存在" }, 400);
-		}
-		const collectionId = shortId();
-		// Homepages go through admin review; the import link 404s until then.
-		await insertBlockCollection(db, {
-			collectionId,
-			title,
-			blocksJson: JSON.stringify(blocks),
-			blockCount: blocks.length,
-			createdAt: new Date().toISOString(),
-			status: "pending",
-		});
-		return c.json({
-			ok: true,
-			pending: true,
-			collectionId,
-			blockCount: blocks.length,
-			importUrl: `${IMPORT_LINK_BASE}?collectionId=${collectionId}`,
-		});
-	} catch (error) {
-		if (error instanceof ServiceUnavailable) {
-			return c.json({ error: error.message }, 503);
-		}
-		throw error;
-	}
+	const collectionId = shortId();
+	await insertBlockCollection(getDb(c), {
+		collectionId,
+		title,
+		blocksJson: JSON.stringify({ version: 1, blocks }),
+		blockCount: blocks.length,
+		createdAt: new Date().toISOString(),
+		status: "approved",
+		authorName: sanitizeAuthorName(body),
+		description: sanitizeDescription(body),
+	});
+	return c.json({
+		ok: true,
+		collectionId,
+		blockCount: blocks.length,
+		importUrl: `${IMPORT_LINK_BASE}?collectionId=${collectionId}`,
+	});
 });
 
 /**
@@ -625,13 +737,13 @@ app.get("/import-payload", async (c) => {
 		if (collectionId) {
 			const row = await getBlockCollection(db, collectionId);
 			if (!row || row.status !== "approved") {
-				return c.json({ error: "首页不存在或未通过审核" }, 404);
+				return c.json({ error: "首页不存在" }, 404);
 			}
 			return c.json({
 				type: "block_import",
 				id: row.collection_id,
 				title: row.title,
-				blocks: JSON.parse(row.blocks_json) as ImportableBlock[],
+				blocks: parseCollectionEntries(row.blocks_json),
 			});
 		}
 		if (blockId) {
@@ -696,9 +808,7 @@ importLandingApp.get("/blocks", async (c) => {
 			const row = await getBlockCollection(db, collectionId);
 			if (!row || row.status !== "approved") return c.notFound();
 			title = row.title;
-			blockTitles = (JSON.parse(row.blocks_json) as ImportableBlock[]).map(
-				(b) => b.title,
-			);
+			blockTitles = collectionBlockTitles(row.blocks_json);
 		} else if (blockId) {
 			const blocks = await resolveImportableBlocks(
 				db,

@@ -20,16 +20,13 @@ import {
 } from "./collections.js";
 import { getDb, shortId } from "./runtime.js";
 import {
-	approveBlockCollection,
 	communityBlockExists,
-	deleteBlockCollection,
 	deleteCommunityBlock,
 	getBlockSnapshot,
 	getCommunityBlock,
 	getSubmission,
 	insertCommunityBlock,
 	listCommunityBlocks,
-	listPendingBlockCollections,
 	listSubmissions,
 	markApproved,
 	markRejected,
@@ -54,7 +51,6 @@ import {
 } from "./types.js";
 import {
 	type AdminCollectionRow,
-	type AdminHomepageRow,
 	AdminLoginPage,
 	AdminPage,
 } from "./views.js";
@@ -127,24 +123,14 @@ app.get("/", async (c) => {
 	if (!isAdmin(c)) return c.html(<AdminLoginPage />);
 	let pending: SubmissionRow[] = [];
 	let collections: AdminCollectionRow[] = [];
-	let homepages: AdminHomepageRow[] = [];
 	try {
 		const db = getDb(c);
-		const [subs, cols, pages] = await Promise.all([
+		const [subs, cols] = await Promise.all([
 			listSubmissions(db, "pending"),
 			listPublishedCollections(db),
-			listPendingBlockCollections(db),
 		]);
 		pending = subs;
 		collections = cols;
-		homepages = pages.map((row) => ({
-			collectionId: row.collection_id,
-			title: row.title,
-			blockTitles: (JSON.parse(row.blocks_json) as { title: string }[]).map(
-				(b) => b.title,
-			),
-			createdAt: row.created_at,
-		}));
 	} catch {
 		pending = [];
 	}
@@ -152,7 +138,6 @@ app.get("/", async (c) => {
 		<AdminPage
 			pending={pending}
 			collections={collections}
-			homepages={homepages}
 		/>,
 	);
 });
@@ -306,6 +291,7 @@ async function publishCollection(
 		title: string;
 		category: BlockCategory;
 		mode: CollectionMode;
+		style?: "rank" | "banner" | "image";
 		children: CollectionChildSpec[];
 		language: string;
 		author: string | null;
@@ -327,6 +313,7 @@ async function publishCollection(
 		input.title,
 		input.mode,
 		resolved.children,
+		input.style,
 	);
 	await insertCommunityBlock(db, {
 		blockId: input.blockId,
@@ -368,26 +355,6 @@ app.post("/collections/create", async (c) => {
 	});
 	if (!result.ok) return c.json({ error: result.error }, 400);
 	return c.json({ ok: true, blockId, itemCount: result.itemCount });
-});
-
-/** Approve a shared homepage: its import link goes live. */
-app.post("/homepages/:collectionId/approve", async (c) => {
-	if (!isAdmin(c)) return c.json({ error: "unauthorized" }, 401);
-	const collectionId = c.req
-		.param("collectionId")
-		.replace(/[^a-zA-Z0-9_-]/g, "");
-	await approveBlockCollection(getDb(c), collectionId);
-	return c.json({ ok: true });
-});
-
-/** Reject (delete) a shared homepage submission. */
-app.post("/homepages/:collectionId/delete", async (c) => {
-	if (!isAdmin(c)) return c.json({ error: "unauthorized" }, 401);
-	const collectionId = c.req
-		.param("collectionId")
-		.replace(/[^a-zA-Z0-9_-]/g, "");
-	await deleteBlockCollection(getDb(c), collectionId);
-	return c.json({ ok: true });
 });
 
 const ASSET_TYPES: Record<string, string> = {

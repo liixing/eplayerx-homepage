@@ -15,6 +15,7 @@ import {
 	type CollectionChild,
 	type CollectionChildSpec,
 	type CollectionMode,
+	type CollectionStyle,
 	type HomeBlock,
 } from "./types.js";
 
@@ -64,6 +65,7 @@ export function officialBlockCategory(block: HomeBlock): BlockCategory {
 export interface CollectionInput {
 	title: string;
 	mode: CollectionMode;
+	style?: CollectionStyle;
 	children: CollectionChildSpec[];
 }
 
@@ -78,6 +80,9 @@ export function parseCollectionInput(
 	if (!title) return { error: "请填写合集标题" };
 
 	const mode: CollectionMode = raw?.mode === "weekday" ? "weekday" : "custom";
+	const style = ["rank", "banner", "image"].includes(String(raw?.style))
+		? (String(raw?.style) as CollectionStyle)
+		: undefined;
 	const rawChildren = Array.isArray(raw?.children) ? raw.children : [];
 	if (rawChildren.length < 2) return { error: "合集至少需要 2 个榜单" };
 	if (rawChildren.length > MAX_COLLECTION_CHILDREN) {
@@ -106,7 +111,7 @@ export function parseCollectionInput(
 			...(image.startsWith("https://") ? { image } : {}),
 		});
 	}
-	return { input: { title, mode, children } };
+	return { input: { title, mode, ...(style ? { style } : {}), children } };
 }
 
 export interface ResolvedCollection {
@@ -207,6 +212,7 @@ export function makeCollectionBlock(
 	title: string,
 	mode: CollectionMode,
 	children: CollectionChild[],
+	style?: CollectionStyle,
 ): CollectionBlock {
 	return {
 		id: blockId,
@@ -214,6 +220,7 @@ export function makeCollectionBlock(
 		preset: COLLECTION_PRESET,
 		groupMode: mode,
 		children,
+		...(style ? { style } : {}),
 	};
 }
 
