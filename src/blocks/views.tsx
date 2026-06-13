@@ -135,33 +135,43 @@ body.selecting .blk .share{display:none}
 .hp-actions .msg{margin:0}
 .hp-byline{color:var(--mut);font-size:13px;margin:0 0 20px}
 /* Collection rows: capsule cards with fanned poster stacks */
-.scroller.caps{gap:10px;padding:6px 0 10px}
-.capsule{display:inline-flex;align-items:center;gap:10px;flex:0 0 auto;background:var(--card2);border:1px solid var(--line);border-radius:999px;padding:6px 18px 6px 16px;cursor:pointer;color:var(--fg);font-family:inherit;transition:border-color .15s,background .15s,transform .12s}
+.scroller.caps{gap:14px;padding:6px 0 10px}
+.capsule{display:inline-flex;align-items:center;gap:12px;flex:0 0 auto;background:rgba(27,33,45,.88);border:1px solid rgba(255,255,255,.06);border-radius:999px;padding:10px 20px 10px 16px;cursor:pointer;color:var(--fg);font-family:inherit;transition:border-color .15s,background .15s,transform .12s;min-height:70px}
 .capsule:hover{border-color:#3a4456}
 .capsule:active{transform:scale(.96)}
 .capsule.on{border-color:rgba(22,224,212,.6);background:linear-gradient(120deg,rgba(75,224,143,.16),rgba(22,224,212,.16))}
 /* Deck-style stack: back posters shrink and peek out as thin slivers. */
-.capsule .stack{position:relative;width:46px;height:46px;flex:0 0 auto}
-.capsule .stack img,.capsule .stack .ph{position:absolute;width:32px;object-fit:cover;border-radius:6px;box-shadow:0 2px 8px rgba(0,0,0,.5);background:#222b3a;inset:auto}
-.capsule .stack .s1{height:46px;left:0;top:0;z-index:3}
-.capsule .stack .s2{height:38px;left:7px;top:4px;z-index:2;filter:brightness(.55)}
-.capsule .stack .s3{height:30px;left:14px;top:8px;z-index:1;filter:brightness(.35)}
-.capsule .clabel{font-size:15px;font-weight:600;white-space:nowrap}
+.capsule .stack{position:relative;width:50px;height:50px;flex:0 0 auto}
+.capsule .stack img,.capsule .stack .ph{position:absolute;width:36px;object-fit:cover;border-radius:6px;box-shadow:0 2px 8px rgba(0,0,0,.5);background:#222b3a;inset:auto}
+.capsule .stack .s1{height:50px;left:0;top:0;z-index:3}
+.capsule .stack .s2{height:41px;left:7px;top:4px;z-index:2;filter:brightness(.55)}
+.capsule .stack .s3{height:32px;left:14px;top:9px;z-index:1;filter:brightness(.35)}
+.capsule .clabel{font-size:17px;font-weight:650;white-space:nowrap}
 .capsule .cbadge{font-size:11px;color:#062a20;background:var(--grad);border-radius:999px;padding:1px 7px;font-weight:700;margin-left:-4px}
 .colprev{min-height:0}
-.col-rank,.col-banner,.col-image{flex:0 0 auto;border:1px solid var(--line);background:var(--card2);color:var(--fg);font-family:inherit;cursor:pointer;transition:transform .12s,border-color .15s}
+.col-rank,.col-banner,.col-image{flex:0 0 auto;border:1px solid rgba(255,255,255,.06);background:rgba(27,33,45,.9);color:var(--fg);font-family:inherit;cursor:pointer;transition:transform .12s,border-color .15s}
 .col-rank:hover,.col-banner:hover,.col-image:hover{border-color:#3a4456}
-.col-rank.on,.col-banner.on,.col-image.on{border-color:rgba(22,224,212,.6);background:linear-gradient(120deg,rgba(75,224,143,.12),rgba(22,224,212,.12))}
-.col-rank{width:260px;border-radius:18px;padding:14px;text-align:left}
-.col-rank .rn{font-size:34px;font-weight:800;color:rgba(234,238,246,.45);line-height:1}
-.col-rank .rt{font-size:15px;font-weight:700;margin:8px 0 10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.rank-lines{display:flex;flex-direction:column;gap:6px;color:var(--mut);font-size:12px;min-height:54px}
-.rank-lines span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.col-banner{width:300px;border-radius:20px;overflow:hidden;text-align:left;padding:0}
-.banner-grid{display:grid;grid-template-columns:repeat(3,1fr);height:136px;background:#0d1118}
-.banner-grid .ph,.banner-grid img{width:100%;height:100%;object-fit:cover;background:#222b3a}
-.banner-grid .s1{grid-row:span 2}
-.col-banner .bt2{display:block;padding:10px 14px;font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.capsule:focus,.col-rank:focus,.col-banner:focus,.col-image:focus{outline:none}
+.col-rank.on,.col-banner.on,.col-image.on{border-color:rgba(22,224,212,.32);background:linear-gradient(120deg,rgba(75,224,143,.08),rgba(22,224,212,.08))}
+.col-rank{width:300px;height:264px;border-radius:26px;padding:18px;text-align:left;position:relative;overflow:hidden}
+.col-rank .rn{display:none}
+.rank-title{display:flex;align-items:center;justify-content:center;gap:8px;margin:0 0 12px;color:rgba(234,238,246,.48)}
+.rank-title .laurel{width:25px;height:18px;flex:0 0 auto;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.rank-title .laurel.r{transform:scaleX(-1)}
+.col-rank .rt{display:block;min-width:0;font-size:18px;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#eaeef6;text-align:center}
+.rank-posters{display:flex;justify-content:space-between;height:112px;margin-bottom:12px}
+.rank-posters .ph,.rank-posters img{width:74px;height:112px;object-fit:cover;border-radius:8px;background:#222b3a}
+.rank-lines{display:flex;flex-direction:column;gap:5px;color:rgba(234,238,246,.82);font-size:16px;line-height:20px;height:70px;overflow:hidden;padding-top:0}
+.rank-lines span{height:20px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.col-banner{width:320px;height:160px;border-radius:28px;overflow:hidden;text-align:left;padding:0;position:relative}
+.banner-grid{position:absolute;width:202px;height:286px;right:-50px;top:-26px;display:grid;grid-template-columns:repeat(3,62px);grid-auto-rows:90px;gap:8px;transform:rotate(17deg);background:transparent}
+.banner-grid .ph,.banner-grid img{width:62px;height:90px;object-fit:cover;border-radius:8px;background:#222b3a}
+.banner-grid .s2,.banner-grid .s5,.banner-grid .s8{transform:translateY(36px)}
+.banner-grid .s3,.banner-grid .s6,.banner-grid .s9{transform:translateY(-44px)}
+.col-banner .bt2{position:absolute;left:24px;top:50%;transform:translateY(-50%);width:124px;display:block;font-size:22px;line-height:1.12;font-weight:800;white-space:normal;overflow:hidden;text-overflow:ellipsis;color:#eaeef6}
+.col-banner .banner-logo{position:absolute;left:24px;top:50%;transform:translateY(-50%);width:124px;height:56px;object-fit:contain;display:none}
+.col-banner.has-logo .bt2{display:none}
+.col-banner.has-logo .banner-logo{display:block}
 .col-image{width:184px;border-radius:20px;overflow:hidden;text-align:left;padding:0}
 .col-image .logo-img{height:108px;display:flex;align-items:center;justify-content:center;background:#0d1118}
 .col-image .logo-img img{max-width:82%;max-height:82%;object-fit:contain}
@@ -448,21 +458,49 @@ const CollectionRow = ({ b }: { b: DisplayBlock }) => {
 	if (style === "rank") {
 		cards = children.map((ch, index) => (
 			<button type="button" class="col-rank" {...sharedAttrs(ch)}>
-				<span class="rn">{index + 1}</span>
-				<span class="rt">{ch.label}</span>
+				<span class="rn">{ch.weekday ?? index + 1}</span>
+				<span class="rank-title">
+					<svg class="laurel" viewBox="0 0 28 20" aria-hidden="true">
+						<path d="M22 17 C14 15 8 10 6 3" />
+						<path d="M15 13 C14 10 16 8 19 8 C19 11 18 13 15 13" />
+						<path d="M11 9 C10 6 12 4 15 4 C15 7 14 9 11 9" />
+						<path d="M8 5 C7 3 8.5 1.5 11 1.5 C11 4 10 5.5 8 5" />
+					</svg>
+					<span class="rt">{ch.label}</span>
+					<svg class="laurel r" viewBox="0 0 28 20" aria-hidden="true">
+						<path d="M22 17 C14 15 8 10 6 3" />
+						<path d="M15 13 C14 10 16 8 19 8 C19 11 18 13 15 13" />
+						<path d="M11 9 C10 6 12 4 15 4 C15 7 14 9 11 9" />
+						<path d="M8 5 C7 3 8.5 1.5 11 1.5 C11 4 10 5.5 8 5" />
+					</svg>
+				</span>
+				<span class="rank-posters">
+					<span class="ph s1" />
+					<span class="ph s2" />
+					<span class="ph s3" />
+				</span>
 				<span class="rank-lines" />
 			</button>
 		));
 	} else if (style === "banner") {
 		cards = children.map((ch) => (
-			<button type="button" class="col-banner" {...sharedAttrs(ch)}>
+			<button
+				type="button"
+				class={`col-banner${ch.image ? " has-logo" : ""}`}
+				{...sharedAttrs(ch)}
+			>
 				<span class="banner-grid">
 					<span class="ph s1" />
 					<span class="ph s2" />
 					<span class="ph s3" />
 					<span class="ph s4" />
 					<span class="ph s5" />
+					<span class="ph s6" />
+					<span class="ph s7" />
+					<span class="ph s8" />
+					<span class="ph s9" />
 				</span>
+				{ch.image ? <img class="banner-logo" src={ch.image} alt="" loading="lazy" /> : null}
 				<span class="bt2">{ch.label}</span>
 			</button>
 		));
@@ -1284,12 +1322,6 @@ async function loadCollection(sec){
     const cards=Array.from(caps.querySelectorAll('[data-csrc]'));
     const key=c=>c.dataset.wd?(((+c.dataset.wd)-today+7)%7):99;
     cards.sort((a,b)=>key(a)-key(b)).forEach(c=>caps.appendChild(c));
-    const first=cards.find(c=>+c.dataset.wd===today);
-    if(first&&!first.querySelector('.cbadge')){
-      const badge=document.createElement('span');
-      badge.className='cbadge';badge.textContent='今天';
-      first.appendChild(badge);
-    }
   }
   caps.classList.add('in');
   caps.querySelectorAll('[data-csrc]').forEach(async c=>{
@@ -1297,10 +1329,12 @@ async function loadCollection(sec){
     const lines=c.querySelector('.rank-lines');
     if(lines){
       lines.innerHTML=items.slice(0,3).map((it,i)=>'<span>'+((i+1)+'. '+(it.title||'未命名'))+'</span>').join('');
-      return;
     }
-    const max=c.classList.contains('col-banner')?5:3;
-    const posters=items.map(it=>img(it.poster_path||it.thumb||it.backdrop_path,'w154')).filter(Boolean).slice(0,max);
+    const max=c.classList.contains('col-banner')?9:3;
+    const basePosters=items.map(it=>img(it.poster_path||it.thumb||it.backdrop_path,'w154')).filter(Boolean);
+    const posters=basePosters.length&&c.classList.contains('col-banner')
+      ? Array.from({length:max},(_,i)=>basePosters[i%basePosters.length])
+      : basePosters.slice(0,max);
     posters.forEach((u,i)=>{
       const ph=c.querySelector('.ph.s'+(i+1));if(!ph)return;
       const im=document.createElement('img');
