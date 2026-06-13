@@ -512,7 +512,7 @@ app.get("/data/:blockId", async (c) => {
 const IMPORT_LINK_BASE =
 	process.env.IMPORT_LINK_BASE_URL || "https://eplayerx.com/import/blocks";
 const MAX_COLLECTION_TITLE_LEN = 40;
-const MAX_COLLECTION_BLOCKS = 30;
+const MAX_COLLECTION_BLOCKS = 50;
 const VALID_SHARED_STYLES = new Set([
 	"poster",
 	"thumb",
