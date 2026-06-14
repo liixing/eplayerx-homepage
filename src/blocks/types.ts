@@ -202,6 +202,7 @@ export interface CommunityBlockRow {
 	category: BlockCategory;
 	title: string;
 	block_json: string;
+	preset: string;
 	data_key: string;
 	item_count: number;
 	installs: number;

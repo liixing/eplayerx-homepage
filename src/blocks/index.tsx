@@ -8,7 +8,7 @@
  * `admin.tsx`). Approved blocks are served to the client unchanged.
  */
 
-import { Hono } from "hono";
+import { type Context, Hono } from "hono";
 import { createDefaultHomeConfig } from "../home/config.js";
 import { isAdmin } from "./admin.js";
 import {
@@ -20,7 +20,7 @@ import {
 import { getDb, ServiceUnavailable, shortId } from "./runtime.js";
 import { validateToken } from "./scraper.js";
 import {
-	countCommunityBlocks,
+	type CommunityBlockFilter,
 	getBlockCollection,
 	getCommunityBlocksByIds,
 	incrementCollectionInstalls,
@@ -67,9 +67,65 @@ const VALID_LANGUAGES = new Set(TMDB_LANGUAGES.map((l) => l.code));
 
 const MAX_SOURCE_LEN = 100_000;
 const PREVIEW_LIMIT = 20;
+const WEB_COMMUNITY_PAGE_SIZE = 50;
+const PUBLIC_CACHE_MAX_AGE_SECONDS = 30;
+const PUBLIC_CACHE_STALE_SECONDS = 120;
 
 const R2_PUBLIC_BASE = `https://${process.env.R2_CUSTOM_DOMAIN || "assets.eplayerx.com"}`;
 const CRAWLER_POPULAR_PREFIX = "/crawler/popular/";
+
+type BlocksContext = Context<{ Bindings: BlocksBindings }>;
+
+function parsePage(value: string | undefined): number {
+	const n = Number.parseInt(value || "1", 10);
+	return Number.isFinite(n) && n > 0 ? n : 1;
+}
+
+function pageHref(currentUrl: string, page: number): string {
+	const url = new URL(currentUrl);
+	if (page <= 1) {
+		url.searchParams.delete("page");
+	} else {
+		url.searchParams.set("page", String(page));
+	}
+	return `${url.pathname}${url.search}`;
+}
+
+function publicCacheHeader(): string {
+	return `public, max-age=${PUBLIC_CACHE_MAX_AGE_SECONDS}, s-maxage=${PUBLIC_CACHE_MAX_AGE_SECONDS}, stale-while-revalidate=${PUBLIC_CACHE_STALE_SECONDS}`;
+}
+
+function defaultCache(): Cache | null {
+	if (typeof caches === "undefined") return null;
+	return (caches as unknown as { default?: Cache }).default ?? null;
+}
+
+async function publicCachedGet(
+	c: BlocksContext,
+	render: () => Response | Promise<Response>,
+): Promise<Response> {
+	const cache = defaultCache();
+	if (isAdmin(c) || c.req.method !== "GET" || !cache) {
+		return render();
+	}
+	const cacheKey = new Request(c.req.url, { method: "GET" });
+	const cached = await cache.match(cacheKey);
+	if (cached) return cached;
+	const response = await render();
+	if (response.ok) {
+		response.headers.set("Cache-Control", publicCacheHeader());
+		c.executionCtx.waitUntil(cache.put(cacheKey, response.clone()));
+	}
+	return response;
+}
+
+function webCommunityFilter(category: ExploreCategory): CommunityBlockFilter {
+	if (VALID_CATEGORIES.includes(category as BlockCategory)) {
+		return { category: category as BlockCategory };
+	}
+	if (category === "collection") return { kind: "collection" };
+	return {};
+}
 
 /**
  * Build a preview URL from a default block's source. Crawler-popular blocks are
@@ -297,48 +353,69 @@ const EXPLORE_CATEGORIES = new Set([
 	"homepage",
 ]);
 
-app.get("/", async (c) => {
-	const raw = c.req.query("category");
-	const category = (
-		EXPLORE_CATEGORIES.has(raw ?? "") ? raw : "all"
-	) as ExploreCategory;
-	const language = c.req.query("language") || "zh-CN";
+app.get("/", (c) =>
+	publicCachedGet(c, async () => {
+		const raw = c.req.query("category");
+		const category = (
+			EXPLORE_CATEGORIES.has(raw ?? "") ? raw : "all"
+		) as ExploreCategory;
+		const language = c.req.query("language") || "zh-CN";
+		const page = parsePage(c.req.query("page"));
+		const offset = (page - 1) * WEB_COMMUNITY_PAGE_SIZE;
 
-	// Render every category up-front; the filter works client-side (instant, no
-	// reload, previews fetched once and kept in the DOM).
-	let community: CommunityBlockRow[] = [];
-	let languages: string[] = [];
-	let homepages: HomepageSummary[] = [];
-	try {
-		const db = getDb(c);
-		const [rows, langs, pages] = await Promise.all([
-			listCommunityBlocks(db),
-			listCommunityLanguages(db),
-			listApprovedBlockCollections(db),
-		]);
-		community = rows;
-		languages = langs;
-		homepages = pages.map(homepageSummaryFromRow);
-	} catch {
-		community = [];
-	}
+		// Render every category up-front; the filter works client-side (instant, no
+		// reload, previews fetched once and kept in the DOM).
+		let community: CommunityBlockRow[] = [];
+		let hasNextPage = false;
+		let languages: string[] = [];
+		let homepages: HomepageSummary[] = [];
+		try {
+			const db = getDb(c);
+			const shouldListCommunity = category !== "homepage";
+			const [rows, langs, pages] = await Promise.all([
+				shouldListCommunity
+					? listCommunityBlocks(
+							db,
+							webCommunityFilter(category),
+							WEB_COMMUNITY_PAGE_SIZE + 1,
+							offset,
+						)
+					: Promise.resolve([]),
+				listCommunityLanguages(db),
+				page === 1 ? listApprovedBlockCollections(db) : Promise.resolve([]),
+			]);
+			hasNextPage = rows.length > WEB_COMMUNITY_PAGE_SIZE;
+			community = rows.slice(0, WEB_COMMUNITY_PAGE_SIZE);
+			languages = langs;
+			homepages = pages.map(homepageSummaryFromRow);
+		} catch {
+			community = [];
+		}
 
-	const blocks: DisplayBlock[] = [
-		...officialBlocks(language),
-		...community.map(communityToDisplay),
-	];
+		const blocks: DisplayBlock[] = [
+			...(page === 1 && category !== "homepage"
+				? officialBlocks(language)
+				: []),
+			...community.map(communityToDisplay),
+		];
 
-	return c.html(
-		<ExplorePage
-			blocks={blocks}
-			imageBase={IMAGE_BASE}
-			category={category}
-			languages={languages}
-			homepages={homepages}
-			isAdmin={isAdmin(c)}
-		/>,
-	);
-});
+		return c.html(
+			<ExplorePage
+				blocks={blocks}
+				imageBase={IMAGE_BASE}
+				category={category}
+				languages={languages}
+				homepages={homepages}
+				pagination={{
+					page,
+					prevHref: page > 1 ? pageHref(c.req.url, page - 1) : undefined,
+					nextHref: hasNextPage ? pageHref(c.req.url, page + 1) : undefined,
+				}}
+				isAdmin={isAdmin(c)}
+			/>,
+		);
+	}),
+);
 
 /** Published homepage detail: every contained block, with an install link. */
 app.get("/homepages/:collectionId", async (c) => {
@@ -368,18 +445,20 @@ app.get("/homepages/:collectionId", async (c) => {
 });
 
 /** Published homepages as JSON (client community browser's 首页 filter). */
-app.get("/homepages", async (c) => {
-	try {
-		const rows = await listApprovedBlockCollections(getDb(c));
-		const homepages = rows.map(homepageSummaryFromRow);
-		return c.json({ version: 1, homepages });
-	} catch (error) {
-		if (error instanceof ServiceUnavailable) {
-			return c.json({ version: 1, homepages: [] });
+app.get("/homepages", (c) =>
+	publicCachedGet(c, async () => {
+		try {
+			const rows = await listApprovedBlockCollections(getDb(c));
+			const homepages = rows.map(homepageSummaryFromRow);
+			return c.json({ version: 1, homepages });
+		} catch (error) {
+			if (error instanceof ServiceUnavailable) {
+				return c.json({ version: 1, homepages: [] });
+			}
+			throw error;
 		}
-		throw error;
-	}
-});
+	}),
+);
 
 app.get("/submit", (c) => c.html(<SubmitPage />));
 
@@ -442,50 +521,55 @@ app.post("/submit", async (c) => {
 
 // MARK: - Consumption API (for the client)
 
-app.get("/community", async (c) => {
-	const raw = c.req.query("category");
-	// "collection" is a pseudo-category: it filters by block kind instead of
-	// the movie/tv/anime taxonomy (mirrors the explore page's filter chips).
-	const filter = {
-		category: VALID_CATEGORIES.includes(raw as BlockCategory)
-			? (raw as BlockCategory)
-			: undefined,
-		kind: raw === "collection" ? ("collection" as const) : undefined,
-		language: c.req.query("language") || undefined,
-		q: c.req.query("q")?.trim() || undefined,
-	};
-	const limit = Math.min(
-		Math.max(Number.parseInt(c.req.query("limit") || "20", 10) || 20, 1),
-		50,
-	);
-	const offset = Math.max(
-		Number.parseInt(c.req.query("offset") || "0", 10) || 0,
-		0,
-	);
-	try {
-		const db = getDb(c);
-		const [rows, total, languages] = await Promise.all([
-			listCommunityBlocks(db, filter, limit, offset),
-			countCommunityBlocks(db, filter),
-			listCommunityLanguages(db),
-		]);
-		// HomeBlock shape plus browse metadata for the client community browser.
-		const blocks = rows.map((r) => ({
-			...(JSON.parse(r.block_json) as HomeBlock),
-			category: r.category,
-			author: r.author,
-			installs: r.installs,
-			itemCount: r.item_count,
-			language: r.language,
-		}));
-		return c.json({ version: 1, total, languages, blocks });
-	} catch (error) {
-		if (error instanceof ServiceUnavailable) {
-			return c.json({ version: 1, total: 0, languages: [], blocks: [] });
+app.get("/community", (c) =>
+	publicCachedGet(c, async () => {
+		const raw = c.req.query("category");
+		// "collection" is a pseudo-category: it filters by block kind instead of
+		// the movie/tv/anime taxonomy (mirrors the explore page's filter chips).
+		const filter = {
+			category: VALID_CATEGORIES.includes(raw as BlockCategory)
+				? (raw as BlockCategory)
+				: undefined,
+			kind: raw === "collection" ? ("collection" as const) : undefined,
+			language: c.req.query("language") || undefined,
+			q: c.req.query("q")?.trim() || undefined,
+		};
+		const limit = Math.min(
+			Math.max(Number.parseInt(c.req.query("limit") || "20", 10) || 20, 1),
+			50,
+		);
+		const offset = Math.max(
+			Number.parseInt(c.req.query("offset") || "0", 10) || 0,
+			0,
+		);
+		try {
+			const db = getDb(c);
+			const [rows, languages] = await Promise.all([
+				listCommunityBlocks(db, filter, limit + 1, offset),
+				offset === 0 ? listCommunityLanguages(db) : Promise.resolve([]),
+			]);
+			const visibleRows = rows.slice(0, limit);
+			const hasMore = rows.length > limit;
+			// Older clients only use total to decide hasMore (fetchedCount < total).
+			const total = offset + visibleRows.length + (hasMore ? 1 : 0);
+			// HomeBlock shape plus browse metadata for the client community browser.
+			const blocks = visibleRows.map((r) => ({
+				...(JSON.parse(r.block_json) as HomeBlock),
+				category: r.category,
+				author: r.author,
+				installs: r.installs,
+				itemCount: r.item_count,
+				language: r.language,
+			}));
+			return c.json({ version: 1, total, languages, blocks });
+		} catch (error) {
+			if (error instanceof ServiceUnavailable) {
+				return c.json({ version: 1, total: 0, languages: [], blocks: [] });
+			}
+			throw error;
 		}
-		throw error;
-	}
-});
+	}),
+);
 
 app.get("/data/:blockId", async (c) => {
 	const blockId = c.req.param("blockId").replace(/[^a-zA-Z0-9_-]/g, "");
@@ -539,15 +623,20 @@ function collectionBlockTitles(blocksJson: string): string[] {
 	return parseCollectionEntries(blocksJson).map((block) => block.title);
 }
 
-function sanitizeAuthorName(body: Record<string, unknown> | null): string | null {
+function sanitizeAuthorName(
+	body: Record<string, unknown> | null,
+): string | null {
 	if (!body) return null;
 	const raw = typeof body.authorName === "string" ? body.authorName.trim() : "";
 	return raw.slice(0, 40) || null;
 }
 
-function sanitizeDescription(body: Record<string, unknown> | null): string | null {
+function sanitizeDescription(
+	body: Record<string, unknown> | null,
+): string | null {
 	if (!body) return null;
-	const raw = typeof body.description === "string" ? body.description.trim() : "";
+	const raw =
+		typeof body.description === "string" ? body.description.trim() : "";
 	return raw.slice(0, 160) || null;
 }
 

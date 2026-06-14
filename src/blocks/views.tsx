@@ -123,6 +123,11 @@ body.selecting .blk .share{display:none}
 .filters .mkbtn{flex:0 0 auto;background:var(--card2);border:1px solid var(--line);color:var(--fg);border-radius:12px;padding:0 16px;font-size:14px;cursor:pointer;font-family:inherit;transition:border-color .15s,background .15s}
 .filters .mkbtn:hover{border-color:var(--acc)}
 .filters .mkbtn.on{background:var(--grad);color:#062a20;border-color:transparent;font-weight:600}
+.pager{display:flex;align-items:center;justify-content:center;gap:12px;margin:26px 0 4px}
+.pager .pbtn{background:var(--card2);border:1px solid var(--line);color:var(--fg);border-radius:999px;padding:9px 16px;font-size:14px}
+.pager .pbtn:hover{border-color:var(--acc)}
+.pager .pbtn.off{opacity:.45;pointer-events:none}
+.pager .pnum{color:var(--mut);font-size:13px}
 /* Homepage cards (published packs) + detail page */
 .hp-card{cursor:pointer}
 .hp-card:hover .bt{color:var(--acc)}
@@ -258,7 +263,9 @@ const Layout = ({ title, active, description, children }: LayoutProps) => (
 			<meta name="apple-itunes-app" content={`app-id=${APP_STORE_ID}`} />
 			{description ? <meta name="description" content={description} /> : null}
 			<meta property="og:title" content={`${title} · EplayerX Blocks`} />
-			{description ? <meta property="og:description" content={description} /> : null}
+			{description ? (
+				<meta property="og:description" content={description} />
+			) : null}
 			<meta property="og:type" content="website" />
 			<title>{title} · EplayerX Blocks</title>
 			<link rel="icon" href={FAVICON} />
@@ -322,6 +329,11 @@ interface ExploreProps {
 	/** Distinct community languages, for the filter menu. */
 	languages: string[];
 	homepages: HomepageSummary[];
+	pagination: {
+		page: number;
+		prevHref?: string;
+		nextHref?: string;
+	};
 	/** Admin session detected: renders the collection builder (direct publish). */
 	isAdmin: boolean;
 }
@@ -500,7 +512,9 @@ const CollectionRow = ({ b }: { b: DisplayBlock }) => {
 					<span class="ph s8" />
 					<span class="ph s9" />
 				</span>
-				{ch.image ? <img class="banner-logo" src={ch.image} alt="" loading="lazy" /> : null}
+				{ch.image ? (
+					<img class="banner-logo" src={ch.image} alt="" loading="lazy" />
+				) : null}
 				<span class="bt2">{ch.label}</span>
 			</button>
 		));
@@ -535,6 +549,7 @@ export const ExplorePage = ({
 	category,
 	languages,
 	homepages,
+	pagination,
 	isAdmin,
 }: ExploreProps) => (
 	<Layout title="社区库" active="explore">
@@ -575,13 +590,34 @@ export const ExplorePage = ({
 		{homepages.map((hp) => (
 			<HomepageCard hp={hp} hidden={category !== "homepage"} />
 		))}
+		{category !== "homepage" && (pagination.prevHref || pagination.nextHref) ? (
+			<nav class="pager" aria-label="分页">
+				{pagination.prevHref ? (
+					<a class="pbtn" href={pagination.prevHref}>
+						上一页
+					</a>
+				) : (
+					<span class="pbtn off">上一页</span>
+				)}
+				<span class="pnum">第 {pagination.page} 页</span>
+				{pagination.nextHref ? (
+					<a class="pbtn" href={pagination.nextHref}>
+						下一页
+					</a>
+				) : (
+					<span class="pbtn off">下一页</span>
+				)}
+			</nav>
+		) : null}
 		<div
 			class={`card${
 				category === "homepage" && homepages.length === 0 ? "" : " hide"
 			}`}
 			id="hpEmpty"
 		>
-			<p class="meta">还没有已发布的首页。现在首页由 iOS 客户端分享后直接公开展示。</p>
+			<p class="meta">
+				还没有已发布的首页。现在首页由 iOS 客户端分享后直接公开展示。
+			</p>
 		</div>
 
 		<div class="selbar hide" id="selbar">
@@ -670,16 +706,17 @@ export const HomepageDetailPage = ({
 }: HomepageDetailProps) => {
 	const importUrl = `${IMPORT_LINK_BASE}?collectionId=${homepage.collectionId}`;
 	const description =
-		homepage.description || `${homepage.blockCount} 个区块 · 安装 ${homepage.installs}`;
+		homepage.description ||
+		`${homepage.blockCount} 个区块 · 安装 ${homepage.installs}`;
 	return (
-		<Layout
-			title={homepage.title}
-			active="explore"
-			description={description}
-		>
+		<Layout title={homepage.title} active="explore" description={description}>
 			<h1 class="gradtext">{homepage.title}</h1>
-			{homepage.authorName ? <div class="hp-byline">by {homepage.authorName}</div> : null}
-			{homepage.description ? <div class="hp-byline">{homepage.description}</div> : null}
+			{homepage.authorName ? (
+				<div class="hp-byline">by {homepage.authorName}</div>
+			) : null}
+			{homepage.description ? (
+				<div class="hp-byline">{homepage.description}</div>
+			) : null}
 			<p class="sub">
 				{homepage.blockCount} 个区块 · 安装 {homepage.installs}
 				。在 iPhone 上安装后会作为一个新首页出现在客户端。
@@ -976,10 +1013,7 @@ const PendingCollectionCard = ({ s }: { s: SubmissionRow }) => (
 	</div>
 );
 
-export const AdminPage = ({
-	pending,
-	collections,
-}: AdminPageProps) => (
+export const AdminPage = ({ pending, collections }: AdminPageProps) => (
 	<Layout title="审核" active="none">
 		<h1 class="gradtext">管理后台</h1>
 		<div class="tabs" id="adminTabs">
@@ -1574,10 +1608,11 @@ function applyFilters(){
 function applyCategory(cat){
   curCat=cat;catSel.value=cat;
   applyFilters();
-  // Keep the filter in the URL so a refresh restores it (server renders ?category=).
+  // Category changes need a server page because the web listing is paginated.
   const u=new URL(location.href);
   if(cat==='all')u.searchParams.delete('category');else u.searchParams.set('category',cat);
-  history.replaceState(null,'',u);
+  u.searchParams.delete('page');
+  location.href=u;
 }
 catSel.addEventListener('change',()=>applyCategory(catSel.value));
 qInput.addEventListener('input',applyFilters);

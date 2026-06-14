@@ -121,6 +121,15 @@ export interface BlockSnapshotRow {
 	updated_at: string;
 }
 
+function presetFromBlockJson(blockJson: string): string {
+	try {
+		const preset = (JSON.parse(blockJson) as { preset?: unknown }).preset;
+		return typeof preset === "string" ? preset : "";
+	} catch {
+		return "";
+	}
+}
+
 /** Record (or refresh) a snapshot publish reported by the local/CI script. */
 export async function upsertBlockSnapshot(
 	db: D1Database,
@@ -172,8 +181,10 @@ export async function updateCommunityBlockJson(
 	blockJson: string,
 ): Promise<void> {
 	await db
-		.prepare(`UPDATE community_blocks SET block_json = ? WHERE block_id = ?`)
-		.bind(blockJson, blockId)
+		.prepare(
+			`UPDATE community_blocks SET block_json = ?, preset = ? WHERE block_id = ?`,
+		)
+		.bind(blockJson, presetFromBlockJson(blockJson), blockId)
 		.run();
 }
 
@@ -310,14 +321,15 @@ export async function insertCommunityBlock(
 	await db
 		.prepare(
 			`INSERT INTO community_blocks
-        (block_id, category, title, block_json, data_key, item_count, installs, author, language, created_at, hidden)
-       VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)`,
+        (block_id, category, title, block_json, preset, data_key, item_count, installs, author, language, created_at, hidden)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)`,
 		)
 		.bind(
 			input.blockId,
 			input.category,
 			input.title,
 			input.blockJson,
+			presetFromBlockJson(input.blockJson),
 			input.dataKey,
 			input.itemCount,
 			input.author,
@@ -350,8 +362,8 @@ function communityWhere(filter: CommunityBlockFilter): {
 		binds.push(filter.category);
 	}
 	if (filter.kind === "collection") {
-		// No preset column; the JSON value string is unique enough to match on.
-		conditions.push(`block_json LIKE '%"preset":"collection-list"%'`);
+		conditions.push("preset = ?");
+		binds.push("collection-list");
 	}
 	if (filter.language) {
 		conditions.push("language = ?");
