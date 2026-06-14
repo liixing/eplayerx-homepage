@@ -1606,8 +1606,8 @@ function applyFilters(){
   if(hint)hint.classList.toggle('hide',!(isHome&&hpShown===0&&!selMode));
 }
 function applyCategory(cat){
+  if(cat===curCat)return;
   curCat=cat;catSel.value=cat;
-  applyFilters();
   // Category changes need a server page because the web listing is paginated.
   const u=new URL(location.href);
   if(cat==='all')u.searchParams.delete('category');else u.searchParams.set('category',cat);
