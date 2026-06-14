@@ -1317,6 +1317,7 @@ const BUILD={'thumb-list':thumb,'poster-list':poster,'hero-list':hero};
 // SWR preview cache: keep only the fields the renderers read, capped per row,
 // so dozens of blocks stay well under the localStorage quota.
 const CK='epx:prev:';
+const inflight=new Map();
 function slim(it){
   return {id:it.tmdbId||it.id,media_type:it.media_type,title:tt(it),
     release_date:it.release_date||it.first_air_date||'',overview:it.overview||'',
@@ -1324,6 +1325,20 @@ function slim(it){
 }
 function readCache(src){
   try{const v=JSON.parse(localStorage.getItem(CK+src));return Array.isArray(v)&&v.length?v:null;}catch(e){return null;}
+}
+function writeCache(src,items){
+  if(items&&items.length)try{localStorage.setItem(CK+src,JSON.stringify(items));}catch(e){}
+}
+async function fetchFresh(src,limit){
+  if(inflight.has(src))return inflight.get(src);
+  const p=(async()=>{
+    const r=await fetch(src);if(!r.ok)throw 0;
+    const items=pickList(await r.json()).slice(0,limit).map(slim);
+    writeCache(src,items);
+    return items;
+  })();
+  inflight.set(src,p);
+  try{return await p;}finally{inflight.delete(src);}
 }
 function render(sc,items,preset,rank,ov,animate){
   const b=BUILD[preset]||thumb;
@@ -1335,16 +1350,23 @@ function render(sc,items,preset,rank,ov,animate){
   });
   sc.classList.add('in');
 }
-// Cached-first fetch used by collection capsules and their preview strips.
-async function fetchItems(src){
-  const cached=readCache(src);
-  if(cached)return cached;
-  try{
-    const r=await fetch(src);if(!r.ok)return [];
-    const items=pickList(await r.json()).slice(0,20).map(slim);
-    if(items.length)try{localStorage.setItem(CK+src,JSON.stringify(items));}catch(e){}
-    return items;
-  }catch(e){return [];}
+function sameItems(a,b){return !!a&&!!b&&JSON.stringify(a)===JSON.stringify(b);}
+function fillCapsule(c,items){
+  const lines=c.querySelector('.rank-lines');
+  if(lines){
+    lines.innerHTML=items.slice(0,3).map((it,i)=>'<span>'+((i+1)+'. '+(it.title||'未命名'))+'</span>').join('');
+  }
+  const max=c.classList.contains('col-banner')?9:3;
+  const basePosters=items.map(it=>img(it.poster_path||it.thumb||it.backdrop_path,'w154')).filter(Boolean);
+  const posters=basePosters.length&&c.classList.contains('col-banner')
+    ? Array.from({length:max},(_,i)=>basePosters[i%basePosters.length])
+    : basePosters.slice(0,max);
+  posters.forEach((u,i)=>{
+    const ph=c.querySelector('.ph.s'+(i+1)+',img.s'+(i+1));if(!ph)return;
+    const im=document.createElement('img');
+    im.className='s'+(i+1);im.loading='lazy';im.src=u;
+    ph.replaceWith(im);
+  });
 }
 function weekdayToday(){return ((new Date().getDay()+6)%7)+1;}
 // Collection rows: fan the first posters of each child into the capsule
@@ -1359,22 +1381,13 @@ async function loadCollection(sec){
   }
   caps.classList.add('in');
   caps.querySelectorAll('[data-csrc]').forEach(async c=>{
-    const items=await fetchItems(c.dataset.csrc);
-    const lines=c.querySelector('.rank-lines');
-    if(lines){
-      lines.innerHTML=items.slice(0,3).map((it,i)=>'<span>'+((i+1)+'. '+(it.title||'未命名'))+'</span>').join('');
-    }
-    const max=c.classList.contains('col-banner')?9:3;
-    const basePosters=items.map(it=>img(it.poster_path||it.thumb||it.backdrop_path,'w154')).filter(Boolean);
-    const posters=basePosters.length&&c.classList.contains('col-banner')
-      ? Array.from({length:max},(_,i)=>basePosters[i%basePosters.length])
-      : basePosters.slice(0,max);
-    posters.forEach((u,i)=>{
-      const ph=c.querySelector('.ph.s'+(i+1));if(!ph)return;
-      const im=document.createElement('img');
-      im.className='s'+(i+1);im.loading='lazy';im.src=u;
-      ph.replaceWith(im);
-    });
+    const src=c.dataset.csrc;
+    const cached=readCache(src);
+    if(cached)fillCapsule(c,cached);
+    try{
+      const fresh=await fetchFresh(src,20);
+      if(!sameItems(cached,fresh))fillCapsule(c,fresh);
+    }catch(e){}
   });
 }
 // Tap a capsule -> load that chart into the preview strip below the row.
@@ -1384,10 +1397,17 @@ async function toggleCapsule(sec,cap){
   sec.querySelectorAll('[data-csrc].on').forEach(c=>c.classList.remove('on'));
   if(wasOn){prev.innerHTML='';prev.classList.remove('in');return;}
   cap.classList.add('on');
-  const items=await fetchItems(cap.dataset.csrc);
-  if(!cap.classList.contains('on'))return;
-  if(!items.length){prev.innerHTML='<div class="prev-empty">预览暂不可用</div>';return;}
-  render(prev,items.slice(0,12),'poster-list',false,false,true);
+  const src=cap.dataset.csrc;
+  const cached=readCache(src);
+  if(cached)render(prev,cached.slice(0,12),'poster-list',false,false,true);
+  try{
+    const fresh=await fetchFresh(src,20);
+    if(!cap.classList.contains('on'))return;
+    if(!fresh.length&&!cached){prev.innerHTML='<div class="prev-empty">预览暂不可用</div>';return;}
+    if(!sameItems(cached,fresh))render(prev,fresh.slice(0,12),'poster-list',false,false,!cached);
+  }catch(e){
+    if(!cached)prev.innerHTML='<div class="prev-empty">预览暂不可用</div>';
+  }
 }
 // Stale-while-revalidate: paint the cached preview instantly (no skeleton),
 // then fetch in the background and only repaint when the data changed.
@@ -1401,13 +1421,9 @@ async function load(sec){
   const cached=readCache(src);
   if(cached)render(sc,cached,preset,rank,ov,false);
   try{
-    const r=await fetch(src);if(!r.ok)throw 0;
-    const items=pickList(await r.json());if(!items.length)throw 0;
     const max=preset==='hero-list'?8:20;
-    const fresh=items.slice(0,max).map(slim);
-    const s=JSON.stringify(fresh);
-    if(!cached||JSON.stringify(cached)!==s)render(sc,fresh,preset,rank,ov,!cached);
-    try{localStorage.setItem(CK+src,s);}catch(e){}
+    const fresh=await fetchFresh(src,max);if(!fresh.length)throw 0;
+    if(!sameItems(cached,fresh))render(sc,fresh,preset,rank,ov,!cached);
   }catch(e){
     if(cached)return; // stale preview is better than an error
     sc.dataset.loaded='';sec.dataset.loaded='';sc.innerHTML='<div class="prev-empty">预览暂不可用</div>';

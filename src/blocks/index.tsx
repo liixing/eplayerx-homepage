@@ -418,31 +418,33 @@ app.get("/", (c) =>
 );
 
 /** Published homepage detail: every contained block, with an install link. */
-app.get("/homepages/:collectionId", async (c) => {
-	const collectionId = c.req
-		.param("collectionId")
-		.replace(/[^a-zA-Z0-9_-]/g, "");
-	try {
-		const row = await getBlockCollection(getDb(c), collectionId);
-		if (!row || row.status !== "approved") return c.notFound();
-		const entries = parseCollectionEntries(row.blocks_json);
-		return c.html(
-			<HomepageDetailPage
-				homepage={{
-					...homepageSummaryFromRow(row),
-					blockTitles: entries.map((b) => b.title),
-				}}
-				blocks={entries.map(importableToDisplay)}
-				imageBase={IMAGE_BASE}
-			/>,
-		);
-	} catch (error) {
-		if (error instanceof ServiceUnavailable) {
-			return c.text("服务暂不可用", 503);
+app.get("/homepages/:collectionId", (c) =>
+	publicCachedGet(c, async () => {
+		const collectionId = c.req
+			.param("collectionId")
+			.replace(/[^a-zA-Z0-9_-]/g, "");
+		try {
+			const row = await getBlockCollection(getDb(c), collectionId);
+			if (!row || row.status !== "approved") return c.notFound();
+			const entries = parseCollectionEntries(row.blocks_json);
+			return c.html(
+				<HomepageDetailPage
+					homepage={{
+						...homepageSummaryFromRow(row),
+						blockTitles: entries.map((b) => b.title),
+					}}
+					blocks={entries.map(importableToDisplay)}
+					imageBase={IMAGE_BASE}
+				/>,
+			);
+		} catch (error) {
+			if (error instanceof ServiceUnavailable) {
+				return c.text("服务暂不可用", 503);
+			}
+			throw error;
 		}
-		throw error;
-	}
-});
+	}),
+);
 
 /** Published homepages as JSON (client community browser's 首页 filter). */
 app.get("/homepages", (c) =>
@@ -571,25 +573,27 @@ app.get("/community", (c) =>
 	}),
 );
 
-app.get("/data/:blockId", async (c) => {
-	const blockId = c.req.param("blockId").replace(/[^a-zA-Z0-9_-]/g, "");
-	const limit = Number.parseInt(c.req.query("limit") || "", 10);
-	const response = await fetch(publicDataUrl(blockId));
-	// Without a limit (the iOS client) stream the snapshot through untouched;
-	// the blob carries the block's display title since publish time.
-	if (!response.ok || !Number.isFinite(limit) || limit <= 0) {
-		return new Response(response.body, {
-			status: response.status,
-			headers: {
-				"Content-Type":
-					response.headers.get("Content-Type") || "application/json",
-			},
-		});
-	}
-	const blob = (await response.json()) as SnapshotBlob;
-	const data = (blob.data ?? []).slice(0, limit);
-	return c.json({ ...blob, count: data.length, data });
-});
+app.get("/data/:blockId", (c) =>
+	publicCachedGet(c, async () => {
+		const blockId = c.req.param("blockId").replace(/[^a-zA-Z0-9_-]/g, "");
+		const limit = Number.parseInt(c.req.query("limit") || "", 10);
+		const response = await fetch(publicDataUrl(blockId));
+		// Without a limit (the iOS client) stream the snapshot through untouched;
+		// the blob carries the block's display title since publish time.
+		if (!response.ok || !Number.isFinite(limit) || limit <= 0) {
+			return new Response(response.body, {
+				status: response.status,
+				headers: {
+					"Content-Type":
+						response.headers.get("Content-Type") || "application/json",
+				},
+			});
+		}
+		const blob = (await response.json()) as SnapshotBlob;
+		const data = (blob.data ?? []).slice(0, limit);
+		return c.json({ ...blob, count: data.length, data });
+	}),
+);
 
 // MARK: - Block collections (shareable bundles, imported via universal link)
 
