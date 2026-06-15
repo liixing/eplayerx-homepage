@@ -239,6 +239,7 @@ async function resolveItem(
 			searchOptions.language,
 			client,
 		);
+		if (!tmdbData?.id) return null;
 	}
 	if (!tmdbData?.id) {
 		const options = item.year
