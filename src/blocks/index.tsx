@@ -34,6 +34,7 @@ import {
 } from "./storage.js";
 import {
 	type BlockCategory,
+	type BlockCollectionRow,
 	type BlockPreset,
 	type BlocksBindings,
 	COLLECTION_PRESET,
@@ -70,11 +71,54 @@ const PREVIEW_LIMIT = 20;
 const WEB_COMMUNITY_PAGE_SIZE = 50;
 const PUBLIC_CACHE_MAX_AGE_SECONDS = 30;
 const PUBLIC_CACHE_STALE_SECONDS = 120;
+const HOT_D1_READ_CACHE_MS = 60_000;
 
 const R2_PUBLIC_BASE = `https://${process.env.R2_CUSTOM_DOMAIN || "assets.eplayerx.com"}`;
 const CRAWLER_POPULAR_PREFIX = "/crawler/popular/";
 
 type BlocksContext = Context<{ Bindings: BlocksBindings }>;
+
+interface TimedCache<T> {
+	value: T;
+	expiresAt: number;
+}
+
+let languageCache: TimedCache<string[]> | null = null;
+let approvedHomepagesCache: TimedCache<BlockCollectionRow[]> | null = null;
+
+async function cachedHotRead<T>(
+	cache: TimedCache<T> | null,
+	load: () => Promise<T>,
+	save: (entry: TimedCache<T>) => void,
+): Promise<T> {
+	const now = Date.now();
+	if (cache && cache.expiresAt > now) return cache.value;
+	const value = await load();
+	save({ value, expiresAt: now + HOT_D1_READ_CACHE_MS });
+	return value;
+}
+
+function cachedCommunityLanguages(db: D1Database): Promise<string[]> {
+	return cachedHotRead(
+		languageCache,
+		() => listCommunityLanguages(db),
+		(entry) => {
+			languageCache = entry;
+		},
+	);
+}
+
+function cachedApprovedBlockCollections(
+	db: D1Database,
+): Promise<BlockCollectionRow[]> {
+	return cachedHotRead(
+		approvedHomepagesCache,
+		() => listApprovedBlockCollections(db),
+		(entry) => {
+			approvedHomepagesCache = entry;
+		},
+	);
+}
 
 function parsePage(value: string | undefined): number {
 	const n = Number.parseInt(value || "1", 10);
@@ -381,8 +425,8 @@ app.get("/", (c) =>
 							offset,
 						)
 					: Promise.resolve([]),
-				listCommunityLanguages(db),
-				page === 1 ? listApprovedBlockCollections(db) : Promise.resolve([]),
+				cachedCommunityLanguages(db),
+				page === 1 ? cachedApprovedBlockCollections(db) : Promise.resolve([]),
 			]);
 			hasNextPage = rows.length > WEB_COMMUNITY_PAGE_SIZE;
 			community = rows.slice(0, WEB_COMMUNITY_PAGE_SIZE);
@@ -450,7 +494,7 @@ app.get("/homepages/:collectionId", (c) =>
 app.get("/homepages", (c) =>
 	publicCachedGet(c, async () => {
 		try {
-			const rows = await listApprovedBlockCollections(getDb(c));
+			const rows = await cachedApprovedBlockCollections(getDb(c));
 			const homepages = rows.map(homepageSummaryFromRow);
 			return c.json({ version: 1, homepages });
 		} catch (error) {
@@ -548,7 +592,7 @@ app.get("/community", (c) =>
 			const db = getDb(c);
 			const [rows, languages] = await Promise.all([
 				listCommunityBlocks(db, filter, limit + 1, offset),
-				offset === 0 ? listCommunityLanguages(db) : Promise.resolve([]),
+				offset === 0 ? cachedCommunityLanguages(db) : Promise.resolve([]),
 			]);
 			const visibleRows = rows.slice(0, limit);
 			const hasMore = rows.length > limit;
