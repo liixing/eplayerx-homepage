@@ -12,7 +12,7 @@ import { publishBlock } from "../../../src/blocks/publish.js";
 import { fetchTraktListItems } from "../lib/trakt.js";
 
 await publishBlock({
-	submissionId: "9897c391ab64",
+	submissionId: "12a50bd6fde3",
 	blockId: "community-imdb-popular-tv",
 	mediaType: "tv",
 	language: "zh-CN",
