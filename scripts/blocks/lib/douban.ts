@@ -100,6 +100,37 @@ export interface DoulistOptions {
 	types?: ReadonlyArray<"movie" | "tv">;
 }
 
+interface NoteEntity {
+	type_name?: string;
+	title?: string;
+	subject_type?: string;
+}
+
+interface NoteResponse {
+	abstract_entities?: NoteEntity[];
+}
+
+/** Linked subjects embedded in a Douban note, in note order (mixed movie/tv). */
+export async function fetchDoubanNoteSubjects(
+	noteId: string,
+): Promise<PublishItem[]> {
+	const res = await fetch(`${REXXAR_BASE}/note/${noteId}`, {
+		headers: HEADERS,
+	});
+	if (!res.ok) {
+		throw new Error(`Douban note API error: ${res.status}`);
+	}
+	const data = (await res.json()) as NoteResponse;
+	return (data.abstract_entities ?? [])
+		.filter((row) => row.type_name === "subject_links" && row.title)
+		.map((row) => ({
+			title: row.title!,
+			...(row.subject_type === "tv" || row.subject_type === "movie"
+				? { mediaType: row.subject_type }
+				: {}),
+		}));
+}
+
 /** Entries of a public doulist, in list order. */
 export async function fetchDoulistItems(
 	doulistId: string,
