@@ -263,6 +263,25 @@ tmdbApp.get("/movie/upcoming", async (c) => {
   return c.json(result.data);
 });
 
+tmdbApp.get("/collection/details", async (c) => {
+  const id = c.req.query("id") || "";
+  const language = c.req.query("language") || "en";
+  const result = await tmdb.GET(`/3/collection/${Number(id)}`, {
+    params: {
+      query: {
+        language,
+      },
+      path: {
+        collection_id: Number(id),
+      },
+    },
+  });
+  if (result.response.status !== 200) {
+    return c.json({ error: result.error }, 500);
+  }
+  return c.json(result.data);
+});
+
 tmdbApp.get("/tv/external_ids", async (c) => {
   const id = c.req.query("id") || "";
   const result = await tmdb.GET(`/3/tv/${Number(id)}/external_ids`, {
