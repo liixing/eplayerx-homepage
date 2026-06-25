@@ -20,6 +20,7 @@ interface DiscoverResponse {
 export interface DiscoverFilter {
 	with_networks?: number;
 	with_companies?: number;
+	sortBy?: string;
 }
 
 /** Popular titles from TMDB discover, one page by default (20 items). */
@@ -34,7 +35,7 @@ export async function fetchTmdbDiscoverItems(
 	for (let page = 1; page <= maxPages; page++) {
 		const params = new URLSearchParams({
 			language,
-			sort_by: "popularity.desc",
+			sort_by: filter.sortBy ?? "popularity.desc",
 			page: String(page),
 		});
 		if (filter.with_networks != null) {
