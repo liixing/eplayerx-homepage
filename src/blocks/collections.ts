@@ -34,6 +34,39 @@ export const MAX_COLLECTION_CHILDREN = 20;
 const MAX_LABEL_LEN = 14;
 const MAX_TITLE_LEN = 40;
 
+const VALID_COLLECTION_STYLES = new Set<CollectionStyle>([
+	"rank",
+	"banner",
+	"image",
+	"image-landscape",
+	"image-portrait",
+]);
+
+/** Default collection card style for well-known fusion bundles. */
+const TITLE_DEFAULT_STYLES: Record<string, CollectionStyle> = {
+	Directors: "image-landscape",
+	Decades: "image-landscape",
+	Awards: "image-landscape",
+};
+
+export function parseCollectionStyle(value: unknown): CollectionStyle | undefined {
+	const raw = String(value);
+	return VALID_COLLECTION_STYLES.has(raw as CollectionStyle)
+		? (raw as CollectionStyle)
+		: undefined;
+}
+
+export function defaultCollectionStyle(title: string): CollectionStyle | undefined {
+	return TITLE_DEFAULT_STYLES[title.trim()];
+}
+
+export function resolveCollectionStyle(
+	title: string,
+	style?: CollectionStyle,
+): CollectionStyle | undefined {
+	return style ?? defaultCollectionStyle(title);
+}
+
 export function absoluteSourcePath(path: string): string {
 	if (path.startsWith("http://") || path.startsWith("https://")) return path;
 	return `${PUBLIC_API_BASE}${path.startsWith("/") ? path : `/${path}`}`;
@@ -80,9 +113,7 @@ export function parseCollectionInput(
 	if (!title) return { error: "请填写合集标题" };
 
 	const mode: CollectionMode = raw?.mode === "weekday" ? "weekday" : "custom";
-	const style = ["rank", "banner", "image"].includes(String(raw?.style))
-		? (String(raw?.style) as CollectionStyle)
-		: undefined;
+	const style = parseCollectionStyle(raw?.style);
 	const rawChildren = Array.isArray(raw?.children) ? raw.children : [];
 	if (rawChildren.length < 2) return { error: "合集至少需要 2 个榜单" };
 	if (rawChildren.length > MAX_COLLECTION_CHILDREN) {
@@ -111,7 +142,10 @@ export function parseCollectionInput(
 			...(image.startsWith("https://") ? { image } : {}),
 		});
 	}
-	return { input: { title, mode, ...(style ? { style } : {}), children } };
+	const resolvedStyle = resolveCollectionStyle(title, style);
+	return {
+		input: { title, mode, ...(resolvedStyle ? { style: resolvedStyle } : {}), children },
+	};
 }
 
 export interface ResolvedCollection {

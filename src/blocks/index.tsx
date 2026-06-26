@@ -652,6 +652,8 @@ const VALID_SHARED_STYLES = new Set([
 	"rank",
 	"banner",
 	"image",
+	"image-landscape",
+	"image-portrait",
 ]);
 const SPECIAL_SHARED_PRESETS = new Set([
 	"genres-list",

@@ -154,10 +154,10 @@ body.selecting .blk .share{display:none}
 .capsule .clabel{font-size:17px;font-weight:650;white-space:nowrap}
 .capsule .cbadge{font-size:11px;color:#062a20;background:var(--grad);border-radius:999px;padding:1px 7px;font-weight:700;margin-left:-4px}
 .colprev{min-height:0}
-.col-rank,.col-banner,.col-image{flex:0 0 auto;border:1px solid rgba(255,255,255,.06);background:rgba(27,33,45,.9);color:var(--fg);font-family:inherit;cursor:pointer;transition:transform .12s,border-color .15s}
-.col-rank:hover,.col-banner:hover,.col-image:hover{border-color:#3a4456}
-.capsule:focus,.col-rank:focus,.col-banner:focus,.col-image:focus{outline:none}
-.col-rank.on,.col-banner.on,.col-image.on{border-color:rgba(22,224,212,.32);background:linear-gradient(120deg,rgba(75,224,143,.08),rgba(22,224,212,.08))}
+.col-rank,.col-banner,.col-image,.col-image-landscape,.col-image-portrait{flex:0 0 auto;border:1px solid rgba(255,255,255,.06);background:rgba(27,33,45,.9);color:var(--fg);font-family:inherit;cursor:pointer;transition:transform .12s,border-color .15s}
+.col-rank:hover,.col-banner:hover,.col-image:hover,.col-image-landscape:hover,.col-image-portrait:hover{border-color:#3a4456}
+.capsule:focus,.col-rank:focus,.col-banner:focus,.col-image:focus,.col-image-landscape:focus,.col-image-portrait:focus{outline:none}
+.col-rank.on,.col-banner.on,.col-image.on,.col-image-landscape.on,.col-image-portrait.on{border-color:rgba(22,224,212,.32);background:linear-gradient(120deg,rgba(75,224,143,.08),rgba(22,224,212,.08))}
 .col-rank{width:300px;height:264px;border-radius:26px;padding:18px;text-align:left;position:relative;overflow:hidden}
 .col-rank .rn{display:none}
 .rank-title{display:flex;align-items:center;justify-content:center;gap:8px;margin:0 0 12px;color:rgba(234,238,246,.48)}
@@ -186,6 +186,24 @@ body.selecting .blk .share{display:none}
 .col-image .logo-img .stack .s2{height:52px;left:9px;top:5px;z-index:2;filter:brightness(.55)}
 .col-image .logo-img .stack .s3{height:42px;left:18px;top:10px;z-index:1;filter:brightness(.35)}
 .col-image .bt2{display:block;padding:10px 12px;font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.col-image-landscape{width:200px;border-radius:20px;overflow:hidden;text-align:left;padding:0}
+.col-image-landscape .logo-img{aspect-ratio:16/9;width:100%;display:flex;align-items:center;justify-content:center;background:#0d1118}
+.col-image-landscape .logo-img img{width:100%;height:100%;object-fit:cover}
+.col-image-landscape .logo-img .stack{position:relative;width:72px;height:40px}
+.col-image-landscape .logo-img .stack img,.col-image-landscape .logo-img .stack .ph{position:absolute;width:52px;object-fit:cover;border-radius:6px;box-shadow:0 2px 8px rgba(0,0,0,.5);background:#222b3a;inset:auto}
+.col-image-landscape .logo-img .stack .s1{height:40px;left:0;top:0;z-index:3}
+.col-image-landscape .logo-img .stack .s2{height:34px;left:10px;top:3px;z-index:2;filter:brightness(.55)}
+.col-image-landscape .logo-img .stack .s3{height:28px;left:20px;top:6px;z-index:1;filter:brightness(.35)}
+.col-image-landscape .bt2{display:block;padding:10px 12px;font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.col-image-portrait{width:136px;border-radius:20px;overflow:hidden;text-align:left;padding:0}
+.col-image-portrait .logo-img{aspect-ratio:2/3;width:100%;display:flex;align-items:center;justify-content:center;background:#0d1118}
+.col-image-portrait .logo-img img{width:100%;height:100%;object-fit:cover}
+.col-image-portrait .logo-img .stack{position:relative;width:62px;height:62px}
+.col-image-portrait .logo-img .stack img,.col-image-portrait .logo-img .stack .ph{position:absolute;width:44px;object-fit:cover;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,.5);background:#222b3a;inset:auto}
+.col-image-portrait .logo-img .stack .s1{height:62px;left:0;top:0;z-index:3}
+.col-image-portrait .logo-img .stack .s2{height:52px;left:9px;top:5px;z-index:2;filter:brightness(.55)}
+.col-image-portrait .logo-img .stack .s3{height:42px;left:18px;top:10px;z-index:1;filter:brightness(.35)}
+.col-image-portrait .bt2{display:block;padding:10px 12px;font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 /* Collection submit panel inside the selection bar */
 .grouppanel{flex-basis:100%;border-top:1px solid var(--line);padding-top:12px;margin-top:4px}
 .grouppanel .grow{display:flex;gap:10px;align-items:center;margin-bottom:8px}
@@ -518,9 +536,19 @@ const CollectionRow = ({ b }: { b: DisplayBlock }) => {
 				<span class="bt2">{ch.label}</span>
 			</button>
 		));
-	} else if (style === "image") {
+	} else if (
+		style === "image" ||
+		style === "image-landscape" ||
+		style === "image-portrait"
+	) {
+		const imageClass =
+			style === "image-landscape"
+				? "col-image-landscape"
+				: style === "image-portrait"
+					? "col-image-portrait"
+					: "col-image";
 		cards = children.map((ch) => (
-			<button type="button" class="col-image" {...sharedAttrs(ch)}>
+			<button type="button" class={imageClass} {...sharedAttrs(ch)}>
 				<span class="logo-img">
 					{ch.image ? <img src={ch.image} alt="" loading="lazy" /> : deck}
 				</span>
@@ -666,6 +694,12 @@ export const ExplorePage = ({
 								</div>
 								<div class="chip" data-v="image">
 									图片
+								</div>
+								<div class="chip" data-v="image-landscape">
+									横图
+								</div>
+								<div class="chip" data-v="image-portrait">
+									竖图
 								</div>
 							</div>
 						</div>
@@ -1498,6 +1532,17 @@ const ADMIN_GROUP_JS = `
 const WD_LABELS=['周一','周二','周三','周四','周五','周六','周日'];
 let grpModeV='custom';
 let grpStyleV='';
+const GRP_TITLE_DEFAULT_STYLE={Directors:'image-landscape',Decades:'image-landscape',Awards:'image-landscape'};
+function applyGroupTitleDefaultStyle(){
+  const title=document.getElementById('grpTitle').value.trim();
+  const def=GRP_TITLE_DEFAULT_STYLE[title];
+  if(!def)return;
+  document.querySelectorAll('#grpStyle .chip').forEach(x=>{
+    x.classList.toggle('on',x.dataset.v===def);
+  });
+  grpStyleV=def;
+}
+document.getElementById('grpTitle').addEventListener('input',applyGroupTitleDefaultStyle);
 function buildGroupRows(){
   const rows=document.getElementById('grpRows');
   rows.innerHTML='';

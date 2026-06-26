@@ -1,11 +1,11 @@
 /**
  * Global streaming platforms & studios (TMDB discover by network/company).
- * Submission: منصات البث العالمية (53828a7124ee, ar-SA).
+ * Submission: 全球流媒体平台 (c56528fc667a, zh-CN).
  *
  * Publishes 11 hidden child snapshots (5 TV networks + 6 movie studios)
- * consumed by collection col-08c5e1d0e131. Refreshed daily (UTC+8 04:00).
+ * consumed by a banner-style collection. Refreshed weekly (UTC+8 Sun 05:00).
  *
- * Run: bun run scripts/blocks/daily/arabic-streaming-platforms.ts
+ * Run: bun run scripts/blocks/weekly/zh-streaming-platforms.ts
  */
 
 import { publishBlock } from "../../../src/blocks/publish.js";
@@ -16,8 +16,8 @@ import {
 } from "../lib/tmdb-discover.js";
 import type { MediaType } from "../../../src/blocks/types.js";
 
-const SUBMISSION_ID = "53828a7124ee";
-const LANGUAGE = "ar-SA";
+const SUBMISSION_ID = "c56528fc667a";
+const LANGUAGE = "zh-CN";
 
 interface Section {
 	blockId: string;
@@ -29,83 +29,85 @@ interface Section {
 
 const SECTIONS: Section[] = [
 	{
-		blockId: "community-ar-netflix",
-		title: "نتفليكس (Netflix)",
+		blockId: "community-zh-netflix",
+		title: "Netflix",
 		label: "Netflix",
 		mediaType: "tv",
 		discover: { with_networks: 213 },
 	},
 	{
-		blockId: "community-ar-disney",
-		title: "ديزني بلس (Disney+)",
+		blockId: "community-zh-disney",
+		title: "Disney+",
 		label: "Disney+",
 		mediaType: "tv",
 		discover: { with_networks: 2739 },
 	},
 	{
-		blockId: "community-ar-hbo",
-		title: "إتش بي أو (HBO)",
+		blockId: "community-zh-hbo",
+		title: "HBO",
 		label: "HBO",
 		mediaType: "tv",
 		discover: { with_networks: 49 },
 	},
 	{
-		blockId: "community-ar-appletv",
-		title: "آبل تي في (+Apple TV)",
+		blockId: "community-zh-appletv",
+		title: "Apple TV+",
 		label: "Apple TV+",
 		mediaType: "tv",
 		discover: { with_networks: 2552 },
 	},
 	{
-		blockId: "community-ar-amazon",
-		title: "أمازون برايم (Amazon)",
+		blockId: "community-zh-amazon",
+		title: "Amazon",
 		label: "Amazon",
 		mediaType: "tv",
 		discover: { with_networks: 1024 },
 	},
 	{
-		blockId: "community-ar-marvel",
-		title: "مارفل (Marvel)",
+		blockId: "community-zh-marvel",
+		title: "漫威 (Marvel)",
 		label: "Marvel",
 		mediaType: "movie",
 		discover: { with_companies: 420 },
 	},
 	{
-		blockId: "community-ar-warner",
-		title: "وارنر براذرز (Warner)",
+		blockId: "community-zh-warner",
+		title: "华纳 (Warner)",
 		label: "Warner",
 		mediaType: "movie",
 		discover: { with_companies: 174 },
 	},
 	{
-		blockId: "community-ar-universal",
-		title: "يونيفرسال (Universal)",
+		blockId: "community-zh-universal",
+		title: "环球 (Universal)",
 		label: "Universal",
 		mediaType: "movie",
 		discover: { with_companies: 33 },
 	},
 	{
-		blockId: "community-ar-sony",
-		title: "سوني/كولومبيا (Sony)",
+		blockId: "community-zh-sony",
+		title: "索尼 (Sony)",
 		label: "Sony",
 		mediaType: "movie",
 		discover: { with_companies: 5 },
 	},
 	{
-		blockId: "community-ar-paramount",
-		title: "باراماونت (Paramount)",
+		blockId: "community-zh-paramount",
+		title: "派拉蒙 (Paramount)",
 		label: "Paramount",
 		mediaType: "movie",
 		discover: { with_companies: 4 },
 	},
 	{
-		blockId: "community-ar-a24",
+		blockId: "community-zh-a24",
 		title: "A24",
 		label: "A24",
 		mediaType: "movie",
 		discover: { with_companies: 41077 },
 	},
 ];
+
+export { SECTIONS, SUBMISSION_ID, LANGUAGE };
 
 const token = await fetchSubmitterToken(SUBMISSION_ID);
 

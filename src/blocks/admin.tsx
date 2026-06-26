@@ -16,7 +16,9 @@ import {
 	isCollectionBlockJson,
 	makeCollectionBlock,
 	parseCollectionInput,
+	parseCollectionStyle,
 	resolveCollectionChildren,
+	resolveCollectionStyle,
 } from "./collections.js";
 import { getDb, shortId } from "./runtime.js";
 import {
@@ -44,6 +46,7 @@ import {
 	type CollectionBlock,
 	type CollectionChildSpec,
 	type CollectionMode,
+	type CollectionStyle,
 	DEFAULT_LANGUAGE,
 	type HomeBlock,
 	type MediaType,
@@ -291,7 +294,7 @@ async function publishCollection(
 		title: string;
 		category: BlockCategory;
 		mode: CollectionMode;
-		style?: "rank" | "banner" | "image";
+		style?: CollectionStyle;
 		children: CollectionChildSpec[];
 		language: string;
 		author: string | null;
@@ -313,7 +316,7 @@ async function publishCollection(
 		input.title,
 		input.mode,
 		resolved.children,
-		input.style,
+		resolveCollectionStyle(input.title, input.style),
 	);
 	await insertCommunityBlock(db, {
 		blockId: input.blockId,
@@ -349,6 +352,7 @@ app.post("/collections/create", async (c) => {
 		title: input.title,
 		category,
 		mode: input.mode,
+		style: input.style,
 		children: input.children,
 		language,
 		author: null,
@@ -441,7 +445,11 @@ app.post("/:id/approve", async (c) => {
 	// Collection submissions need no snapshot: freeze the child specs from
 	// the submission and publish under a generated blockId.
 	if (sub.preset === COLLECTION_PRESET) {
-		let spec: { mode?: CollectionMode; children?: CollectionChildSpec[] };
+		let spec: {
+			mode?: CollectionMode;
+			style?: CollectionStyle;
+			children?: CollectionChildSpec[];
+		};
 		try {
 			spec = JSON.parse(sub.source_spec);
 		} catch {
@@ -450,11 +458,13 @@ app.post("/:id/approve", async (c) => {
 		const blockId = `col-${shortId()}`;
 		const title = String(body.title ?? "").trim() || sub.title;
 		const category = pickEnum(body.category, CATEGORIES, sub.category);
+		const specStyle = parseCollectionStyle(spec.style);
 		const result = await publishCollection(db, {
 			blockId,
 			title,
 			category,
 			mode: spec.mode === "weekday" ? "weekday" : "custom",
+			style: resolveCollectionStyle(title, specStyle),
 			children: spec.children ?? [],
 			language: sub.language,
 			author: sub.author,

@@ -101,7 +101,12 @@ export const COLLECTION_PRESET = "collection-list";
 
 /** weekday: children carry weekday 1-7 and the client puts today first. */
 export type CollectionMode = "weekday" | "custom";
-export type CollectionStyle = "rank" | "banner" | "image";
+export type CollectionStyle =
+	| "rank"
+	| "banner"
+	| "image"
+	| "image-landscape"
+	| "image-portrait";
 
 /** What a builder picks per child before the collection is frozen. */
 export interface CollectionChildSpec {
