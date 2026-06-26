@@ -52,7 +52,13 @@ export async function fetchGuduoBillboardItems(
 			headers: HEADERS,
 		});
 		if (!res.ok) continue;
-		const data = (await res.json()) as GuduoBillboardResponse;
+		let data: GuduoBillboardResponse;
+		try {
+			data = (await res.json()) as GuduoBillboardResponse;
+		} catch {
+			// Guduo occasionally returns HTML/empty bodies with HTTP 200.
+			continue;
+		}
 		if (data.code != null && data.code !== 0) continue;
 		const rows = data.data ?? [];
 		if (rows.length === 0) continue;
