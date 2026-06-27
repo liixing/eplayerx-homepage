@@ -11,6 +11,19 @@ export interface FusionTraktItem {
 	imageURL?: string;
 }
 
+export interface FusionStreamingSource {
+	username: string;
+	listSlug: string;
+	listName?: string;
+	itemType: "movies" | "shows";
+}
+
+export interface FusionStreamingItem {
+	title: string;
+	imageURL?: string;
+	sources: FusionStreamingSource[];
+}
+
 export interface FusionCollectionItem {
 	name: string;
 	imageURL?: string;
@@ -41,6 +54,50 @@ interface FusionWidgetExport {
 interface FusionCollectionExport {
 	name: string;
 	backgroundImageURL?: string;
+}
+
+function traktItemType(listSlug: string, listName?: string): "movies" | "shows" {
+	const haystack = `${listSlug} ${listName ?? ""}`.toLowerCase();
+	return haystack.includes("movie") ? "movies" : "shows";
+}
+
+/** Streaming widget items — each platform may carry separate movie + show lists. */
+export async function fetchFusionStreamingItems(
+	url: string,
+): Promise<FusionStreamingItem[]> {
+	const res = await fetch(url);
+	if (!res.ok) throw new Error(`Fusion widget fetch error: ${res.status}`);
+	const data = (await res.json()) as FusionWidgetExport;
+	const items = data.widgets[0]?.dataSource?.payload?.items;
+	if (!items?.length) throw new Error("No widget items in fusion export");
+
+	const seen = new Set<string>();
+	const out: FusionStreamingItem[] = [];
+	for (const item of items) {
+		const key = fusionPlatformKey(item.title);
+		if (seen.has(key)) continue;
+		seen.add(key);
+
+		const sources: FusionStreamingSource[] = [];
+		for (const ds of item.dataSources ?? []) {
+			if (ds.kind !== "traktList") continue;
+			const { username, listSlug, listName } = ds.payload ?? {};
+			if (!username || !listSlug) {
+				throw new Error(`Missing traktList on item "${item.title}"`);
+			}
+			sources.push({
+				username,
+				listSlug,
+				listName,
+				itemType: traktItemType(listSlug, listName),
+			});
+		}
+		if (!sources.length) {
+			throw new Error(`Missing traktList on item "${item.title}"`);
+		}
+		out.push({ title: item.title, imageURL: item.imageURL, sources });
+	}
+	return out;
 }
 
 /** Items from a fusion widget JSON (each maps to one Trakt public list). */
@@ -87,4 +144,9 @@ export function fusionBlockSuffix(title: string): string {
 		.toLowerCase()
 		.replace(/[^a-z0-9]+/g, "-")
 		.replace(/^-|-$/g, "");
+}
+
+/** Normalize platform titles so "Hbomax2" dedupes against "Hbomax". */
+function fusionPlatformKey(title: string): string {
+	return fusionBlockSuffix(title.replace(/\d+$/, ""));
 }
