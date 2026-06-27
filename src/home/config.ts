@@ -1,3 +1,5 @@
+import type { TmdbListRoute } from "../blocks/types.js";
+
 type Locale = "en" | "zh" | "zh-Hant" | "ja" | "es" | "ar";
 
 type HomeTitleKey =
@@ -27,22 +29,6 @@ interface HomePagination {
   startPage: number;
 }
 
-type TmdbListRoute = {
-  type: "tmdb-list";
-  title: string;
-  params: {
-    category: "trending" | "top-rated" | "discover";
-    type: "movie" | "tv";
-    genre?: string;
-    language?: string;
-    network?: string;
-    networkName?: string;
-    originCountry?: string;
-  };
-};
-
-type TmdbListRouteParams = TmdbListRoute["params"];
-
 interface HomeBlockSource {
   id?: string;
   path?: string;
@@ -64,6 +50,8 @@ interface HomeBlock {
   };
   route?: TmdbListRoute;
 }
+
+type TmdbListRouteParams = TmdbListRoute["params"];
 
 type HomeBlockTemplate = Omit<HomeBlock, "title"> & {
   titleKey?: HomeTitleKey;

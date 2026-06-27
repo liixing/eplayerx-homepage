@@ -204,12 +204,13 @@ function previewSrcFromSource(
  * this worker (so we can cap the payload); everything else passes through.
  */
 function childPreviewSrc(
-	source: { path: string; query?: Record<string, unknown> },
+	source?: { path?: string; query?: Record<string, unknown> },
 	limit = 6,
 ): string {
+	if (!source?.path) return "";
 	const match = source.path.match(/\/blocks\/data\/([a-zA-Z0-9_-]+)$/);
 	if (match) return `/blocks/data/${match[1]}?limit=${limit}`;
-	return previewSrcFromSource(source) ?? source.path;
+	return previewSrcFromSource(source as { path: string; query?: Record<string, unknown> }) ?? source.path;
 }
 
 function presetForSharedStyle(
@@ -731,8 +732,14 @@ function sanitizeSharedBlock(raw: unknown): ImportableEntry | null {
 		}
 		const children = block.children.filter((child) => {
 			if (!child || typeof child !== "object") return false;
-			const source = (child as { source?: { path?: unknown } }).source;
-			return typeof source?.path === "string" && source.path.length > 0;
+			const c = child as {
+				source?: { path?: unknown };
+				route?: { type?: unknown };
+			};
+			const hasSource =
+				typeof c.source?.path === "string" && c.source.path.length > 0;
+			const hasRoute = c.route?.type === "tmdb-list";
+			return hasSource || hasRoute;
 		});
 		if (children.length === 0) return null;
 		block.children = children;
@@ -761,6 +768,7 @@ function importableFromCommunity(row: CommunityBlockRow): ImportableBlock {
 		} as unknown as ImportableBlock;
 	}
 	const hb = block as HomeBlock;
+	if (!hb.source?.path) return null;
 	return {
 		...hb,
 		source: { ...hb.source, path: absoluteSourcePath(hb.source.path) },

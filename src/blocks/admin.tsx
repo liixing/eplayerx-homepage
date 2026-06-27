@@ -51,6 +51,7 @@ import {
 	type HomeBlock,
 	type MediaType,
 	type SubmissionRow,
+	type TmdbListRoute,
 } from "./types.js";
 import {
 	type AdminCollectionRow,
@@ -228,6 +229,59 @@ interface RegisterHiddenBody {
 	isAnime?: boolean;
 	language?: string;
 	author?: string;
+	route?: TmdbListRoute;
+}
+
+function parseTmdbListRoute(raw: unknown): TmdbListRoute | undefined {
+	if (!raw || typeof raw !== "object") return undefined;
+	const o = raw as Record<string, unknown>;
+	if (o.type !== "tmdb-list") return undefined;
+	const title = String(o.title ?? "").trim();
+	const params = o.params as Record<string, unknown> | undefined;
+	if (!title || !params || typeof params !== "object") return undefined;
+	const category = params.category;
+	const type = params.type;
+	if (
+		category !== "trending" &&
+		category !== "top-rated" &&
+		category !== "discover"
+	) {
+		return undefined;
+	}
+	if (type !== "movie" && type !== "tv") return undefined;
+	return {
+		type: "tmdb-list",
+		title,
+		params: {
+			category,
+			type,
+			...(typeof params.genre === "string" ? { genre: params.genre } : {}),
+			...(typeof params.language === "string"
+				? { language: params.language }
+				: {}),
+			...(typeof params.network === "string"
+				? { network: params.network }
+				: {}),
+			...(typeof params.networkName === "string"
+				? { networkName: params.networkName }
+				: {}),
+			...(typeof params.originCountry === "string"
+				? { originCountry: params.originCountry }
+				: {}),
+			...(typeof params.company === "string"
+				? { company: params.company }
+				: {}),
+			...(typeof params.companyName === "string"
+				? { companyName: params.companyName }
+				: {}),
+			...(typeof params.releaseDateGte === "string"
+				? { releaseDateGte: params.releaseDateGte }
+				: {}),
+			...(typeof params.releaseDateLte === "string"
+				? { releaseDateLte: params.releaseDateLte }
+				: {}),
+		},
+	};
 }
 
 /** Register a published snapshot as a hidden, collection-only chart (no
@@ -261,6 +315,7 @@ app.post("/api/register-hidden", async (c) => {
 	const mediaType = pickEnum(body.mediaType, MEDIA_TYPES, "tv" as MediaType);
 	const preset = pickEnum(body.preset, PRESETS, "poster-list" as BlockPreset);
 	const isAnime = body.isAnime === true;
+	const route = parseTmdbListRoute(body.route);
 	const block: HomeBlock = {
 		id: blockId,
 		title,
@@ -269,6 +324,7 @@ app.post("/api/register-hidden", async (c) => {
 		showRank: body.showRank === true,
 		showOverview: body.showOverview === true,
 		source: { path: `/blocks/data/${blockId}`, itemEnvelope: "data" },
+		...(route ? { route } : {}),
 		...(isAnime ? { metadata: { isAnime: true } } : {}),
 	};
 	await insertCommunityBlock(db, {

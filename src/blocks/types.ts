@@ -79,6 +79,27 @@ export interface SnapshotBlob {
 	data: SnapshotItem[];
 }
 
+/** Client navigation target for TMDB trending / discover lists. */
+export type TmdbListRoute = {
+	type: "tmdb-list";
+	title: string;
+	params: {
+		category: "trending" | "top-rated" | "discover";
+		type: "movie" | "tv";
+		genre?: string;
+		language?: string;
+		network?: string;
+		networkName?: string;
+		originCountry?: string;
+		/** TMDB company id — discover `with_companies`. */
+		company?: string;
+		companyName?: string;
+		/** Movie release window — discover `primary_release_date.gte/lte`. */
+		releaseDateGte?: string;
+		releaseDateLte?: string;
+	};
+};
+
 /** HomeBlock shape the iOS client already understands (see home/config.ts). */
 export interface HomeBlock {
 	id: string;
@@ -87,10 +108,13 @@ export interface HomeBlock {
 	preset: BlockPreset;
 	showRank?: boolean;
 	showOverview?: boolean;
-	source: {
+	source?: {
 		path: string;
-		itemEnvelope: "data";
+		itemEnvelope?: "data" | "results" | "array";
+		query?: Record<string, string | number | boolean>;
+		pagination?: { pageParam?: string; startPage?: number };
 	};
+	route?: TmdbListRoute;
 	metadata?: { isAnime?: boolean };
 }
 
@@ -130,12 +154,15 @@ export interface CollectionChild {
 	preset: BlockPreset;
 	showRank?: boolean;
 	showOverview?: boolean;
-	source: {
+	/** Home-row preview + source-list fallback when no route. */
+	source?: {
 		path: string;
 		itemEnvelope?: string;
 		query?: Record<string, string | number | boolean>;
 		pagination?: { pageParam?: string; startPage?: number };
 	};
+	/** Drill-down navigation; when set the client opens TMDB discover/trending. */
+	route?: TmdbListRoute;
 	metadata?: { isAnime?: boolean };
 }
 

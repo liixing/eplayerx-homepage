@@ -157,6 +157,34 @@ export interface ResolvedCollection {
 	dataKey: string;
 }
 
+function freezeCollectionChild(
+	spec: CollectionChildSpec,
+	block: HomeBlock,
+): CollectionChild | null {
+	const sourcePath = block.source?.path;
+	const source = sourcePath
+		? {
+				...block.source,
+				path: absoluteSourcePath(sourcePath),
+			}
+		: undefined;
+	if (!source && !block.route) return null;
+	return {
+		id: spec.blockId,
+		label: spec.label,
+		...(spec.weekday ? { weekday: spec.weekday } : {}),
+		...(spec.image ? { image: spec.image } : {}),
+		title: block.title,
+		mediaType: block.mediaType,
+		preset: block.preset,
+		showRank: block.showRank,
+		showOverview: block.showOverview,
+		...(source ? { source } : {}),
+		...(block.route ? { route: block.route } : {}),
+		...(block.metadata ? { metadata: block.metadata } : {}),
+	};
+}
+
 /**
  * Freeze child specs into self-contained children: community charts resolve
  * from D1 (absolute `/blocks/data/...` URL), official charts from the
@@ -188,46 +216,19 @@ export async function resolveCollectionChildren(
 				continue;
 			}
 			// Nested collections are not supported.
-			if (!block.source?.path) continue;
-			children.push({
-				id: spec.blockId,
-				label: spec.label,
-				...(spec.weekday ? { weekday: spec.weekday } : {}),
-				...(spec.image ? { image: spec.image } : {}),
-				title: block.title,
-				mediaType: block.mediaType,
-				preset: block.preset,
-				showRank: block.showRank,
-				showOverview: block.showOverview,
-				source: {
-					...block.source,
-					path: absoluteSourcePath(block.source.path),
-				},
-				...(block.metadata ? { metadata: block.metadata } : {}),
-			});
+			const child = freezeCollectionChild(spec, block);
+			if (!child) continue;
+			children.push(child);
 			categories.push(row.category);
 			itemCount += row.item_count;
 			if (!dataKey) dataKey = row.data_key;
 			continue;
 		}
 		const officialBlock = official.get(spec.blockId);
-		if (officialBlock?.source?.path) {
-			children.push({
-				id: spec.blockId,
-				label: spec.label,
-				...(spec.weekday ? { weekday: spec.weekday } : {}),
-				...(spec.image ? { image: spec.image } : {}),
-				title: officialBlock.title,
-				mediaType: officialBlock.mediaType,
-				preset: officialBlock.preset,
-				showRank: officialBlock.showRank,
-				showOverview: officialBlock.showOverview,
-				source: {
-					...(officialBlock.source as CollectionChild["source"]),
-					path: absoluteSourcePath(officialBlock.source.path),
-				},
-				...(officialBlock.metadata ? { metadata: officialBlock.metadata } : {}),
-			});
+		if (officialBlock) {
+			const child = freezeCollectionChild(spec, officialBlock as HomeBlock);
+			if (!child) continue;
+			children.push(child);
 			categories.push(officialBlockCategory(officialBlock));
 		}
 	}
