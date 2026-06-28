@@ -265,6 +265,12 @@ function parseTmdbListRoute(raw: unknown): TmdbListRoute | undefined {
 			...(typeof params.networkName === "string"
 				? { networkName: params.networkName }
 				: {}),
+			...(typeof params.watchProvider === "string"
+				? { watchProvider: params.watchProvider }
+				: {}),
+			...(typeof params.watchRegion === "string"
+				? { watchRegion: params.watchRegion }
+				: {}),
 			...(typeof params.originCountry === "string"
 				? { originCountry: params.originCountry }
 				: {}),

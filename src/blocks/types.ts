@@ -90,6 +90,9 @@ export type TmdbListRoute = {
 		language?: string;
 		network?: string;
 		networkName?: string;
+		/** TMDB watch provider id(s) — discover `with_watch_providers`. */
+		watchProvider?: string;
+		watchRegion?: string;
 		originCountry?: string;
 		/** TMDB company id — discover `with_companies`. */
 		company?: string;

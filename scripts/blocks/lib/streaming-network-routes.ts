@@ -1,20 +1,31 @@
 import type { TmdbListRoute } from "../../../src/blocks/types.js";
 
-/** TMDB network ids for fusion streaming platform block suffixes. */
-export const STREAMING_NETWORK_ROUTES: Record<
-	string,
-	{ networkId: number; networkName: string }
-> = {
-	netflix: { networkId: 213, networkName: "Netflix" },
-	disney: { networkId: 2739, networkName: "Disney+" },
-	hbomax: { networkId: 8304, networkName: "HBO Max" },
-	appletv: { networkId: 2552, networkName: "Apple TV+" },
-	primevideo: { networkId: 1024, networkName: "Prime Video" },
-	hulu: { networkId: 453, networkName: "Hulu" },
-	paramount: { networkId: 4330, networkName: "Paramount+" },
-	peacock: { networkId: 3353, networkName: "Peacock" },
-	crunchyroll: { networkId: 9085, networkName: "Crunchyroll" },
-	discoveryplus: { networkId: 4353, networkName: "Discovery+" },
+/** Per-platform TMDB discover filters for fusion streaming widgets. */
+export interface StreamingRouteSpec {
+	networkName: string;
+	/** TMDB `with_networks` — pipe (`|`) for OR, e.g. HBO Max + HBO. */
+	network?: string;
+	/** TMDB `with_watch_providers` — requires `watchRegion`. */
+	watchProvider?: string;
+	watchRegion?: string;
+}
+
+export const STREAMING_NETWORK_ROUTES: Record<string, StreamingRouteSpec> = {
+	netflix: { networkName: "Netflix", network: "213" },
+	disney: { networkName: "Disney+", network: "2739" },
+	hbomax: { networkName: "HBO Max", network: "8304|49" },
+	appletv: { networkName: "Apple TV+", network: "2552" },
+	primevideo: { networkName: "Prime Video", network: "1024" },
+	hulu: { networkName: "Hulu", network: "453" },
+	paramount: { networkName: "Paramount+", network: "4330" },
+	peacock: { networkName: "Peacock", network: "3353" },
+	// Crunchyroll has no usable TMDB network id; use US watch providers instead.
+	crunchyroll: {
+		networkName: "Crunchyroll",
+		watchProvider: "283|1968",
+		watchRegion: "US",
+	},
+	discoveryplus: { networkName: "Discovery+", network: "4353" },
 };
 
 export function fusionStreamingBlockSuffix(blockId: string): string | null {
@@ -22,9 +33,12 @@ export function fusionStreamingBlockSuffix(blockId: string): string | null {
 	return m?.[1] ?? null;
 }
 
-export function tmdbNetworkDiscoverRoute(
+export function tmdbStreamingDiscoverRoute(
 	networkName: string,
-	networkId: number,
+	spec: Pick<
+		StreamingRouteSpec,
+		"network" | "watchProvider" | "watchRegion"
+	>,
 ): TmdbListRoute {
 	return {
 		type: "tmdb-list",
@@ -32,8 +46,14 @@ export function tmdbNetworkDiscoverRoute(
 		params: {
 			category: "discover",
 			type: "tv",
-			network: String(networkId),
-			networkName,
+			...(spec.network ? { network: spec.network, networkName } : {}),
+			...(spec.watchProvider
+				? {
+						watchProvider: spec.watchProvider,
+						watchRegion: spec.watchRegion ?? "US",
+						networkName,
+					}
+				: {}),
 		},
 	};
 }
@@ -46,5 +66,16 @@ export function routeForFusionStreamingBlock(
 	if (!suffix) return undefined;
 	const entry = STREAMING_NETWORK_ROUTES[suffix];
 	if (!entry) return undefined;
-	return tmdbNetworkDiscoverRoute(label ?? entry.networkName, entry.networkId);
+	const name = label ?? entry.networkName;
+	return tmdbStreamingDiscoverRoute(name, entry);
+}
+
+/** @deprecated use tmdbStreamingDiscoverRoute */
+export function tmdbNetworkDiscoverRoute(
+	networkName: string,
+	networkId: number | string,
+): TmdbListRoute {
+	return tmdbStreamingDiscoverRoute(networkName, {
+		network: String(networkId),
+	});
 }
