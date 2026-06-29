@@ -4,6 +4,7 @@ import {
 } from "../../../src/blocks/publish.js";
 import {
 	fetchFusionStreamingItems,
+	fetchFusionTraktCollectionEntries,
 	fetchFusionWidgetItems,
 	type FusionStreamingItem,
 	fusionBlockSuffix,
@@ -81,6 +82,45 @@ export async function publishFusionStreamingBlocks(opts: {
 				blockId,
 				label: item.title,
 				...(item.imageURL ? { image: item.imageURL } : {}),
+			});
+		} catch (error) {
+			failed = true;
+			console.error(`✗ ${blockId} failed:`, error);
+		}
+	}
+	if (failed) process.exit(1);
+	return children;
+}
+
+/** Publish hidden child snapshots from a fusion `collections.json` export. */
+export async function publishFusionTraktCollectionBlocks(opts: {
+	submissionId: string;
+	language: string;
+	blockIdPrefix: string;
+	sourceUrl: string;
+	limit?: number;
+}): Promise<Array<{ blockId: string; label: string; image?: string }>> {
+	const entries = await fetchFusionTraktCollectionEntries(opts.sourceUrl);
+	const slice = opts.limit ? entries.slice(0, opts.limit) : entries;
+	const children: Array<{ blockId: string; label: string; image?: string }> =
+		[];
+	let failed = false;
+	for (const entry of slice) {
+		const blockId = `${opts.blockIdPrefix}-${fusionBlockSuffix(entry.name)}`;
+		try {
+			await publishBlock({
+				submissionId: opts.submissionId,
+				blockId,
+				mediaType: "movie",
+				language: opts.language,
+				useTmdbTitle: true,
+				fetchItems: () =>
+					fetchTraktListItems(entry.username, entry.listSlug, "movies"),
+			});
+			children.push({
+				blockId,
+				label: entry.name,
+				...(entry.imageURL ? { image: entry.imageURL } : {}),
 			});
 		} catch (error) {
 			failed = true;

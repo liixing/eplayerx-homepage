@@ -29,6 +29,14 @@ export interface FusionCollectionItem {
 	imageURL?: string;
 }
 
+/** Trakt-backed franchise entry from a fusion `collections.json` export. */
+export interface FusionTraktCollectionEntry {
+	name: string;
+	username: string;
+	listSlug: string;
+	imageURL?: string;
+}
+
 interface FusionTraktPayload {
 	listName?: string;
 	listSlug: string;
@@ -54,7 +62,19 @@ interface FusionWidgetExport {
 interface FusionCollectionExport {
 	name: string;
 	backgroundImageURL?: string;
+	dataSource?: { kind: string; payload?: FusionTraktPayload & Record<string, unknown> };
 }
+
+/** Broken tmdbDiscover rows in some exports — map to official Trakt lists. */
+const TMDB_DISCOVER_FALLBACKS: Record<
+	string,
+	{ username: string; listSlug: string }
+> = {
+	"The Chronicles of Riddick": {
+		username: "Trakt",
+		listSlug: "the-chronicles-of-riddick-collection",
+	},
+};
 
 function traktItemType(listSlug: string, listName?: string): "movies" | "shows" {
 	const haystack = `${listSlug} ${listName ?? ""}`.toLowerCase();
@@ -128,14 +148,56 @@ export async function fetchFusionWidgetItems(
 export async function fetchFusionCollectionItems(
 	url: string,
 ): Promise<FusionCollectionItem[]> {
-	const res = await fetch(url);
-	if (!res.ok) throw new Error(`Fusion collection fetch error: ${res.status}`);
-	const entries = (await res.json()) as FusionCollectionExport[];
-	if (!entries.length) throw new Error("Empty fusion collection export");
+	const entries = await fetchFusionCollectionExport(url);
 	return entries.map((e) => ({
 		name: e.name,
 		imageURL: e.backgroundImageURL,
 	}));
+}
+
+/** Trakt list refs from a fusion `collections.json` (one franchise per row). */
+export async function fetchFusionTraktCollectionEntries(
+	url: string,
+): Promise<FusionTraktCollectionEntry[]> {
+	const entries = await fetchFusionCollectionExport(url);
+	return entries.map((entry) => {
+		const ds = entry.dataSource;
+		if (ds?.kind === "traktList") {
+			const { username, listSlug } = ds.payload ?? {};
+			if (!username || !listSlug) {
+				throw new Error(`Missing traktList payload on "${entry.name}"`);
+			}
+			return {
+				name: entry.name,
+				username,
+				listSlug,
+				imageURL: entry.backgroundImageURL,
+			};
+		}
+		if (ds?.kind === "tmdbDiscover") {
+			const fallback = TMDB_DISCOVER_FALLBACKS[entry.name];
+			if (!fallback) {
+				throw new Error(`Unsupported tmdbDiscover entry "${entry.name}"`);
+			}
+			return {
+				name: entry.name,
+				username: fallback.username,
+				listSlug: fallback.listSlug,
+				imageURL: entry.backgroundImageURL,
+			};
+		}
+		throw new Error(`Unsupported dataSource on "${entry.name}"`);
+	});
+}
+
+async function fetchFusionCollectionExport(
+	url: string,
+): Promise<FusionCollectionExport[]> {
+	const res = await fetch(url);
+	if (!res.ok) throw new Error(`Fusion collection fetch error: ${res.status}`);
+	const entries = (await res.json()) as FusionCollectionExport[];
+	if (!entries.length) throw new Error("Empty fusion collection export");
+	return entries;
 }
 
 /** Stable block id suffix from a fusion item title (e.g. "1960s", "Bafta"). */

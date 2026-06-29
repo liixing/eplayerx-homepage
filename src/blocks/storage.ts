@@ -457,14 +457,22 @@ export async function getCommunityBlocksByIds(
 	blockIds: string[],
 ): Promise<Map<string, CommunityBlockRow>> {
 	if (blockIds.length === 0) return new Map();
-	const placeholders = blockIds.map(() => "?").join(", ");
-	const result = await db
-		.prepare(
-			`SELECT * FROM community_blocks WHERE block_id IN (${placeholders})`,
-		)
-		.bind(...blockIds)
-		.all<CommunityBlockRow>();
-	return new Map((result.results ?? []).map((row) => [row.block_id, row]));
+	const out = new Map<string, CommunityBlockRow>();
+	const BATCH = 100;
+	for (let i = 0; i < blockIds.length; i += BATCH) {
+		const batch = blockIds.slice(i, i + BATCH);
+		const placeholders = batch.map(() => "?").join(", ");
+		const result = await db
+			.prepare(
+				`SELECT * FROM community_blocks WHERE block_id IN (${placeholders})`,
+			)
+			.bind(...batch)
+			.all<CommunityBlockRow>();
+		for (const row of result.results ?? []) {
+			out.set(row.block_id, row);
+		}
+	}
+	return out;
 }
 
 // MARK: - Block collections
