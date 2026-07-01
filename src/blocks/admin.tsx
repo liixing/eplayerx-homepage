@@ -13,6 +13,7 @@
 import { type Context, Hono } from "hono";
 import { getCookie, setCookie } from "hono/cookie";
 import {
+	buildCollectionPreviewChildren,
 	isCollectionBlockJson,
 	makeCollectionBlock,
 	parseCollectionInput,
@@ -34,6 +35,7 @@ import {
 	markRejected,
 	publicAssetUrl,
 	publicKey,
+	putCollectionPreviewBlob,
 	updateCommunityBlockItemCount,
 	updateCommunityBlockJson,
 	upsertBlockSnapshot,
@@ -380,12 +382,17 @@ async function publishCollection(
 		resolved.children,
 		resolveCollectionStyle(input.title, input.style),
 	);
+	const previewChildren = await buildCollectionPreviewChildren(resolved.children);
+	if (Object.keys(previewChildren).length < 2) {
+		return { ok: false, error: "可用的子榜单不足 2 个（可能已被删除）。" };
+	}
+	await putCollectionPreviewBlob(input.blockId, previewChildren, input.title);
 	await insertCommunityBlock(db, {
 		blockId: input.blockId,
 		category: input.category,
 		title: input.title,
 		blockJson: JSON.stringify(block),
-		dataKey: resolved.dataKey,
+		dataKey: publicKey(input.blockId),
 		itemCount: resolved.itemCount,
 		author: input.author,
 		language: input.language,

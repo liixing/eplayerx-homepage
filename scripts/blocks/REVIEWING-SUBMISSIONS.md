@@ -129,15 +129,27 @@ curl -s -X POST "https://api.eplayerx.com/admin/<投稿ID>/approve" \
 - 必须先跑完第 3 步：approve 会校验 D1 `block_snapshots` 里有该 blockId 的发布记录。
 - 驳回用 `POST /admin/<投稿ID>/reject`，body 可带 `{"reason":"..."}`。
 
-## 4.5 周更表合集（一个投稿 → 7 个隐藏 block + 1 个合集）
+## 4.5 周更表 / 多 block 合集
 
-巴哈姆特周更表 / MyAnimeList周更表 这类「按星期」合集，子榜单不在社区库单独
-显示，只露出合集本身。流程：
+巴哈姆特周更表 / MyAnimeList周更表 / Fusion 系列合集 这类「多个隐藏子榜单 +
+一个合集 block」的流程：
 
-1. 脚本发布 7 个快照（blockId 如 `community-<源>-monday`..`-sunday`，
-   submissionId 共用同一个投稿即可，见 `weekly/mal-weekdays.ts`）。
-2. 用 `POST /admin/api/register-hidden` 把每个子榜单注册为隐藏 block
-   （Bearer 密码或 admin cookie 均可）：
+### 顺序（必须按此来）
+
+1. **先发布每个子榜单快照** — 跑 publish 脚本（如 `weekly/mal-weekdays.ts`、
+   `manual/zh-fusion-collections.ts`）。每个 blockId 必须出现在 D1
+   `block_snapshots` 且 R2 有 `blocks/public/<blockId>.json`。
+2. **再 register + create 合集** — 用 `register-*-collections.ts` 或手动：
+   - `POST /admin/api/register-hidden` 逐个注册（无快照会报错/跳过）
+   - **只有快照已存在的子 block 才能进合集**；缺数据时应先补 publish，不要硬建合集
+   - `POST /admin/collections/create` 创建合集（worker 会写入合并预览 blob）
+   - register 脚本末尾会 `warmCollectionPreviewR2` 直写 R2，避免线上 lazy-build
+3. **投稿标记**（如有）— SQL 更新 `submissions.status='approved'`
+
+`warm-collection-previews.ts` 仅用于**历史合集一次性补预热**或子榜单大规模
+刷新后 `--force` 重建；新合集不必再跑。
+
+### 手动 register-hidden 示例
 
 ```bash
 curl -s -X POST "https://api.eplayerx.com/admin/api/register-hidden" \
@@ -146,8 +158,8 @@ curl -s -X POST "https://api.eplayerx.com/admin/api/register-hidden" \
        "mediaType":"tv","preset":"poster-list","isAnime":true,"language":"zh-CN"}'
 ```
 
-3. 用 `POST /admin/collections/create`（cookie 认证）创建按星期合集，
-   children 填 7 个子 blockId + 周一..周日 label + weekday 1-7。
+3. 用 `POST /admin/collections/create`（cookie 认证）创建合集，
+   children 只填**已有快照**的子 blockId（周更表再加 weekday 1-7 + 周一..周日 label）。
 4. 投稿没有直接对应的 approve blockId，用 SQL 标记通过即可：
 
 ```bash

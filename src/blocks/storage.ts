@@ -14,6 +14,7 @@ import {
 import type {
 	BlockCategory,
 	BlockCollectionRow,
+	CollectionPreviewBlob,
 	CommunityBlockRow,
 	MediaType,
 	SnapshotBlob,
@@ -70,6 +71,18 @@ function makeBlob(items: SnapshotItem[], title?: string): SnapshotBlob {
 	};
 }
 
+export function isCollectionPreviewBlob(
+	raw: unknown,
+): raw is CollectionPreviewBlob {
+	return (
+		typeof raw === "object" &&
+		raw !== null &&
+		(raw as { type?: string }).type === "collection_preview" &&
+		typeof (raw as { children?: unknown }).children === "object" &&
+		(raw as { children?: unknown }).children !== null
+	);
+}
+
 export async function putSnapshot(
 	key: string,
 	items: SnapshotItem[],
@@ -83,6 +96,32 @@ export async function putSnapshot(
 			Bucket: R2_BUCKET_NAME,
 			Key: key,
 			Body: JSON.stringify(makeBlob(items, title)),
+			ContentType: "application/json",
+		}),
+	);
+}
+
+/** Write a pre-merged collection preview (one R2 read serves the whole home row). */
+export async function putCollectionPreviewBlob(
+	collectionBlockId: string,
+	children: CollectionPreviewBlob["children"],
+	title?: string,
+): Promise<void> {
+	if (!R2_BUCKET_NAME) {
+		throw new Error("R2_BUCKET_NAME is not configured");
+	}
+	const blob: CollectionPreviewBlob = {
+		type: "collection_preview",
+		count: Object.keys(children).length,
+		lastUpdated: new Date().toISOString(),
+		...(title ? { title } : {}),
+		children,
+	};
+	await r2().send(
+		new PutObjectCommand({
+			Bucket: R2_BUCKET_NAME,
+			Key: publicKey(collectionBlockId),
+			Body: JSON.stringify(blob),
 			ContentType: "application/json",
 		}),
 	);

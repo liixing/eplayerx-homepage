@@ -79,6 +79,21 @@ export interface SnapshotBlob {
 	data: SnapshotItem[];
 }
 
+/** Per-child preview slice inside a collection snapshot. */
+export interface CollectionPreviewChildBlob {
+	title?: string;
+	data: SnapshotItem[];
+}
+
+/** One R2 object for an entire collection home row (all child previews). */
+export interface CollectionPreviewBlob {
+	type: "collection_preview";
+	count: number;
+	lastUpdated: string;
+	title?: string;
+	children: Record<string, CollectionPreviewChildBlob>;
+}
+
 /** Client navigation target for TMDB trending / discover lists. */
 export type TmdbListRoute = {
 	type: "tmdb-list";

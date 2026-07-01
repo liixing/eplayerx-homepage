@@ -6,7 +6,13 @@
  */
 
 import { createDefaultHomeConfig } from "../home/config.js";
-import { getCommunityBlocksByIds } from "./storage.js";
+import {
+	getCommunityBlock,
+	getCommunityBlocksByIds,
+	getSnapshot,
+	publicKey,
+	putCollectionPreviewBlob,
+} from "./storage.js";
 import {
 	type BlockCategory,
 	type BlockPreset,
@@ -15,6 +21,7 @@ import {
 	type CollectionChild,
 	type CollectionChildSpec,
 	type CollectionMode,
+	type CollectionPreviewBlob,
 	type CollectionStyle,
 	type HomeBlock,
 } from "./types.js";
@@ -23,6 +30,11 @@ export const PUBLIC_API_BASE =
 	process.env.PUBLIC_API_BASE_URL || "https://api.eplayerx.com";
 export const IMAGE_BASE =
 	process.env.TMDB_IMAGE_BASE_URL || "https://image.tmdb.org/t/p";
+
+/** Posters per child baked into the collection preview snapshot. */
+export const COLLECTION_PREVIEW_LIMIT = 6;
+
+const PREVIEW_BUILD_CONCURRENCY = 20;
 
 const MEDIA_LIST_PRESETS = new Set<BlockPreset>([
 	"thumb-list",
@@ -65,6 +77,73 @@ export function resolveCollectionStyle(
 	style?: CollectionStyle,
 ): CollectionStyle | undefined {
 	return style ?? defaultCollectionStyle(title);
+}
+
+/** Extract a community snapshot id from a frozen `/blocks/data/:id` path. */
+export function communityBlockIdFromDataPath(path: string): string | null {
+	const match = path.match(/\/blocks\/data\/([a-zA-Z0-9_-]+)/);
+	return match?.[1] ?? null;
+}
+
+/** Build per-child preview slices from existing child snapshots in R2. */
+export async function buildCollectionPreviewChildren(
+	frozenChildren: CollectionChild[],
+	previewLimit = COLLECTION_PREVIEW_LIMIT,
+): Promise<CollectionPreviewBlob["children"]> {
+	const children: CollectionPreviewBlob["children"] = {};
+	for (let i = 0; i < frozenChildren.length; i += PREVIEW_BUILD_CONCURRENCY) {
+		const chunk = frozenChildren.slice(i, i + PREVIEW_BUILD_CONCURRENCY);
+		await Promise.all(
+			chunk.map(async (child) => {
+				const snapshotId = communityBlockIdFromDataPath(
+					child.source?.path ?? "",
+				);
+				if (!snapshotId) return;
+				try {
+					const blob = await getSnapshot(publicKey(snapshotId));
+					children[child.id] = {
+						...(blob.title ? { title: blob.title } : {}),
+						data: (blob.data ?? []).slice(0, previewLimit),
+					};
+				} catch {
+					// child snapshot missing — skip
+				}
+			}),
+		);
+	}
+	return children;
+}
+
+/** Publish or backfill the single merged preview blob for a collection block. */
+export async function ensureCollectionPreviewBlob(
+	db: D1Database,
+	collectionBlockId: string,
+): Promise<CollectionPreviewBlob | null> {
+	const row = await getCommunityBlock(db, collectionBlockId);
+	if (!row) return null;
+	let block: CollectionBlock;
+	try {
+		block = JSON.parse(row.block_json) as CollectionBlock;
+	} catch {
+		return null;
+	}
+	if (block.preset !== COLLECTION_PRESET || block.children.length < 2) {
+		return null;
+	}
+	const previewChildren = await buildCollectionPreviewChildren(block.children);
+	if (Object.keys(previewChildren).length < 2) return null;
+	await putCollectionPreviewBlob(
+		collectionBlockId,
+		previewChildren,
+		block.title,
+	);
+	return {
+		type: "collection_preview",
+		count: Object.keys(previewChildren).length,
+		lastUpdated: new Date().toISOString(),
+		title: block.title,
+		children: previewChildren,
+	};
 }
 
 export function absoluteSourcePath(path: string): string {

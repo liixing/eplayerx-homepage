@@ -13,6 +13,8 @@ import { createDefaultHomeConfig } from "../home/config.js";
 import { isAdmin } from "./admin.js";
 import {
 	absoluteSourcePath,
+	buildCollectionPreviewChildren,
+	ensureCollectionPreviewBlob,
 	IMAGE_BASE,
 	officialHomeBlocksById,
 	PUBLIC_API_BASE,
@@ -31,6 +33,7 @@ import {
 	listCommunityBlocks,
 	listCommunityLanguages,
 	publicDataUrl,
+	isCollectionPreviewBlob,
 } from "./storage.js";
 import {
 	type BlockCategory,
@@ -48,6 +51,7 @@ import {
 	type ImportableEntry,
 	type MediaType,
 	type SnapshotBlob,
+	type CollectionPreviewBlob,
 	TMDB_LANGUAGES,
 } from "./types.js";
 import {
@@ -622,7 +626,18 @@ app.get("/data/:blockId", (c) =>
 	publicCachedGet(c, async () => {
 		const blockId = c.req.param("blockId").replace(/[^a-zA-Z0-9_-]/g, "");
 		const limit = Number.parseInt(c.req.query("limit") || "", 10);
-		const response = await fetch(publicDataUrl(blockId));
+		let response = await fetch(publicDataUrl(blockId));
+		// Legacy collections never wrote a merged preview — build once on first read.
+		if (response.status === 404) {
+			try {
+				const preview = await ensureCollectionPreviewBlob(getDb(c), blockId);
+				if (preview) {
+					return c.json(preview);
+				}
+			} catch {
+				// fall through to 404
+			}
+		}
 		// Without a limit (the iOS client) stream the snapshot through untouched;
 		// the blob carries the block's display title since publish time.
 		if (!response.ok || !Number.isFinite(limit) || limit <= 0) {
@@ -634,7 +649,10 @@ app.get("/data/:blockId", (c) =>
 				},
 			});
 		}
-		const blob = (await response.json()) as SnapshotBlob;
+		const blob = (await response.json()) as SnapshotBlob | CollectionPreviewBlob;
+		if (isCollectionPreviewBlob(blob)) {
+			return c.json(blob);
+		}
 		const data = (blob.data ?? []).slice(0, limit);
 		return c.json({ ...blob, count: data.length, data });
 	}),
