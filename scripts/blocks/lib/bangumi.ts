@@ -119,3 +119,55 @@ export async function fetchBangumiTodayCalendar(
 	const weekdayId = now.getDay() === 0 ? 7 : now.getDay();
 	return fetchBangumiCalendarDay(weekdayId, knownIds);
 }
+
+const TAG_PAGE_UA =
+	"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125 Safari/537.36";
+
+/** Anime tagged on Bangumi, sorted by rank (HTML list + v0 subject lookup). */
+export async function fetchBangumiTaggedAnime(
+	tag: string,
+	max = 100,
+	knownIds: KnownIds = {},
+): Promise<PublishItem[]> {
+	const items: PublishItem[] = [];
+	const seen = new Set<string>();
+
+	for (let page = 1; items.length < max; page++) {
+		const url =
+			page === 1
+				? `https://bangumi.tv/anime/tag/${encodeURIComponent(tag)}/?sort=rank`
+				: `https://bangumi.tv/anime/tag/${encodeURIComponent(tag)}/?sort=rank&page=${page}`;
+		const res = await fetch(url, { headers: { "User-Agent": TAG_PAGE_UA } });
+		if (!res.ok) {
+			throw new Error(`Bangumi tag page error: ${res.status}`);
+		}
+		const html = await res.text();
+
+		const pageIds: string[] = [];
+		for (const match of html.matchAll(/\/subject\/(\d+)/g)) {
+			const sid = match[1];
+			if (!seen.has(sid)) {
+				seen.add(sid);
+				pageIds.push(sid);
+			}
+		}
+		if (pageIds.length === 0) break;
+
+		for (const sid of pageIds) {
+			if (items.length >= max) break;
+			const subjectRes = await fetch(`${API_BASE}/v0/subjects/${sid}`, {
+				headers: HEADERS,
+			});
+			if (!subjectRes.ok) continue;
+			const subject = (await subjectRes.json()) as BgmSubject;
+			if (!SERIES_PLATFORMS.has(subject.platform ?? "")) continue;
+			const item = toPublishItem(subject, knownIds);
+			if (item) items.push(item);
+			await delay(PAGE_DELAY_MS);
+		}
+
+		if (!html.includes(`page=${page + 1}`)) break;
+		await delay(PAGE_DELAY_MS);
+	}
+	return items;
+}
