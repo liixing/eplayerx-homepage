@@ -2,7 +2,7 @@
  * Trakt trending shows via snoak's mirror list (mdblist.com/lists/snoak/trakt-s-trending-shows).
  * Submission: Trakt Trending Shows (zh-CN, tv, poster-list) by @Nacho.
  *
- * Run: bun run scripts/blocks/weekly/trakt-trending-shows.ts
+ * Run: bun run scripts/blocks/daily/trakt-trending-shows.ts
  */
 
 import { publishBlock } from "../../../src/blocks/publish.js";

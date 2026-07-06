@@ -4,7 +4,7 @@
  *
  * List items carry TMDB ids; default order is added-desc (newest first).
  *
- * Run: bun run scripts/blocks/weekly/trakt-latest-4k.ts
+ * Run: bun run scripts/blocks/daily/trakt-latest-4k.ts
  */
 
 import { publishBlock } from "../../../src/blocks/publish.js";

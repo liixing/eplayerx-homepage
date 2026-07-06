@@ -2,7 +2,7 @@
  * Trakt trending movies via snoak's mirror list (mdblist.com/lists/snoak/trending-movies).
  * Submission: Trakt Trending Movies (zh-CN, movie, poster-list) by @Nacho.
  *
- * Run: bun run scripts/blocks/weekly/trakt-trending-movies.ts
+ * Run: bun run scripts/blocks/daily/trakt-trending-movies.ts
  */
 
 import { publishBlock } from "../../../src/blocks/publish.js";

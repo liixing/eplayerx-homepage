@@ -105,6 +105,10 @@ body.selecting .blk .pick{display:inline-flex}
 .blk.sel .pick::before{content:"✓"}
 body.selecting .blk{cursor:pointer}
 body.selecting .blk.sel .blk-head .bt{color:var(--acc)}
+body.pack-pick .blk{margin-bottom:14px}
+body.pack-pick .blk.sel .blk-head .pick{box-shadow:0 0 0 3px rgba(22,224,212,.25)}
+body.pack-pick .hp-card,body.pack-pick .pager{display:none!important}
+body.pack-pick .selbar{display:none!important}
 .selbar{position:fixed;left:0;right:0;bottom:0;z-index:20;background:rgba(8,10,15,.88);backdrop-filter:blur(14px);border-top:1px solid var(--line);padding:14px 20px calc(14px + env(safe-area-inset-bottom))}
 .selbar .inner{max-width:900px;margin:0 auto;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
 .selbar input{flex:1;min-width:160px;width:auto}
@@ -112,10 +116,87 @@ body.selecting .blk.sel .blk-head .bt{color:var(--acc)}
 .selbar .msg{flex-basis:100%;margin:0}
 .colresult{flex-basis:100%;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
 .colresult .srcbox{flex:1;min-width:200px;margin-top:0}
-body.selecting{padding-bottom:90px}
+body.selecting:not(.pack-pick){padding-bottom:90px}
 .blk .share{flex:0 0 auto;background:none;border:1px solid var(--line);color:var(--mut);border-radius:999px;padding:3px 10px;font-size:12px;cursor:pointer}
 .blk .share:hover{color:var(--fg);border-color:var(--mut)}
 body.selecting .blk .share{display:none}
+/* Homepage pack builder */
+.pack-steps{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 8px}
+.pack-steps .step{font-size:12px;color:var(--mut);padding:5px 12px;border:1px solid var(--line);border-radius:999px;transition:all .18s}
+.pack-steps .step.on{color:#062a20;border-color:transparent;background:var(--grad);font-weight:600;box-shadow:0 4px 14px -6px rgba(22,224,212,.45)}
+.pack-pick-head{display:none;position:fixed;top:0;left:0;right:0;z-index:50;flex-direction:column;background:rgba(8,10,15,.96);backdrop-filter:blur(16px);border-bottom:1px solid var(--line)}
+body.pack-pick.pack-fullscreen .pack-pick-head{display:flex}
+body.pack-pick.pack-fullscreen .nav,body.pack-pick.pack-fullscreen .wrap>h1,body.pack-pick.pack-fullscreen .wrap>.sub{display:none!important}
+body.pack-pick.pack-fullscreen{overflow:hidden}
+body.pack-pick.pack-fullscreen .wrap{position:fixed;top:var(--pick-chrome-h,118px);left:0;right:0;bottom:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:0 20px 32px;max-width:none;z-index:40}
+body.pack-pick.pack-fullscreen .pack-pick-head .filters{position:relative;top:auto;margin:0;padding:10px 16px 12px;border-bottom:none;background:transparent;animation:none}
+body.pack-pick.pack-fullscreen .pack-pick-head .filters .mkbtn{display:none}
+body.pack-pick.pack-fullscreen #packSelectedBar{display:flex!important;position:fixed;left:0;right:0;bottom:0;z-index:45;margin:0;border-radius:18px 18px 0 0;border-left:none;border-right:none;border-bottom:none;padding:14px 16px calc(14px + env(safe-area-inset-bottom));background:rgba(8,10,15,.94);backdrop-filter:blur(16px);box-shadow:0 -12px 40px -20px rgba(0,0,0,.8);max-height:38vh;overflow-y:auto}
+body.pack-pick.pack-fullscreen #packSelectedBar.hide~*,body.pack-pick.pack-fullscreen .wrap:has(#packSelectedBar.hide){padding-bottom:32px}
+body.pack-pick.pack-fullscreen .wrap:has(#packSelectedBar:not(.hide)){padding-bottom:calc(120px + env(safe-area-inset-bottom))}
+.pp-toolbar{display:flex;align-items:center;gap:10px;padding:8px 16px calc(8px + env(safe-area-inset-top));border-bottom:1px solid var(--line)}
+.pack-pick-head .pp-mid{flex:1;min-width:0;text-align:center}
+.pack-pick-head .pack-steps{justify-content:center;margin:0 0 4px}
+.pack-pick-head .pp-sub{font-size:12px;color:var(--mut);margin:0;line-height:1.35}
+#packPreviewList{display:flex;flex-direction:column;gap:14px;padding:4px 0 20px}
+#packPreviewList .pack-slot{margin:0!important}
+#packPreviewList .blk{margin-bottom:0}
+#packPreviewList .blk .pick,#packPreviewList .blk .share{display:none!important}
+#packPreviewList.pack-sorting .pack-slot{transition:transform .28s cubic-bezier(.25,1,.5,1),box-shadow .22s,border-color .22s}
+.pack-sort-ghost{opacity:.45!important;background:rgba(22,224,212,.06)!important;border:2px dashed rgba(22,224,212,.35)!important;box-shadow:none!important;transform:none!important}
+.pack-sort-ghost *{visibility:hidden}
+.pack-sort-chosen{box-shadow:0 16px 40px -14px rgba(0,0,0,.65);border-color:rgba(22,224,212,.45)!important;cursor:grabbing!important}
+.pack-sort-drag{opacity:.98;transform:scale(1.015);box-shadow:0 24px 56px -18px rgba(0,0,0,.82);border-color:rgba(22,224,212,.55)!important;z-index:8}
+#packSelectedBar{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-start;margin:0 0 16px;padding:12px 14px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.02)}
+#packSelectedBar.hide{display:none!important}
+#packSelectedBar .slabel{font-size:13px;color:var(--mut);padding-top:6px}
+#packSelectedBar .chips{flex:1}
+#packSelectedBar .chip.on{position:relative;padding-right:28px}
+#packSelectedBar .chip .x{position:absolute;right:8px;top:50%;transform:translateY(-50%);opacity:.7;cursor:pointer}
+.blk-stylebar{display:none;gap:8px;flex-wrap:wrap;align-items:center;padding:8px 10px;margin:0 0 6px;border-radius:10px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.05)}
+body.pack-pick .blk-stylebar{display:none!important}
+body.pack-edit .pack-slot .blk-stylebar{display:flex}
+.blk-stylebar .slabel{font-size:11px;color:var(--mut);white-space:nowrap;text-transform:uppercase;letter-spacing:.04em}
+.blk-stylebar .chips{gap:5px}
+.blk-stylebar .chip{padding:7px 13px;font-size:12px;border-radius:10px}
+.blk-stylebar .tog{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--fg);cursor:pointer;user-select:none;white-space:nowrap;padding:6px 10px;border-radius:10px;border:1px solid var(--line);background:var(--card2)}
+.blk-stylebar .tog input{width:auto;margin:0;accent-color:var(--acc)}
+body.pack-edit .blk:not(.pack-slot){display:none!important}
+body.pack-edit .hp-card{display:none!important}
+body.pack-pick #packEditor{display:none!important}
+body.pack-fullscreen{overflow:hidden}
+.pack-editor{position:fixed;inset:0;z-index:50;display:flex;flex-direction:column;background:var(--bg);background-image:radial-gradient(900px 480px at 78% -8%,rgba(22,224,212,.12),transparent 60%),radial-gradient(760px 420px at 8% 2%,rgba(75,224,143,.10),transparent 55%)}
+.pack-editor.hide{display:none!important}
+.pe-head{display:flex;align-items:flex-start;gap:12px;padding:12px 16px calc(12px + env(safe-area-inset-top));border-bottom:1px solid var(--line);background:rgba(8,10,15,.94);backdrop-filter:blur(16px);flex:0 0 auto}
+.pe-head .pe-mid{flex:1;min-width:0}
+.pe-head .pack-steps{margin-bottom:6px}
+.pe-head .pe-title{font-size:16px;font-weight:650}
+.pe-head .pe-sub{font-size:12px;color:var(--mut);margin-top:2px}
+.pe-body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:16px 16px 28px}
+.pe-body .wrap-inner{max-width:900px;margin:0 auto}
+.pe-final-header{margin:0 0 24px;padding:8px 4px 0}
+.pe-final-header h1{font-size:28px;margin:0 0 10px}
+.pe-final-header .hp-byline{color:var(--mut);font-size:13px;margin:0 0 6px}
+.pe-final-header .hp-meta{color:var(--mut);font-size:13px;margin:0}
+body.pack-preview .blk-stylebar,body.pack-preview .drag-handle{display:none!important}
+body.pack-preview .pack-slot{border-color:rgba(255,255,255,.04);box-shadow:none;background:transparent;padding:0 4px 8px}
+body.pack-preview .pe-foot .pe-edit-only{display:none}
+body.pack-edit .pe-foot .pe-preview-only{display:none}
+.pe-foot{flex:0 0 auto;padding:16px 16px calc(16px + env(safe-area-inset-bottom));border-top:1px solid var(--line);background:rgba(8,10,15,.94);backdrop-filter:blur(16px)}
+.pe-foot .inner{max-width:900px;margin:0 auto}
+.pe-foot .msg{margin:10px 0 0}
+.pe-meta{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.pe-meta .pe-field-wide{grid-column:1/-1}
+.pe-meta label{display:block;font-size:11px;color:var(--mut);margin:0 0 5px;letter-spacing:.03em}
+.pe-meta input{width:100%}
+.pe-actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.pe-actions .btn{flex:1;min-width:140px;justify-content:center}
+.pack-slot{border:none;border-radius:0;padding:0;background:transparent;box-shadow:none}
+.pack-slot .blk-head{padding-top:4px}
+.pack-slot .drag-handle{flex:0 0 auto;background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:10px;color:var(--mut);cursor:grab;touch-action:none;padding:6px 10px;font-size:14px;letter-spacing:-3px;line-height:1;font-family:inherit;transition:color .15s,border-color .15s,background .15s}
+.pack-slot .drag-handle:hover{color:var(--acc);border-color:rgba(22,224,212,.35);background:rgba(22,224,212,.08)}
+.pack-slot .drag-handle:active{cursor:grabbing;color:var(--acc)}
+body.pack-fullscreen .selbar{display:none!important}
 /* Type dropdown + search + language filter + builder buttons */
 .filters{display:flex;gap:10px;margin:0 0 18px;flex-wrap:wrap;animation:up .55s .2s cubic-bezier(.22,.68,.3,1) both}
 .filters input{flex:1;min-width:180px}
@@ -406,6 +487,20 @@ const BlockSection = ({ b, hidden }: { b: DisplayBlock; hidden?: boolean }) => (
 		data-lang={b.language ?? ""}
 		data-kind={b.collectionChildren ? "collection" : "chart"}
 		data-mode={b.collectionMode ?? ""}
+		data-colstyle={b.collectionStyle ?? ""}
+		data-children={
+			b.collectionChildren
+				? JSON.stringify(
+						b.collectionChildren.map((ch) => ({
+							id: ch.id,
+							label: ch.label,
+							weekday: ch.weekday,
+							image: ch.image,
+							previewSrc: ch.previewSrc,
+						})),
+					)
+				: undefined
+		}
 	>
 		<div class="blk-head">
 			<span class="pick" />
@@ -584,6 +679,22 @@ export const ExplorePage = ({
 		<h1 class="gradtext">社区 Blocks</h1>
 		<p class="sub">官方默认板块与社区共建板块,挑你喜欢的加进客户端首页。</p>
 
+		<div class="pack-pick-head hide" id="packPickHead">
+			<div class="pp-toolbar">
+				<button type="button" class="btn sec" id="packPickCancel">
+					取消
+				</button>
+				<div class="pp-mid">
+					<div class="pp-sub" id="packPickSub">
+						挑选区块 · 点击加入，可跨页翻页
+					</div>
+				</div>
+				<button type="button" class="btn" id="packPickDone" disabled>
+					完成
+				</button>
+			</div>
+		</div>
+
 		<div class="filters">
 			<select id="catSel">
 				{EXPLORE_FILTERS.map((t) => (
@@ -604,6 +715,26 @@ export const ExplorePage = ({
 					生成合集
 				</button>
 			) : null}
+			<button type="button" class="mkbtn" id="makeHomeBtn">
+				生成首页
+			</button>
+		</div>
+
+		<div class="pack-steps hide" id="packSteps">
+			<span class="step on" id="packStepPick">
+				1. 挑选
+			</span>
+			<span class="step" id="packStepEdit">
+				2. 编辑
+			</span>
+			<span class="step" id="packStepPreview">
+				3. 预览
+			</span>
+		</div>
+
+		<div class="hide" id="packSelectedBar">
+			<span class="slabel">已选</span>
+			<div class="chips" id="packSelectedChips" />
 		</div>
 
 		{blocks.length === 0 ? (
@@ -621,7 +752,7 @@ export const ExplorePage = ({
 		{category !== "homepage" && (pagination.prevHref || pagination.nextHref) ? (
 			<nav class="pager" aria-label="分页">
 				{pagination.prevHref ? (
-					<a class="pbtn" href={pagination.prevHref}>
+					<a class="pbtn" href={pagination.prevHref} data-page-link>
 						上一页
 					</a>
 				) : (
@@ -629,7 +760,7 @@ export const ExplorePage = ({
 				)}
 				<span class="pnum">第 {pagination.page} 页</span>
 				{pagination.nextHref ? (
-					<a class="pbtn" href={pagination.nextHref}>
+					<a class="pbtn" href={pagination.nextHref} data-page-link>
 						下一页
 					</a>
 				) : (
@@ -643,9 +774,7 @@ export const ExplorePage = ({
 			}`}
 			id="hpEmpty"
 		>
-			<p class="meta">
-				还没有已发布的首页。现在首页由 iOS 客户端分享后直接公开展示。
-			</p>
+			<p class="meta">还没有已发布的首页,选中几个区块点「生成首页」试试。</p>
 		</div>
 
 		<div class="selbar hide" id="selbar">
@@ -716,6 +845,87 @@ export const ExplorePage = ({
 				) : null}
 			</div>
 		</div>
+
+		<div class="pack-editor hide" id="packEditor">
+			<header class="pe-head">
+				<button type="button" class="btn sec" id="packEditorBack">
+					继续挑选
+				</button>
+				<div class="pe-mid" id="packEditorMid">
+					<div class="pe-title">编辑首页</div>
+					<div class="pe-sub">⋮⋮ 拖动排序 · 下方可改样式</div>
+				</div>
+				<button type="button" class="btn" id="packGoPreviewHead">
+					预览
+				</button>
+			</header>
+			<div class="pe-body">
+				<div class="wrap-inner">
+					<div class="pe-final-header hide" id="packFinalHeader" />
+					<div id="packPreviewList" />
+				</div>
+			</div>
+			<footer class="pe-foot">
+				<div class="inner pe-edit-only">
+					<div class="pe-meta">
+						<div class="pe-field">
+							<label for="packTitle">标题</label>
+							<input
+								id="packTitle"
+								placeholder="如 周末片单"
+								maxlength={40}
+							/>
+						</div>
+						<div class="pe-field">
+							<label for="packAuthor">作者</label>
+							<input
+								id="packAuthor"
+								placeholder="可选"
+								maxlength={40}
+							/>
+						</div>
+						<div class="pe-field pe-field-wide">
+							<label for="packDesc">简介</label>
+							<input
+								id="packDesc"
+								placeholder="可选"
+								maxlength={160}
+							/>
+						</div>
+					</div>
+					<div class="pe-actions">
+						<button class="btn" id="packGoPreviewBtn" type="button">
+							预览首页
+						</button>
+					</div>
+					<div class="msg" id="packEditorMsg" />
+				</div>
+				<div class="inner pe-preview-only hide" id="packPreviewFoot">
+					<div class="gfoot">
+						<button class="btn sec" id="packBackEditBtn" type="button">
+							返回编辑
+						</button>
+						<button class="btn" id="makePackBtn" type="button">
+							确认发布
+						</button>
+					</div>
+					<div class="colresult hide" id="colResult">
+						<div class="srcbox mono" id="colUrl" />
+						<button class="btn sec" id="copyColBtn" type="button">
+							复制链接
+						</button>
+						<a class="btn sec" id="viewHpBtn" href="#">
+							查看首页
+						</a>
+					</div>
+					<div class="msg" id="packPreviewMsg" />
+				</div>
+			</footer>
+		</div>
+		<script
+			src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"
+			crossorigin="anonymous"
+		/>
 		<script
 			dangerouslySetInnerHTML={{
 				__html: raw(exploreJs(imageBase, isAdmin)) as unknown as string,
@@ -1403,6 +1613,120 @@ function fillCapsule(c,items){
   });
 }
 function weekdayToday(){return ((new Date().getDay()+6)%7)+1;}
+const LAUREL='<svg class="laurel" viewBox="0 0 28 20" aria-hidden="true"><path d="M22 17 C14 15 8 10 6 3"/><path d="M15 13 C14 10 16 8 19 8 C19 11 18 13 15 13"/><path d="M11 9 C10 6 12 4 15 4 C15 7 14 9 11 9"/><path d="M8 5 C7 3 8.5 1.5 11 1.5 C11 4 10 5.5 8 5"/></svg>';
+const LAUREL_R='<svg class="laurel r" viewBox="0 0 28 20" aria-hidden="true"><path d="M22 17 C14 15 8 10 6 3"/><path d="M15 13 C14 10 16 8 19 8 C19 11 18 13 15 13"/><path d="M11 9 C10 6 12 4 15 4 C15 7 14 9 11 9"/><path d="M8 5 C7 3 8.5 1.5 11 1.5 C11 4 10 5.5 8 5"/></svg>';
+const COL_DECK='<span class="stack"><span class="ph s1"></span><span class="ph s2"></span><span class="ph s3"></span></span>';
+function colAttrs(ch){
+  return ' data-cid="'+esc(ch.id)+'" data-csrc="'+esc(ch.previewSrc||'')+'"'+(ch.weekday?' data-wd="'+ch.weekday+'"':'');
+}
+function buildCollectionCapsHtml(children,style){
+  return children.map((ch,i)=>{
+    const a=colAttrs(ch);
+    if(style==='rank'){
+      const rn=ch.weekday||i+1;
+      return '<button type="button" class="col-rank"'+a+'><span class="rank-title">'+LAUREL+'<span class="rt">'+esc(ch.label)+'</span>'+LAUREL_R+'</span><span class="rank-posters"><span class="ph s1"></span><span class="ph s2"></span><span class="ph s3"></span></span><span class="rank-lines"></span></button>';
+    }
+    if(style==='banner'){
+      const logo=ch.image?'<img class="banner-logo" src="'+esc(ch.image)+'" alt="" loading="lazy">':'';
+      return '<button type="button" class="col-banner'+(ch.image?' has-logo':'')+'"'+a+'><span class="banner-grid"><span class="ph s1"></span><span class="ph s2"></span><span class="ph s3"></span><span class="ph s4"></span><span class="ph s5"></span><span class="ph s6"></span><span class="ph s7"></span><span class="ph s8"></span><span class="ph s9"></span></span>'+logo+'<span class="bt2">'+esc(ch.label)+'</span></button>';
+    }
+    if(style==='image'||style==='image-landscape'||style==='image-portrait'){
+      const cls=style==='image-landscape'?'col-image-landscape':style==='image-portrait'?'col-image-portrait':'col-image';
+      const img=ch.image?'<img src="'+esc(ch.image)+'" alt="" loading="lazy">':COL_DECK;
+      return '<button type="button" class="'+cls+'"'+a+'><span class="logo-img">'+img+'</span><span class="bt2">'+esc(ch.label)+'</span></button>';
+    }
+    return '<button type="button" class="capsule"'+a+'>'+COL_DECK+'<span class="clabel">'+esc(ch.label)+'</span></button>';
+  }).join('');
+}
+function readCollectionChildren(sec){
+  try{
+    const parsed=JSON.parse(sec.dataset.children||'[]');
+    if(Array.isArray(parsed)&&parsed.length)return parsed;
+  }catch(e){}
+  return Array.from(sec.querySelectorAll('[data-csrc]')).map((c,i)=>({
+    id:c.dataset.cid||('c'+i),
+    label:(c.querySelector('.clabel,.rt,.bt2')||{}).textContent||'',
+    weekday:c.dataset.wd?+c.dataset.wd:undefined,
+    image:(c.querySelector('.banner-logo,.logo-img img')||{}).src||undefined,
+    previewSrc:c.dataset.csrc||'',
+  }));
+}
+function styleToPreset(style,fallback){
+  if(style==='poster')return 'poster-list';
+  if(style==='hero')return 'hero-list';
+  if(style==='thumb')return 'thumb-list';
+  return fallback||'thumb-list';
+}
+function reloadBlockPreview(sec){
+  if(!sec)return;
+  if(sec.dataset.kind==='collection'){
+    const caps=sec.querySelector('.scroller.caps');
+    const prev=sec.querySelector('[data-colprev]');
+    if(!caps)return;
+    const children=readCollectionChildren(sec);
+    const style=sec.dataset.colstyle||'';
+    caps.innerHTML=buildCollectionCapsHtml(children,style);
+    if(prev){prev.innerHTML='';prev.classList.remove('in');}
+    sec.querySelectorAll('[data-csrc].on').forEach(c=>c.classList.remove('on'));
+    sec.dataset.loaded='';
+    loadCollection(sec);
+    return;
+  }
+  const sc=sec.querySelector('.scroller:not(.caps):not(.colprev)');
+  if(!sc)return;
+  sec.dataset.loaded='';
+  sc.classList.remove('in');
+  sc.innerHTML='';
+  load(sec);
+}
+function chartBodyHtml(preset){
+  const isHero=preset==='hero-list';
+  const isPoster=preset==='poster-list';
+  const count=isHero?2:isPoster?6:5;
+  const artClass=isHero?'art-hero':isPoster?'art-poster':'art-thumb';
+  const itClass=isHero?'it-hero':isPoster?'it-poster':'it-thumb';
+  let h='';
+  for(let i=0;i<count;i++){
+    h+='<div class="it '+itClass+'"><div class="art '+artClass+' shimmer"></div><div class="cap"><div class="txt"><div class="sk-line shimmer"></div></div></div></div>';
+  }
+  return '<div class="scroller">'+h+'</div>';
+}
+function collectionBodyHtml(b){
+  const children=(b.collectionChildren||[]).map(ch=>({
+    id:ch.id,label:ch.label,weekday:ch.weekday,image:ch.image,previewSrc:ch.previewSrc,
+  }));
+  const style=b.collectionStyle||'';
+  return '<div class="scroller caps">'+buildCollectionCapsHtml(children,style)+'</div><div class="scroller colprev" data-colprev></div>';
+}
+function buildBlockSectionEl(b){
+  const sec=document.createElement('section');
+  sec.className='blk pack-slot sel vis';
+  sec.dataset.id=b.id;
+  sec.dataset.category=b.category||'tv';
+  sec.dataset.src=b.previewSrc||'';
+  sec.dataset.preset=b.preset||'thumb-list';
+  sec.dataset.rank=b.showRank?'1':'0';
+  sec.dataset.ov=b.showOverview?'1':'0';
+  sec.dataset.title=b.title||'';
+  sec.dataset.author=b.author||'';
+  sec.dataset.lang=b.language||'';
+  sec.dataset.kind=b.collectionChildren?'collection':'chart';
+  sec.dataset.mode=b.collectionMode||'';
+  sec.dataset.colstyle=b.collectionStyle||'';
+  if(b.collectionChildren){
+    sec.dataset.children=JSON.stringify(b.collectionChildren.map(ch=>({
+      id:ch.id,label:ch.label,weekday:ch.weekday,image:ch.image,previewSrc:ch.previewSrc,
+    })));
+  }
+  const meta=b.collectionChildren
+    ? (b.collectionChildren.length+' 个榜单')
+    : ((b.itemCount||0)+' 项');
+  sec.innerHTML='<div class="blk-head"><button type="button" class="drag-handle" aria-label="拖拽排序">⋮⋮</button><span class="bt">'+esc(b.title)+'</span><span class="chev">›</span>'
+    +(b.collectionChildren?'<span class="tag tag-official">合集</span>':'')
+    +'<span class="meta-inline">'+esc(meta)+'</span></div>'
+    +(b.collectionChildren?collectionBodyHtml(b):chartBodyHtml(b.preset));
+  return sec;
+}
 // Collection rows: fan the first posters of each child into the capsule
 // stacks; weekday collections rotate so today's chart comes first.
 async function loadCollection(sec){
@@ -1648,18 +1972,20 @@ function applyFilters(){
       show=isHome&&qOk&&!selMode;
       if(show)hpShown++;
     }else{
-      let catOk;
-      if(isHome)catOk=false;
-      else if(curCat==='collection')catOk=s.dataset.kind==='collection';
-      else catOk=curCat==='all'||s.dataset.category===curCat;
-      // Collections cannot be nested: hide them while building a collection.
-      if(selKind==='group'&&s.dataset.kind==='collection')catOk=false;
-      const langOk=!lang||s.dataset.lang===lang;
-      const text=((s.dataset.title||'')+' '+(s.dataset.author||'')).toLowerCase();
-      const qOk=!q||text.indexOf(q)>=0;
-      show=catOk&&langOk&&qOk;
+      if(packPhase==='edit'&&selKind==='pack'){
+        show=s.classList.contains('pack-slot');
+      }else{
+        let catOk;
+        if(isHome)catOk=false;
+        else if(curCat==='collection')catOk=s.dataset.kind==='collection';
+        else catOk=curCat==='all'||s.dataset.category===curCat;
+        if(selKind==='group'&&s.dataset.kind==='collection')catOk=false;
+        const langOk=!lang||s.dataset.lang===lang;
+        const text=((s.dataset.title||'')+' '+(s.dataset.author||'')).toLowerCase();
+        const qOk=!q||text.indexOf(q)>=0;
+        show=catOk&&langOk&&qOk;
+      }
     }
-    // Drop 'vis' when hiding so the reveal animation replays on re-show.
     if(!show)s.classList.remove('vis');
     s.classList.toggle('hide',!show);
   });
@@ -1669,10 +1995,20 @@ function applyFilters(){
 function applyCategory(cat){
   if(cat===curCat)return;
   curCat=cat;catSel.value=cat;
-  // Category changes need a server page because the web listing is paginated.
   const u=new URL(location.href);
   if(cat==='all')u.searchParams.delete('category');else u.searchParams.set('category',cat);
   u.searchParams.delete('page');
+  if(selMode&&selKind==='pack'){
+    savePackState();
+    u.searchParams.set('pack','1');
+    location.href=u;
+    return;
+  }
+  if(selMode){
+    applyFilters();
+    history.replaceState(null,'',u);
+    return;
+  }
   location.href=u;
 }
 catSel.addEventListener('change',()=>applyCategory(catSel.value));
@@ -1682,16 +2018,353 @@ langSel.addEventListener('change',applyFilters);
 document.querySelectorAll('.hp-card').forEach(c=>{
   c.addEventListener('click',()=>{location.href='/blocks/homepages/'+c.dataset.hp;});
 });
-// ── Multi-select: 生成合集 (admin only) ─────────────────────────────
+// ── Homepage pack builder (pick → edit → publish) ───────────────────
 let selMode=false;
 let selKind='';
+let packPhase='';
 const selected=new Set();
+const selectedOrder=[];
+const blockConfigs=new Map();
 const selbar=document.getElementById('selbar');
+const makeHomeBtn=document.getElementById('makeHomeBtn');
+const packPickDone=document.getElementById('packPickDone');
+const packPickHead=document.getElementById('packPickHead');
+let filtersAnchor=null;
 const colMsg=document.getElementById('colMsg');
-// Admin-only elements; null for regular visitors.
+const colResult=document.getElementById('colResult');
+const packEditor=document.getElementById('packEditor');
+const packEditorMsg=document.getElementById('packEditorMsg');
+const packSteps=document.getElementById('packSteps');
+const packStepPick=document.getElementById('packStepPick');
+const packStepEdit=document.getElementById('packStepEdit');
+const packStepPreview=document.getElementById('packStepPreview');
+const packPreviewList=document.getElementById('packPreviewList');
+const packFinalHeader=document.getElementById('packFinalHeader');
 const makeGroupBtn=document.getElementById('makeGroupBtn');
 const groupBtn=document.getElementById('groupBtn');
 const groupPanel=document.getElementById('groupPanel');
+const CHART_STYLES=[{v:'thumb',l:'横图'},{v:'poster',l:'竖图'},{v:'hero',l:'大图'}];
+const PACK_COL_STYLES=[{v:'',l:'胶囊'},{v:'rank',l:'排行'},{v:'banner',l:'横幅'},{v:'image',l:'图片'},{v:'image-landscape',l:'横图'},{v:'image-portrait',l:'竖图'}];
+function presetToStyle(preset){
+  if(preset==='poster-list')return 'poster';
+  if(preset==='hero-list')return 'hero';
+  return 'thumb';
+}
+function defaultStyleForSec(sec){
+  if(!sec)return 'thumb';
+  if(sec.dataset.kind==='collection')return sec.dataset.colstyle||'';
+  return presetToStyle(sec.dataset.preset||'thumb-list');
+}
+const PACK_STORE_KEY='epx:pack';
+const packLabels=new Map();
+const packKinds=new Map();
+function packSection(id){
+  return document.querySelector('.pack-slot[data-id="'+CSS.escape(id)+'"]')
+    || (packPhase==='pick'?document.querySelector('.blk[data-id="'+CSS.escape(id)+'"]:not(.pack-slot)'):null);
+}
+function savePackState(){
+  if(selKind!=='pack'){
+    sessionStorage.removeItem(PACK_STORE_KEY);
+    return;
+  }
+  const configs={};
+  blockConfigs.forEach((v,k)=>{configs[k]=v;});
+  const labels={};
+  packLabels.forEach((v,k)=>{labels[k]=v;});
+  const kinds={};
+  packKinds.forEach((v,k)=>{kinds[k]=v;});
+  sessionStorage.setItem(PACK_STORE_KEY,JSON.stringify({
+    active:true,phase:packPhase,order:selectedOrder.slice(),configs,labels,kinds,
+  }));
+}
+function syncPickChromeHeight(){
+  if(!packPickHead||packPhase!=='pick')return;
+  document.documentElement.style.setProperty('--pick-chrome-h',packPickHead.offsetHeight+'px');
+}
+function mountPickFilters(){
+  const filters=document.querySelector('.wrap>.filters');
+  if(!filters||!packPickHead)return;
+  if(!filtersAnchor){
+    filtersAnchor=document.createComment('filters-anchor');
+    packPickHead.parentElement.insertBefore(filtersAnchor,packPickHead.nextSibling);
+  }
+  if(filters.parentElement!==packPickHead)packPickHead.appendChild(filters);
+  syncPickChromeHeight();
+}
+function unmountPickFilters(){
+  const filters=document.querySelector('.filters');
+  if(!filters||!filtersAnchor?.parentElement)return;
+  filtersAnchor.parentElement.insertBefore(filters,filtersAnchor.nextSibling);
+  document.documentElement.style.removeProperty('--pick-chrome-h');
+}
+function placePackSteps(){
+  if(!packSteps||selKind!=='pack')return;
+  packSteps.classList.remove('hide');
+  if(packPhase==='pick'){
+    const mid=document.querySelector('#packPickHead .pp-mid');
+    if(mid&&!mid.contains(packSteps))mid.insertBefore(packSteps,mid.firstChild);
+    mountPickFilters();
+    syncPickChromeHeight();
+  }else{
+    unmountPickFilters();
+    const mid=document.getElementById('packEditorMid');
+    if(mid&&!mid.contains(packSteps))mid.insertBefore(packSteps,mid.firstChild);
+  }
+}
+function renderSelectedChips(){
+  const box=document.getElementById('packSelectedChips');
+  const bar=document.getElementById('packSelectedBar');
+  if(!box||!bar)return;
+  if(!selectedOrder.length||selKind!=='pack'||packPhase!=='pick'){
+    bar.classList.add('hide');return;
+  }
+  bar.classList.remove('hide');
+  box.innerHTML=selectedOrder.map(id=>{
+    const title=packLabels.get(id)||id;
+    const onPage=!!document.querySelector('.blk[data-id="'+CSS.escape(id)+'"]:not(.pack-slot)');
+    return '<div class="chip on" data-rmid="'+esc(id)+'">'+esc(title)+(onPage?'':' · 其他页')+'<span class="x">×</span></div>';
+  }).join('');
+  box.querySelectorAll('[data-rmid]').forEach(ch=>{
+    ch.onclick=(e)=>{
+      e.stopPropagation();
+      if(e.target.classList.contains('x'))unselectId(ch.dataset.rmid);
+    };
+  });
+}
+function unselectId(id){
+  if(!selected.has(id))return;
+  selected.delete(id);
+  selectedOrder.splice(selectedOrder.indexOf(id),1);
+  blockConfigs.delete(id);
+  packLabels.delete(id);
+  packKinds.delete(id);
+  const sec=document.querySelector('.blk[data-id="'+CSS.escape(id)+'"]:not(.pack-slot)');
+  if(sec){sec.classList.remove('sel');removeStyleBar(sec);}
+  updateSelCount();
+  renderSelectedChips();
+  savePackState();
+  if(packPhase==='edit'||packPhase==='preview')buildEditPreview();
+}
+function ensureBlockConfig(id,sec){
+  if(blockConfigs.has(id))return blockConfigs.get(id);
+  const cfg={
+    style:defaultStyleForSec(sec),
+    showRank:sec?sec.dataset.rank==='1':false,
+    showOverview:sec?sec.dataset.ov==='1':false,
+  };
+  blockConfigs.set(id,cfg);
+  return cfg;
+}
+function applyBlockConfig(sec){
+  if(!sec)return;
+  const cfg=ensureBlockConfig(sec.dataset.id,sec);
+  if(sec.dataset.kind==='collection'){
+    sec.dataset.colstyle=cfg.style||'';
+    reloadBlockPreview(sec);
+    return;
+  }
+  sec.dataset.preset=styleToPreset(cfg.style,sec.dataset.preset||'thumb-list');
+  sec.dataset.rank=cfg.showRank?'1':'0';
+  sec.dataset.ov=cfg.showOverview?'1':'0';
+  reloadBlockPreview(sec);
+}
+function styleChips(id,styles,cur,kind){
+  return styles.map(s=>'<div class="chip'+(s.v===cur?' on':'')+'" data-kind="'+kind+'" data-bid="'+esc(id)+'" data-v="'+esc(s.v)+'">'+esc(s.l)+'</div>').join('');
+}
+function removeStyleBar(sec){
+  sec?.querySelector('.blk-stylebar')?.remove();
+}
+function renderStyleBar(sec){
+  if(!sec||selKind!=='pack'||packPhase==='pick'){removeStyleBar(sec);return;}
+  const inEditSlot=packPhase==='edit'&&sec.classList.contains('pack-slot');
+  if(packPhase==='edit'&&!inEditSlot){removeStyleBar(sec);return;}
+  const id=sec.dataset.id;
+  const cfg=ensureBlockConfig(id,sec);
+  let bar=sec.querySelector('.blk-stylebar');
+  if(!bar){
+    bar=document.createElement('div');
+    bar.className='blk-stylebar';
+    sec.querySelector('.blk-head').after(bar);
+  }
+  if(sec.dataset.kind==='collection'){
+    bar.innerHTML='<span class="slabel">合集样式</span><div class="chips">'+styleChips(id,PACK_COL_STYLES,cfg.style,'style')+'</div>';
+  }else{
+    bar.innerHTML='<span class="slabel">展示</span><div class="chips">'+styleChips(id,CHART_STYLES,cfg.style,'style')+'</div>'
+      +'<label class="tog"><input type="checkbox" data-kind="rank" data-bid="'+esc(id)+'"'+(cfg.showRank?' checked':'')+'>序号</label>'
+      +'<label class="tog"><input type="checkbox" data-kind="ov" data-bid="'+esc(id)+'"'+(cfg.showOverview?' checked':'')+'>简介</label>';
+  }
+  bar.querySelectorAll('.chip').forEach(c=>{
+    c.onclick=(e)=>{
+      e.stopPropagation();
+      const bid=c.dataset.bid;
+      const cfg2=ensureBlockConfig(bid,packSection(bid));
+      cfg2.style=c.dataset.v;
+      c.parentElement.querySelectorAll('.chip').forEach(x=>x.classList.toggle('on',x===c));
+      applyBlockConfig(packSection(bid));
+      savePackState();
+    };
+  });
+  bar.querySelectorAll('input[type=checkbox]').forEach(inp=>{
+    inp.onchange=(e)=>{
+      e.stopPropagation();
+      const bid=inp.dataset.bid;
+      const cfg2=ensureBlockConfig(bid,packSection(bid));
+      if(inp.dataset.kind==='rank')cfg2.showRank=inp.checked;
+      else cfg2.showOverview=inp.checked;
+      applyBlockConfig(packSection(bid));
+      savePackState();
+    };
+  });
+}
+function syncOrderFromDom(){
+  if(!packPreviewList)return;
+  const ids=[...packPreviewList.querySelectorAll('.pack-slot')].map(s=>s.dataset.id);
+  if(!ids.length)return;
+  selectedOrder.length=0;
+  ids.forEach(id=>selectedOrder.push(id));
+  packPreviewList.querySelectorAll('.pack-slot').forEach(renderStyleBar);
+  savePackState();
+}
+let packSortable=null;
+function destroyPackSortable(){
+  if(packSortable){packSortable.destroy();packSortable=null;}
+  packPreviewList?.classList.remove('pack-sorting');
+}
+function ensurePackDragHandles(list){
+  list.querySelectorAll('.pack-slot').forEach(slot=>{
+    if(slot.querySelector('.drag-handle'))return;
+    const handle=document.createElement('button');
+    handle.type='button';
+    handle.className='drag-handle';
+    handle.textContent='⋮⋮';
+    handle.setAttribute('aria-label','拖拽排序');
+    slot.querySelector('.blk-head')?.prepend(handle);
+  });
+}
+function bindPackReorder(list){
+  if(!list||packPhase!=='edit'||typeof Sortable==='undefined')return;
+  destroyPackSortable();
+  list.querySelector('.pack-drop-line')?.remove();
+  ensurePackDragHandles(list);
+  const scrollEl=document.querySelector('#packEditor .pe-body');
+  packSortable=Sortable.create(list,{
+    handle:'.drag-handle',
+    draggable:'.pack-slot',
+    animation:220,
+    easing:'cubic-bezier(0.25, 1, 0.5, 1)',
+    ghostClass:'pack-sort-ghost',
+    chosenClass:'pack-sort-chosen',
+    dragClass:'pack-sort-drag',
+    direction:'vertical',
+    swapThreshold:0.62,
+    invertSwap:false,
+    fallbackTolerance:4,
+    delay:0,
+    delayOnTouchOnly:true,
+    touchStartThreshold:6,
+    scroll:scrollEl||true,
+    scrollSensitivity:80,
+    scrollSpeed:14,
+    bubbleScroll:true,
+    onStart(){list.classList.add('pack-sorting');},
+    onEnd(){list.classList.remove('pack-sorting');syncOrderFromDom();},
+  });
+}
+async function buildEditPreview(){
+  if(!packPreviewList||!selectedOrder.length||packPhase==='pick'){
+    if(packPreviewList&&packPhase==='pick')packPreviewList.innerHTML='';
+    return;
+  }
+  destroyPackSortable();
+  packPreviewList.innerHTML='<div class="prev-empty">加载首页预览…</div>';
+  try{
+    const lang=langSel.value||'zh-CN';
+    const r=await fetch('/blocks/pick-blocks?ids='+encodeURIComponent(selectedOrder.join(','))+'&language='+encodeURIComponent(lang));
+    const j=await r.json();
+    if(!r.ok)throw new Error(j.error||'load failed');
+    packPreviewList.innerHTML='';
+    const byId=new Map((j.blocks||[]).map(b=>[b.id,b]));
+    selectedOrder.forEach(id=>{
+      const b=byId.get(id);
+      if(!b)return;
+      const cfg=blockConfigs.get(id);
+      if(cfg){
+        if(b.collectionChildren)b.collectionStyle=cfg.style||'';
+        else{
+          b.preset=styleToPreset(cfg.style,b.preset);
+          b.showRank=cfg.showRank;
+          b.showOverview=cfg.showOverview;
+        }
+      }
+      const sec=buildBlockSectionEl(b);
+      renderStyleBar(sec);
+      packPreviewList.appendChild(sec);
+      io.observe(sec);
+      load(sec);
+    });
+    bindPackReorder(packPreviewList);
+  }catch(e){
+    packPreviewList.innerHTML='<div class="prev-empty">预览加载失败</div>';
+  }
+}
+function updateFinalHeader(){
+  if(!packFinalHeader)return;
+  const title=document.getElementById('packTitle').value.trim()||'未命名首页';
+  const author=document.getElementById('packAuthor').value.trim();
+  const desc=document.getElementById('packDesc').value.trim();
+  packFinalHeader.innerHTML='<h1 class="gradtext">'+esc(title)+'</h1>'
+    +(author?'<div class="hp-byline">by '+esc(author)+'</div>':'')
+    +(desc?'<div class="hp-byline">'+esc(desc)+'</div>':'')
+    +'<div class="hp-meta">'+selectedOrder.length+' 个区块 · 确认无误后发布</div>';
+}
+function goPreview(){
+  if(!document.getElementById('packTitle').value.trim()){packShow('err','请填写首页标题');return;}
+  if(!selectedOrder.length){packShow('err','请先选择区块');return;}
+  packShow('','');
+  setPackPhase('preview');
+}
+function setPackPhase(phase){
+  packPhase=phase;
+  document.body.classList.toggle('pack-pick',selKind==='pack'&&phase==='pick');
+  document.body.classList.toggle('pack-edit',selKind==='pack'&&phase==='edit');
+  document.body.classList.toggle('pack-preview',selKind==='pack'&&phase==='preview');
+  document.body.classList.toggle('pack-fullscreen',selKind==='pack'&&(phase==='pick'||phase==='edit'||phase==='preview'));
+  packPickHead?.classList.toggle('hide',!(selKind==='pack'&&phase==='pick'));
+  packStepPick?.classList.toggle('on',phase==='pick');
+  packStepEdit?.classList.toggle('on',phase==='edit');
+  packStepPreview?.classList.toggle('on',phase==='preview');
+  packEditor?.classList.toggle('hide',!(selKind==='pack'&&(phase==='edit'||phase==='preview')));
+  placePackSteps();
+  const peTitle=document.querySelector('#packEditor .pe-title');
+  const peSub=document.querySelector('#packEditor .pe-sub');
+  if(peTitle)peTitle.textContent=phase==='preview'?'首页预览':'编辑首页';
+  if(peSub)peSub.textContent=phase==='preview'
+    ? '与发布后详情页相同 · 确认后即可发布'
+    : '⋮⋮ 拖动排序 · 下方可改样式';
+  document.getElementById('packGoPreviewHead')?.classList.toggle('hide',phase!=='edit');
+  const backBtn=document.getElementById('packEditorBack');
+  if(backBtn)backBtn.textContent=phase==='preview'?'返回编辑':'继续挑选';
+  packFinalHeader?.classList.toggle('hide',phase!=='preview');
+  document.getElementById('packPreviewFoot')?.classList.toggle('hide',phase!=='preview');
+  if(phase==='edit'){
+    document.querySelector('.wrap')?.scrollTo(0,0);
+    document.querySelector('#packEditor .pe-body')?.scrollTo(0,0);
+    if(!packPreviewList.querySelector('.pack-slot'))buildEditPreview();
+    else bindPackReorder(packPreviewList);
+  }else if(phase==='preview'){
+    destroyPackSortable();
+    if(!packPreviewList.querySelector('.pack-slot'))buildEditPreview().then(()=>updateFinalHeader());
+    else updateFinalHeader();
+  }else{
+    destroyPackSortable();
+    unmountPickFilters();
+    if(packPreviewList)packPreviewList.innerHTML='';
+    if(packFinalHeader)packFinalHeader.innerHTML='';
+  }
+  renderSelectedChips();
+  applyFilters();
+  savePackState();
+}
 function showPanel(which){
   if(groupPanel)groupPanel.classList.toggle('hide',which!=='group');
 }
@@ -1700,33 +2373,209 @@ function setSelMode(kind){
   selMode=!!selKind;
   document.body.classList.toggle('selecting',selMode);
   selbar.classList.toggle('hide',!selMode);
+  makeHomeBtn?.classList.toggle('on',selKind==='pack');
   if(makeGroupBtn)makeGroupBtn.classList.toggle('on',selKind==='group');
   if(groupBtn)groupBtn.classList.toggle('hide',selKind!=='group');
   selected.clear();
-  document.querySelectorAll('.blk.sel').forEach(s=>s.classList.remove('sel'));
+  selectedOrder.length=0;
+  blockConfigs.clear();
+  packLabels.clear();
+  packKinds.clear();
+  document.querySelectorAll('.blk.sel').forEach(s=>{s.classList.remove('sel');removeStyleBar(s);});
+  if(packPreviewList)packPreviewList.innerHTML='';
+  destroyPackSortable();
+  unmountPickFilters();
+  const pt=document.getElementById('packTitle');
+  const pa=document.getElementById('packAuthor');
+  const pd=document.getElementById('packDesc');
+  if(pt)pt.value='';
+  if(pa)pa.value='';
+  if(pd)pd.value='';
   colMsg.className='msg';colMsg.textContent='';
+  colResult?.classList.add('hide');
   showPanel('');
   updateSelCount();
-  // Selection happens over the block list, so leave homepage/collection-only views.
-  if(selMode&&(curCat==='homepage'||curCat==='collection'))applyCategory('all');
-  else applyFilters();
+  if(selKind==='pack'){
+    if(curCat==='homepage'){curCat='all';catSel.value='all';}
+    setPackPhase('pick');
+  }else{
+    packPhase='';
+    document.body.classList.remove('pack-pick','pack-edit','pack-preview','pack-fullscreen');
+    packSteps?.classList.add('hide');
+    packPickHead?.classList.add('hide');
+    packEditor?.classList.add('hide');
+    unmountPickFilters();
+    document.getElementById('packSelectedBar')?.classList.add('hide');
+    sessionStorage.removeItem(PACK_STORE_KEY);
+    if(selMode&&(curCat==='collection')){curCat='all';catSel.value='all';}
+    applyFilters();
+  }
+  if(selMode&&selKind!=='pack')applyFilters();
 }
 function updateSelCount(){
-  document.getElementById('selCount').textContent='已选 '+selected.size;
+  const n=selected.size;
+  const selCount=document.getElementById('selCount');
+  if(selCount)selCount.textContent='已选 '+n+'（可跨页）';
+  if(packPickDone)packPickDone.disabled=n===0;
+  const sub=document.getElementById('packPickSub');
+  if(sub&&packPhase==='pick'){
+    sub.style.color='var(--mut)';
+    sub.textContent=n
+      ? '已选 '+n+' 个 · 翻页不丢 · 点完成进入编辑'
+      : '挑选区块 · 点击加入，可跨页翻页';
+  }
 }
 function toggleSelect(sec){
+  const id=sec.dataset.id;if(!id||selKind!=='pack'||packPhase!=='pick')return;
+  if(selected.has(id)){
+    unselectId(id);
+    return;
+  }
+  selected.add(id);
+  selectedOrder.push(id);
+  packLabels.set(id,sec.dataset.title||id);
+  packKinds.set(id,sec.dataset.kind||'chart');
+  sec.classList.add('sel');
+  ensureBlockConfig(id,sec);
+  updateSelCount();
+  renderSelectedChips();
+  savePackState();
+}
+onBlkTap=(s,e)=>{
+  if(!selMode)return false;
+  if(selKind==='pack'){
+    if(e.target.closest('.blk-stylebar,.drag-handle,.chip,.tog'))return true;
+    if(packPhase==='pick'){toggleSelect(s);return true;}
+    return true;
+  }
+  if(selKind==='group'){toggleSelectGroup(s);return true;}
+  return false;
+};
+function toggleSelectGroup(sec){
   const id=sec.dataset.id;if(!id)return;
   if(selected.has(id)){selected.delete(id);sec.classList.remove('sel');}
   else{selected.add(id);sec.classList.add('sel');}
   updateSelCount();
 }
-onBlkTap=(s)=>{if(selMode){toggleSelect(s);return true;}return false;};
+makeHomeBtn.onclick=()=>setSelMode(selKind==='pack'?'':'pack');
 document.getElementById('selCancelBtn').onclick=()=>setSelMode('');
 function colShow(cls,text){colMsg.className='msg '+cls;colMsg.textContent=text;}
 function requireSelection(){
-  if(selected.size===0){colShow('err','请先选择区块');return false;}
+  if(selected.size===0){
+    if(selKind==='pack'&&packPhase==='pick'){
+      const sub=document.getElementById('packPickSub');
+      if(sub){sub.style.color='var(--danger)';sub.textContent='请至少选一个区块';}
+    }else colShow('err','请先选择区块');
+    return false;
+  }
   colShow('','');return true;
 }
+document.getElementById('packPickDone').onclick=()=>{if(!requireSelection())return;setPackPhase('edit');};
+document.getElementById('packPickCancel').onclick=()=>setSelMode('');
+document.getElementById('packGoPreviewBtn').onclick=goPreview;
+document.getElementById('packGoPreviewHead').onclick=goPreview;
+document.getElementById('packBackEditBtn').onclick=()=>setPackPhase('edit');
+document.getElementById('packEditorBack').onclick=()=>{
+  if(packPhase==='preview')setPackPhase('edit');
+  else setPackPhase('pick');
+};
+function packShow(cls,text){
+  if(packPhase==='pick'){
+    const sub=document.getElementById('packPickSub');
+    if(sub&&text){sub.style.color=cls==='err'?'var(--danger)':'var(--mut)';sub.textContent=text;}
+    return;
+  }
+  let msg=packEditorMsg;
+  if(packPhase==='preview')msg=document.getElementById('packPreviewMsg');
+  if(!msg)return;
+  msg.className='msg '+cls;
+  msg.textContent=text;
+}
+document.getElementById('makePackBtn').onclick=async()=>{
+  const title=document.getElementById('packTitle').value.trim();
+  if(!title)return packShow('err','请填写首页标题');
+  if(!selectedOrder.length)return packShow('err','请先选择区块');
+  const authorName=document.getElementById('packAuthor').value.trim();
+  const description=document.getElementById('packDesc').value.trim();
+  const entries=selectedOrder.map(id=>{
+    const cfg=ensureBlockConfig(id,packSection(id));
+    const entry={blockId:id};
+    if(cfg.style)entry.style=cfg.style;
+    if(packKinds.get(id)!=='collection'){
+      entry.showRank=!!cfg.showRank;
+      entry.showOverview=!!cfg.showOverview;
+    }
+    return entry;
+  });
+  const btn=document.getElementById('makePackBtn');
+  btn.disabled=true;btn.innerHTML='<span class="spin"></span> 发布中…';
+  packShow('','');
+  colShow('','');
+  try{
+    const r=await fetch('/blocks/collections',{method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        title,
+        authorName:authorName||undefined,
+        description:description||undefined,
+        language:langSel.value||undefined,
+        entries,
+      })});
+    const j=await r.json();
+    if(!r.ok){packShow('err',j.error||'发布失败');btn.disabled=false;btn.textContent='发布首页';return;}
+    document.getElementById('colUrl').textContent=j.importUrl;
+    const viewHp=document.getElementById('viewHpBtn');
+    if(viewHp)viewHp.href=j.detailUrl||('/blocks/homepages/'+j.collectionId);
+    colResult.classList.remove('hide');
+    packShow('ok','首页已发布,可在「首页」分类查看,或在 iPhone 上打开链接导入。');
+    btn.disabled=false;btn.textContent='发布首页';
+  }catch(e){packShow('err','网络错误');btn.disabled=false;btn.textContent='发布首页';}
+};
+document.getElementById('copyColBtn').onclick=async()=>{
+  const url=document.getElementById('colUrl').textContent;
+  if(url&&await copyText(url))packShow('ok','已复制导入链接');
+};
+document.querySelectorAll('[data-page-link]').forEach(a=>{
+  a.addEventListener('click',()=>{if(selKind==='pack')savePackState();});
+});
+(function initPackRestore(){
+  try{
+    const raw=sessionStorage.getItem(PACK_STORE_KEY);
+    const url=new URL(location.href);
+    if(!raw&&!url.searchParams.has('pack'))return;
+    if(!raw)return;
+    const st=JSON.parse(raw);
+    if(!st||!st.active)return;
+    (st.order||[]).forEach(id=>{
+      selected.add(id);
+      selectedOrder.push(id);
+    });
+    Object.entries(st.configs||{}).forEach(([k,v])=>blockConfigs.set(k,v));
+    Object.entries(st.labels||{}).forEach(([k,v])=>packLabels.set(k,v));
+    Object.entries(st.kinds||{}).forEach(([k,v])=>packKinds.set(k,v));
+    selKind='pack';
+    selMode=true;
+    document.body.classList.add('selecting');
+    selbar.classList.remove('hide');
+    makeHomeBtn.classList.add('on');
+    packSteps.classList.remove('hide');
+    document.querySelectorAll('.blk[data-id]:not(.pack-slot)').forEach(sec=>{
+      if(selected.has(sec.dataset.id)){
+        sec.classList.add('sel');
+        renderStyleBar(sec);
+      }
+    });
+    setPackPhase(st.phase||'pick');
+    updateSelCount();
+    if(url.searchParams.has('pack')){
+      url.searchParams.delete('pack');
+      history.replaceState(null,'',url);
+    }
+  }catch(e){
+    sessionStorage.removeItem(PACK_STORE_KEY);
+  }
+})();
+window.addEventListener('resize',()=>{if(packPhase==='pick')syncPickChromeHeight();});
 ${isAdmin ? ADMIN_GROUP_JS : ""}
 `;
 }

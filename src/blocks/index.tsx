@@ -664,6 +664,42 @@ const IMPORT_LINK_BASE =
 	process.env.IMPORT_LINK_BASE_URL || "https://eplayerx.com/import/blocks";
 const MAX_COLLECTION_TITLE_LEN = 40;
 const MAX_COLLECTION_BLOCKS = 50;
+
+/** Display metadata for homepage pack preview (same shape as the explore page). */
+app.get("/pick-blocks", (c) =>
+	publicCachedGet(c, async () => {
+		const blockIds = [
+			...new Set(
+				(c.req.query("ids") || "")
+					.split(",")
+					.map((id) => id.trim())
+					.filter((id) => /^[a-zA-Z0-9_-]+$/.test(id)),
+			),
+		];
+		if (blockIds.length === 0) {
+			return c.json({ error: "缺少 ids" }, 400);
+		}
+		if (blockIds.length > MAX_COLLECTION_BLOCKS) {
+			return c.json(
+				{ error: `最多查询 ${MAX_COLLECTION_BLOCKS} 个区块` },
+				400,
+			);
+		}
+		const language = VALID_LANGUAGES.has(String(c.req.query("language")))
+			? String(c.req.query("language"))
+			: DEFAULT_LANGUAGE;
+		try {
+			const blocks = await resolveDisplayBlocks(getDb(c), blockIds, language);
+			return c.json({ blocks });
+		} catch (error) {
+			if (error instanceof ServiceUnavailable) {
+				return c.json({ error: error.message }, 503);
+			}
+			throw error;
+		}
+	}),
+);
+
 const VALID_SHARED_STYLES = new Set([
 	"poster",
 	"thumb",
@@ -813,6 +849,54 @@ function importableFromOfficial(
 	};
 }
 
+/** Official default block -> DisplayBlock for the web pack preview API. */
+function officialToDisplay(
+	block: HomeBlock,
+	language: string,
+): DisplayBlock | null {
+	const previewSrc = previewSrcFromSource(block.source);
+	if (!previewSrc) return null;
+	return {
+		id: block.id,
+		title: block.title ?? block.id,
+		category: block.metadata?.isAnime
+			? "anime"
+			: block.mediaType === "movie"
+				? "movie"
+				: "tv",
+		preset: block.preset as BlockPreset,
+		showRank: !!block.showRank,
+		showOverview: !!block.showOverview,
+		previewSrc,
+		official: true,
+		language,
+	};
+}
+
+/** Resolve block ids into DisplayBlock rows (community + official), preserving order. */
+async function resolveDisplayBlocks(
+	db: D1Database,
+	blockIds: string[],
+	language: string,
+): Promise<DisplayBlock[]> {
+	const community = await getCommunityBlocksByIds(db, blockIds);
+	const official = officialHomeBlocksById(language);
+	const blocks: DisplayBlock[] = [];
+	for (const id of blockIds) {
+		const row = community.get(id);
+		if (row) {
+			blocks.push(communityToDisplay(row));
+			continue;
+		}
+		const officialBlock = official.get(id);
+		if (officialBlock) {
+			const display = officialToDisplay(officialBlock, language);
+			if (display) blocks.push(display);
+		}
+	}
+	return blocks;
+}
+
 /** Resolve mixed community/official block ids into importable payloads. */
 async function resolveImportableBlocks(
 	db: D1Database,
@@ -837,11 +921,149 @@ async function resolveImportableBlocks(
 	return blocks;
 }
 
+const CHART_SHARED_STYLES = new Set(["poster", "thumb", "hero"]);
+const COLLECTION_SHARED_STYLES = new Set([
+	"rank",
+	"banner",
+	"image",
+	"image-landscape",
+	"image-portrait",
+]);
+
+interface PackEntryInput {
+	blockId: string;
+	style?: string;
+	showRank?: boolean;
+	showOverview?: boolean;
+}
+
+function parsePackEntry(raw: unknown): PackEntryInput | null {
+	if (!raw || typeof raw !== "object") return null;
+	const blockId = String((raw as { blockId?: unknown }).blockId ?? "").trim();
+	if (!/^[a-zA-Z0-9_-]+$/.test(blockId)) return null;
+	const styleRaw = (raw as { style?: unknown }).style;
+	const style =
+		typeof styleRaw === "string" && styleRaw.trim() ? styleRaw.trim() : undefined;
+	const showRank =
+		typeof (raw as { showRank?: unknown }).showRank === "boolean"
+			? (raw as { showRank: boolean }).showRank
+			: undefined;
+	const showOverview =
+		typeof (raw as { showOverview?: unknown }).showOverview === "boolean"
+			? (raw as { showOverview: boolean }).showOverview
+			: undefined;
+	return { blockId, style, showRank, showOverview };
+}
+
+function parsePackEntries(body: Record<string, unknown> | null): PackEntryInput[] {
+	if (!body) return [];
+	const seen = new Set<string>();
+	const entries: PackEntryInput[] = [];
+	const push = (entry: PackEntryInput | null) => {
+		if (!entry || seen.has(entry.blockId)) return;
+		seen.add(entry.blockId);
+		entries.push(entry);
+	};
+	if (Array.isArray(body.entries)) {
+		for (const raw of body.entries) push(parsePackEntry(raw));
+		return entries;
+	}
+	if (!Array.isArray(body.blockIds)) return [];
+	for (const id of body.blockIds) {
+		const blockId = String(id).trim();
+		if (!/^[a-zA-Z0-9_-]+$/.test(blockId)) continue;
+		push({ blockId });
+	}
+	return entries;
+}
+
+function applyPackEntryOverrides(
+	block: ImportableEntry,
+	entry: PackEntryInput,
+): ImportableEntry {
+	let result = block;
+	if (entry.style) {
+		const allowed =
+			block.preset === COLLECTION_PRESET
+				? COLLECTION_SHARED_STYLES
+				: CHART_SHARED_STYLES;
+		if (allowed.has(entry.style)) {
+			result = { ...block, style: entry.style } as ImportableEntry;
+		}
+	}
+	if (result.preset === COLLECTION_PRESET) return result;
+	const hb = result as ImportableBlock;
+	const next: ImportableBlock = { ...hb };
+	if (typeof entry.showRank === "boolean") next.showRank = entry.showRank;
+	if (typeof entry.showOverview === "boolean") {
+		next.showOverview = entry.showOverview;
+	}
+	return next;
+}
+
+/** Web library picker: resolve block ids + optional style overrides into a homepage. */
 app.post("/collections", async (c) => {
-	return c.json(
-		{ error: "网页端首页创建已关闭，请在 iOS 客户端分享首页。" },
-		410,
-	);
+	const body = (await c.req.json().catch(() => null)) as Record<
+		string,
+		unknown
+	> | null;
+	const title = String(body?.title || "")
+		.trim()
+		.slice(0, MAX_COLLECTION_TITLE_LEN);
+	const entries = parsePackEntries(body);
+	const language = VALID_LANGUAGES.has(String(body?.language))
+		? String(body?.language)
+		: DEFAULT_LANGUAGE;
+
+	if (!title) return c.json({ error: "请填写首页标题" }, 400);
+	if (entries.length === 0) {
+		return c.json({ error: "请至少选择一个区块" }, 400);
+	}
+	if (entries.length > MAX_COLLECTION_BLOCKS) {
+		return c.json({ error: `最多选择 ${MAX_COLLECTION_BLOCKS} 个区块` }, 400);
+	}
+
+	try {
+		const db = getDb(c);
+		const resolved = await resolveImportableBlocks(
+			db,
+			entries.map((entry) => entry.blockId),
+			language,
+		);
+		if (resolved.length === 0) {
+			return c.json({ error: "所选区块不存在" }, 400);
+		}
+		if (resolved.length !== entries.length) {
+			return c.json({ error: "部分区块不存在或不可用" }, 400);
+		}
+		const entryById = new Map(entries.map((entry) => [entry.blockId, entry]));
+		const blocks = resolved.map((block) =>
+			applyPackEntryOverrides(block, entryById.get(block.id) ?? { blockId: block.id }),
+		);
+		const collectionId = shortId();
+		await insertBlockCollection(db, {
+			collectionId,
+			title,
+			blocksJson: JSON.stringify({ version: 1, blocks }),
+			blockCount: blocks.length,
+			createdAt: new Date().toISOString(),
+			status: "approved",
+			authorName: sanitizeAuthorName(body),
+			description: sanitizeDescription(body),
+		});
+		return c.json({
+			ok: true,
+			collectionId,
+			blockCount: blocks.length,
+			importUrl: `${IMPORT_LINK_BASE}?collectionId=${collectionId}`,
+			detailUrl: `/blocks/homepages/${collectionId}`,
+		});
+	} catch (error) {
+		if (error instanceof ServiceUnavailable) {
+			return c.json({ error: error.message }, 503);
+		}
+		throw error;
+	}
 });
 
 app.post("/collections/share", async (c) => {
