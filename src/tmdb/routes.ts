@@ -6,6 +6,164 @@ const tmdbApp = new Hono();
 const TMDB_IMAGE_CACHE_CONTROL =
   "public, max-age=31536000, s-maxage=31536000, immutable";
 
+function cacheHeader(maxAgeSeconds: number, swrSeconds: number): string {
+  return `public, max-age=${maxAgeSeconds}, s-maxage=${maxAgeSeconds}, stale-while-revalidate=${swrSeconds}`;
+}
+
+/** Per-surface TTLs — matched to how often TMDB data actually changes. */
+const CACHE = {
+  /** find, external_ids, genre lists */
+  immutable: cacheHeader(2_592_000, 604_800),
+  /** poster/backdrop/logo lists */
+  artwork: cacheHeader(2_592_000, 604_800),
+  /** movie/tv/collection/person details */
+  details: cacheHeader(604_800, 86_400),
+  /** cast & crew */
+  credits: cacheHeader(604_800, 86_400),
+  /** recommendations — shift more often than static metadata */
+  similar: cacheHeader(86_400, 21_600),
+  /** trailers/clips occasionally added */
+  videos: cacheHeader(259_200, 43_200),
+  /** episode lists for airing shows */
+  season: cacheHeader(43_200, 10_800),
+  /** filmography pages */
+  personCredits: cacheHeader(259_200, 43_200),
+  /** popular / top_rated charts */
+  charts: cacheHeader(86_400, 21_600),
+  /** trending week window */
+  trendingWeek: cacheHeader(86_400, 21_600),
+  /** trending day window */
+  trendingDay: cacheHeader(10_800, 3_600),
+  /** release calendars */
+  upcoming: cacheHeader(43_200, 10_800),
+  onTheAir: cacheHeader(43_200, 10_800),
+  /** filtered home-feed discover queries */
+  discover: cacheHeader(21_600, 3_600),
+  /** same query → same results for a long window */
+  search: cacheHeader(86_400, 21_600),
+} as const;
+
+function defaultCache(): Cache | null {
+  if (typeof caches === "undefined") return null;
+  return (caches as unknown as { default?: Cache }).default ?? null;
+}
+
+/** Strip the parent mount prefix so matchers work inside `app.route("/tmdb", …)`. */
+function tmdbApiPath(rawPath: string): string {
+  if (rawPath.startsWith("/tmdb/")) {
+    return rawPath.slice("/tmdb".length);
+  }
+  if (rawPath === "/tmdb") {
+    return "/";
+  }
+  return rawPath;
+}
+
+function cacheControlForRequest(c: Context): string | null {
+  const path = tmdbApiPath(c.req.path);
+  if (path.startsWith("/image/")) return null;
+
+  const url = new URL(c.req.url);
+
+  if (
+    path === "/find" ||
+    /^\/genre\/(movie|tv)\/list$/.test(path) ||
+    /^\/(movie|tv)\/external_ids$/.test(path)
+  ) {
+    return CACHE.immutable;
+  }
+
+  if (/^\/(movie|tv)\/images$/.test(path) || path === "/tv/season/images") {
+    return CACHE.artwork;
+  }
+
+  if (
+    /^\/(movie|tv)\/details$/.test(path) ||
+    path === "/collection/details" ||
+    path === "/person/details"
+  ) {
+    return CACHE.details;
+  }
+
+  if (/^\/(movie|tv)\/credits$/.test(path)) {
+    return CACHE.credits;
+  }
+
+  if (/^\/(movie|tv)\/similar$/.test(path)) {
+    return CACHE.similar;
+  }
+
+  if (/^\/(movie|tv)\/videos$/.test(path)) {
+    return CACHE.videos;
+  }
+
+  if (path === "/tv/season/details") {
+    return CACHE.season;
+  }
+
+  if (path === "/person/movie_credits" || path === "/person/tv_credits") {
+    return CACHE.personCredits;
+  }
+
+  if (/^\/(movie|tv)\/(popular|top_rated)$/.test(path)) {
+    return CACHE.charts;
+  }
+
+  if (path === "/movie/upcoming") {
+    return CACHE.upcoming;
+  }
+
+  if (path === "/tv/on_the_air") {
+    return CACHE.onTheAir;
+  }
+
+  if (path.startsWith("/trending/")) {
+    const timeWindow = url.searchParams.get("timeWindow") || "day";
+    return timeWindow === "week" ? CACHE.trendingWeek : CACHE.trendingDay;
+  }
+
+  if (path.startsWith("/discover/")) {
+    return CACHE.discover;
+  }
+
+  if (path.startsWith("/search/")) {
+    return CACHE.search;
+  }
+
+  return null;
+}
+
+async function cachedJsonGet(
+  c: Context,
+  cacheControl: string,
+  render: () => Promise<Response>,
+): Promise<Response> {
+  const cache = defaultCache();
+  if (c.req.method !== "GET" || !cache) {
+    return render();
+  }
+  const cacheKey = new Request(c.req.url, { method: "GET" });
+  const hit = await cache.match(cacheKey);
+  if (hit) return hit;
+  const response = await render();
+  if (response.ok) {
+    response.headers.set("Cache-Control", cacheControl);
+    c.executionCtx.waitUntil(cache.put(cacheKey, response.clone()));
+  }
+  return response;
+}
+
+tmdbApp.use("*", async (c, next) => {
+  const cacheControl = cacheControlForRequest(c);
+  if (!cacheControl || c.req.method !== "GET") {
+    return next();
+  }
+  return cachedJsonGet(c, cacheControl, async () => {
+    await next();
+    return c.res;
+  });
+});
+
 async function proxyTmdbDiscover(c: Context, path: string) {
   if (!process.env.TMDB_API_TOKEN) {
     throw new Error("TMDB_API_TOKEN is not set");
