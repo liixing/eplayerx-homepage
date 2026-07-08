@@ -4,7 +4,7 @@ import adminApp from "./blocks/admin.js";
 import blocksApp, { importLandingApp } from "./blocks/index.js";
 import crawlerApp from "./crawler/index.js";
 import homeApp from "./home/index.js";
-import tmdbApp from "./tmdb/index.js";
+import tmdbApp, { tmdbCacheMiddleware } from "./tmdb/index.js";
 
 const app = new Hono();
 
@@ -23,6 +23,7 @@ const publicCors = cors({
 });
 
 app.use("/tmdb/*", publicCors);
+app.use("/tmdb/*", tmdbCacheMiddleware);
 app.use("/crawler/*", publicCors);
 app.use("/blocks/community", publicCors);
 app.use("/blocks/data/*", publicCors);

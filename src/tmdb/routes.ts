@@ -133,36 +133,36 @@ function cacheControlForRequest(c: Context): string | null {
   return null;
 }
 
-async function cachedJsonGet(
-  c: Context,
-  cacheControl: string,
-  render: () => Promise<Response>,
-): Promise<Response> {
-  const cache = defaultCache();
-  if (c.req.method !== "GET" || !cache) {
-    return render();
-  }
-  const cacheKey = new Request(c.req.url, { method: "GET" });
-  const hit = await cache.match(cacheKey);
-  if (hit) return hit;
-  const response = await render();
-  if (response.ok) {
-    response.headers.set("Cache-Control", cacheControl);
-    c.executionCtx.waitUntil(cache.put(cacheKey, response.clone()));
-  }
-  return response;
-}
-
-tmdbApp.use("*", async (c, next) => {
-  const cacheControl = cacheControlForRequest(c);
-  if (!cacheControl || c.req.method !== "GET") {
+export async function tmdbCacheMiddleware(c: Context, next: () => Promise<void>) {
+  if (c.req.method !== "GET" && c.req.method !== "HEAD") {
     return next();
   }
-  return cachedJsonGet(c, cacheControl, async () => {
-    await next();
-    return c.res;
-  });
-});
+
+  const cacheControl = cacheControlForRequest(c);
+  if (!cacheControl) {
+    return next();
+  }
+
+  const cache = defaultCache();
+  const cacheKey = new Request(c.req.url, { method: "GET" });
+  if (cache) {
+    const hit = await cache.match(cacheKey);
+    if (hit) {
+      const headers = new Headers(hit.headers);
+      headers.set("Cache-Control", cacheControl);
+      return new Response(c.req.method === "HEAD" ? null : hit.body, {
+        status: hit.status,
+        headers,
+      });
+    }
+  }
+
+  await next();
+  c.header("Cache-Control", cacheControl);
+  if (cache && c.req.method === "GET" && c.res.ok) {
+    c.executionCtx.waitUntil(cache.put(cacheKey, c.res.clone()));
+  }
+}
 
 async function proxyTmdbDiscover(c: Context, path: string) {
   if (!process.env.TMDB_API_TOKEN) {
