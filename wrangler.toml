@@ -15,6 +15,9 @@ routes = [
 	{ pattern = "eplayerx.com/blocks*", zone_name = "eplayerx.com" },
 ]
 
+[placement]
+mode = "smart"
+
 [observability]
 enabled = true
 
