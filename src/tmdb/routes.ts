@@ -153,6 +153,42 @@ tmdbApp.get("/movie/external_ids", async (c) => {
   return c.json(result.data);
 });
 
+tmdbApp.get("/find", async (c) => {
+  const id = c.req.query("id") || "";
+  const externalSource = c.req.query("external_source") || "imdb_id";
+  const language = c.req.query("language");
+
+  if (!id) {
+    return c.json({ error: "id is required" }, 400);
+  }
+
+  const result = await tmdb.GET(`/3/find/${id}`, {
+    params: {
+      query: {
+        external_source: externalSource as
+          | ""
+          | "imdb_id"
+          | "facebook_id"
+          | "instagram_id"
+          | "tvdb_id"
+          | "tiktok_id"
+          | "twitter_id"
+          | "wikidata_id"
+          | "youtube_id",
+        ...(language ? { language } : {}),
+      },
+      path: {
+        external_id: id,
+      },
+    },
+  });
+
+  if (result.response.status !== 200) {
+    return c.json({ error: result.error }, 500);
+  }
+  return c.json(result.data);
+});
+
 tmdbApp.get("/movie/credits", async (c) => {
   const id = c.req.query("id") || "";
   const language = c.req.query("language") || "en";
