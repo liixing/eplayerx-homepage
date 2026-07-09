@@ -21,6 +21,10 @@ app.get("/config", (c) => {
 		process.env.TMDB_IMAGE_BASE_URL ||
 		DEFAULT_IMAGE_BASE_URL;
 
+	c.header(
+		"Cache-Control",
+		"public, max-age=300, s-maxage=300, stale-while-revalidate=3600",
+	);
 	return c.json(
 		createDefaultHomeConfig({
 			apiBaseUrl,

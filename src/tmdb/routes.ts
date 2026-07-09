@@ -841,12 +841,11 @@ tmdbApp.get("/trending/tv", async (c) => {
   }
 
   if (page === 1 && result.data?.results?.length) {
-    const enriched = await enrichWithImages(
-      result.data.results as Record<string, unknown>[],
-      language,
-      "tv"
-    );
-    return c.json({ ...result.data, results: enriched });
+    const results = result.data.results as Record<string, unknown>[];
+    const top = results.slice(0, 10);
+    const rest = results.slice(10);
+    const enriched = await enrichWithImages(top, language, "tv");
+    return c.json({ ...result.data, results: [...enriched, ...rest] });
   }
   return c.json(result.data);
 });

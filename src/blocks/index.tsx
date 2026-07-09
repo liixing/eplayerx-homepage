@@ -33,6 +33,7 @@ import {
 	listCommunityBlocks,
 	listCommunityLanguages,
 	publicDataUrl,
+	publicKey,
 	isCollectionPreviewBlob,
 } from "./storage.js";
 import {
@@ -73,8 +74,8 @@ const VALID_LANGUAGES = new Set(TMDB_LANGUAGES.map((l) => l.code));
 const MAX_SOURCE_LEN = 100_000;
 const PREVIEW_LIMIT = 20;
 const WEB_COMMUNITY_PAGE_SIZE = 50;
-const PUBLIC_CACHE_MAX_AGE_SECONDS = 30;
-const PUBLIC_CACHE_STALE_SECONDS = 120;
+const PUBLIC_CACHE_MAX_AGE_SECONDS = 300;
+const PUBLIC_CACHE_STALE_SECONDS = 900;
 const HOT_D1_READ_CACHE_MS = 60_000;
 
 const R2_PUBLIC_BASE = `https://${process.env.R2_CUSTOM_DOMAIN || "assets.eplayerx.com"}`;
@@ -622,13 +623,36 @@ app.get("/community", (c) =>
 	}),
 );
 
+/**
+ * Prefer the Workers R2 binding (no CDN hop). Fall back to the public
+ * custom-domain URL when ASSETS is unbound (local Bun / Docker).
+ */
+async function readPublicSnapshotObject(
+	c: BlocksContext,
+	blockId: string,
+): Promise<
+	| { kind: "r2"; object: R2ObjectBody }
+	| { kind: "http"; response: Response }
+	| null
+> {
+	const key = publicKey(blockId);
+	const bucket = c.env.ASSETS;
+	if (bucket) {
+		const object = await bucket.get(key);
+		return object ? { kind: "r2", object } : null;
+	}
+	const response = await fetch(publicDataUrl(blockId));
+	if (response.status === 404) return null;
+	return { kind: "http", response };
+}
+
 app.get("/data/:blockId", (c) =>
 	publicCachedGet(c, async () => {
 		const blockId = c.req.param("blockId").replace(/[^a-zA-Z0-9_-]/g, "");
 		const limit = Number.parseInt(c.req.query("limit") || "", 10);
-		let response = await fetch(publicDataUrl(blockId));
+		const object = await readPublicSnapshotObject(c, blockId);
 		// Legacy collections never wrote a merged preview — build once on first read.
-		if (response.status === 404) {
+		if (!object) {
 			try {
 				const preview = await ensureCollectionPreviewBlob(getDb(c), blockId);
 				if (preview) {
@@ -637,19 +661,36 @@ app.get("/data/:blockId", (c) =>
 			} catch {
 				// fall through to 404
 			}
+			return c.json({ error: "Not found" }, 404);
 		}
-		// Without a limit (the iOS client) stream the snapshot through untouched;
-		// the blob carries the block's display title since publish time.
-		if (!response.ok || !Number.isFinite(limit) || limit <= 0) {
-			return new Response(response.body, {
-				status: response.status,
+		if (object.kind === "http" && !object.response.ok) {
+			return new Response(object.response.body, {
+				status: object.response.status,
 				headers: {
 					"Content-Type":
-						response.headers.get("Content-Type") || "application/json",
+						object.response.headers.get("Content-Type") || "application/json",
 				},
 			});
 		}
-		const blob = (await response.json()) as SnapshotBlob | CollectionPreviewBlob;
+		const body =
+			object.kind === "r2" ? object.object.body : object.response.body;
+		const contentType =
+			object.kind === "r2"
+				? object.object.httpMetadata?.contentType || "application/json"
+				: object.response.headers.get("Content-Type") || "application/json";
+		// Without a limit (the iOS client) stream the snapshot through untouched;
+		// the blob carries the block's display title since publish time.
+		if (!Number.isFinite(limit) || limit <= 0) {
+			return new Response(body, {
+				status: 200,
+				headers: { "Content-Type": contentType },
+			});
+		}
+		const blob = (
+			object.kind === "r2"
+				? await object.object.json()
+				: await object.response.json()
+		) as SnapshotBlob | CollectionPreviewBlob;
 		if (isCollectionPreviewBlob(blob)) {
 			return c.json(blob);
 		}

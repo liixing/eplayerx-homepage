@@ -1,3 +1,4 @@
+/// <reference types="@cloudflare/workers-types" />
 import { type Context, Hono } from "hono";
 import {
   crawlBangumiAnimation,
@@ -12,7 +13,156 @@ import {
 
 const R2_CUSTOM_DOMAIN = process.env.R2_CUSTOM_DOMAIN || "assets.eplayerx.com";
 
-const app = new Hono();
+/** Cron-refreshed charts — long edge TTL is safe. */
+const STATIC_JSON_CACHE_CONTROL =
+  "public, max-age=3600, s-maxage=3600, stale-while-revalidate=21600";
+
+type CrawlerBindings = {
+  ASSETS?: R2Bucket;
+};
+
+type CrawlerContext = Context<{ Bindings: CrawlerBindings }>;
+
+const app = new Hono<{ Bindings: CrawlerBindings }>();
+
+function defaultCache(): Cache | null {
+  if (typeof caches === "undefined") return null;
+  return (caches as unknown as { default?: Cache }).default ?? null;
+}
+
+/**
+ * Prefer the Workers R2 binding (no CDN hop). Fall back to the public
+ * custom-domain URL when ASSETS is unbound (local Bun / Docker).
+ */
+async function serveStaticR2Json(
+  c: CrawlerContext,
+  key: string
+): Promise<Response> {
+  const result = await readStaticR2Object(c, key);
+  if (!result) {
+    return new Response(JSON.stringify({ error: "Not found" }), {
+      status: 404,
+      headers: {
+        "Content-Type": "application/json",
+        "Cache-Control": STATIC_JSON_CACHE_CONTROL,
+      },
+    });
+  }
+  if (result.kind === "http" && !result.response.ok) {
+    return new Response(result.response.body, {
+      status: result.response.status,
+      headers: {
+        "Content-Type":
+          result.response.headers.get("Content-Type") || "application/json",
+        "Cache-Control": STATIC_JSON_CACHE_CONTROL,
+      },
+    });
+  }
+  const body =
+    result.kind === "r2" ? result.object.body : result.response.body;
+  const contentType =
+    result.kind === "r2"
+      ? result.object.httpMetadata?.contentType || "application/json"
+      : result.response.headers.get("Content-Type") || "application/json";
+  return new Response(body, {
+    status: 200,
+    headers: {
+      "Content-Type": contentType,
+      "Cache-Control": STATIC_JSON_CACHE_CONTROL,
+    },
+  });
+}
+
+async function readStaticR2Json(
+  c: CrawlerContext,
+  key: string
+): Promise<{ ok: true; data: unknown } | { ok: false; response: Response }> {
+  const result = await readStaticR2Object(c, key);
+  if (!result) {
+    return {
+      ok: false,
+      response: new Response(JSON.stringify({ error: "Not found" }), {
+        status: 404,
+        headers: {
+          "Content-Type": "application/json",
+          "Cache-Control": STATIC_JSON_CACHE_CONTROL,
+        },
+      }),
+    };
+  }
+  if (result.kind === "http" && !result.response.ok) {
+    return {
+      ok: false,
+      response: new Response(result.response.body, {
+        status: result.response.status,
+        headers: {
+          "Content-Type":
+            result.response.headers.get("Content-Type") || "application/json",
+          "Cache-Control": STATIC_JSON_CACHE_CONTROL,
+        },
+      }),
+    };
+  }
+  const data =
+    result.kind === "r2"
+      ? await result.object.json()
+      : await result.response.json();
+  return { ok: true, data };
+}
+
+async function readStaticR2Object(
+  c: CrawlerContext,
+  key: string
+): Promise<
+  | { kind: "r2"; object: R2ObjectBody }
+  | { kind: "http"; response: Response }
+  | null
+> {
+  const bucket = c.env.ASSETS;
+  if (bucket) {
+    const object = await bucket.get(key);
+    return object ? { kind: "r2", object } : null;
+  }
+  const response = await fetch(`https://${R2_CUSTOM_DOMAIN}/${key}`);
+  if (response.status === 404) return null;
+  return { kind: "http", response };
+}
+
+/** Edge-cache GET responses for popular / discover chart routes. */
+async function staticJsonCacheMiddleware(
+  c: CrawlerContext,
+  next: () => Promise<void>
+) {
+  if (c.req.method !== "GET" && c.req.method !== "HEAD") {
+    return next();
+  }
+  const cache = defaultCache();
+  if (!cache) {
+    return next();
+  }
+  const cacheKey = new Request(c.req.url, { method: "GET" });
+  const hit = await cache.match(cacheKey);
+  if (hit) {
+    const headers = new Headers(hit.headers);
+    if (!headers.has("Cache-Control")) {
+      headers.set("Cache-Control", STATIC_JSON_CACHE_CONTROL);
+    }
+    return new Response(c.req.method === "HEAD" ? null : hit.body, {
+      status: hit.status,
+      headers,
+    });
+  }
+  await next();
+  if (c.req.method === "GET" && c.res.ok) {
+    if (!c.res.headers.has("Cache-Control")) {
+      c.header("Cache-Control", STATIC_JSON_CACHE_CONTROL);
+    }
+    c.executionCtx.waitUntil(cache.put(cacheKey, c.res.clone()));
+  }
+}
+
+app.use("/popular/*", staticJsonCacheMiddleware);
+app.use("/discover/*", staticJsonCacheMiddleware);
 
 type Locale = "en" | "zh" | "zh-Hant" | "ja" | "es" | "ar";
 
@@ -466,148 +616,64 @@ app.get("/cron/crawl-all", async (c) => {
   }
 });
 
-app.get("/popular/douban/movies", async (_c) => {
-  const url = `https://${R2_CUSTOM_DOMAIN}/douban-movies.json`;
-  const response = await fetch(url);
-  return new Response(response.body, {
-    status: response.status,
-    headers: {
-      "Content-Type":
-        response.headers.get("Content-Type") || "application/json",
-    },
-  });
-});
+app.get("/popular/douban/movies", (c) =>
+  serveStaticR2Json(c, "douban-movies.json")
+);
 
-app.get("/popular/douban/tv", async (_c) => {
-  const url = `https://${R2_CUSTOM_DOMAIN}/douban-tv.json`;
-  const response = await fetch(url);
-  return new Response(response.body, {
-    status: response.status,
-    headers: {
-      "Content-Type":
-        response.headers.get("Content-Type") || "application/json",
-    },
-  });
-});
+app.get("/popular/douban/tv", (c) => serveStaticR2Json(c, "douban-tv.json"));
 
-app.get("/popular/douban/korean-tv", async (_c) => {
-  const url = `https://${R2_CUSTOM_DOMAIN}/douban-korean-tv.json`;
-  const response = await fetch(url);
-  return new Response(response.body, {
-    status: response.status,
-    headers: {
-      "Content-Type":
-        response.headers.get("Content-Type") || "application/json",
-    },
-  });
-});
+app.get("/popular/douban/korean-tv", (c) =>
+  serveStaticR2Json(c, "douban-korean-tv.json")
+);
 
-app.get("/popular/douban/japanese-tv", async (_c) => {
-  const url = `https://${R2_CUSTOM_DOMAIN}/douban-japanese-tv.json`;
-  const response = await fetch(url);
-  return new Response(response.body, {
-    status: response.status,
-    headers: {
-      "Content-Type":
-        response.headers.get("Content-Type") || "application/json",
-    },
-  });
-});
+app.get("/popular/douban/japanese-tv", (c) =>
+  serveStaticR2Json(c, "douban-japanese-tv.json")
+);
 
-app.get("/popular/hami/taiwanese-tv", async (_c) => {
-  const url = `https://${R2_CUSTOM_DOMAIN}/hami-taiwanese-tv.json`;
-  const response = await fetch(url);
-  return new Response(response.body, {
-    status: response.status,
-    headers: {
-      "Content-Type":
-        response.headers.get("Content-Type") || "application/json",
-    },
-  });
-});
+app.get("/popular/hami/taiwanese-tv", (c) =>
+  serveStaticR2Json(c, "hami-taiwanese-tv.json")
+);
 
-app.get("/popular/douban/animation", async (_c) => {
-  const url = `https://${R2_CUSTOM_DOMAIN}/douban-animation.json`;
-  const response = await fetch(url);
-  return new Response(response.body, {
-    status: response.status,
-    headers: {
-      "Content-Type":
-        response.headers.get("Content-Type") || "application/json",
-    },
-  });
-});
+app.get("/popular/douban/animation", (c) =>
+  serveStaticR2Json(c, "douban-animation.json")
+);
 
-app.get("/popular/douban/hot-variety-shows", async (_c) => {
-  const url = `https://${R2_CUSTOM_DOMAIN}/douban-hot-variety-shows.json`;
-  const response = await fetch(url);
-  return new Response(response.body, {
-    status: response.status,
-    headers: {
-      "Content-Type":
-        response.headers.get("Content-Type") || "application/json",
-    },
-  });
-});
+app.get("/popular/douban/hot-variety-shows", (c) =>
+  serveStaticR2Json(c, "douban-hot-variety-shows.json")
+);
 
-app.get("/popular/bangumi/animation", async (_c) => {
-  const url = `https://${R2_CUSTOM_DOMAIN}/bangumi-animation.json`;
-  const response = await fetch(url);
-  return new Response(response.body, {
-    status: response.status,
-    headers: {
-      "Content-Type":
-        response.headers.get("Content-Type") || "application/json",
-    },
-  });
-});
+app.get("/popular/bangumi/animation", (c) =>
+  serveStaticR2Json(c, "bangumi-animation.json")
+);
 
 app.get("/discover/genres", (c) => {
   const locale = resolveRequestLocale(c) ?? "en";
-  return c.json(createDiscoverGenres(locale));
+  const body = createDiscoverGenres(locale);
+  return c.json(body, 200, {
+    "Cache-Control": STATIC_JSON_CACHE_CONTROL,
+  });
 });
 
 app.get("/discover/tv-by-language", async (c) => {
   const locale = resolveRequestLocale(c);
-  const url = `https://${R2_CUSTOM_DOMAIN}/discover-tv-by-language.json`;
-  const response = await fetch(url);
+  const key = "discover-tv-by-language.json";
   if (!locale) {
-    return new Response(response.body, {
-      status: response.status,
-      headers: {
-        "Content-Type":
-          response.headers.get("Content-Type") || "application/json",
-      },
-    });
-  }
-  if (!response.ok) {
-    return new Response(response.body, {
-      status: response.status,
-      headers: {
-        "Content-Type":
-          response.headers.get("Content-Type") || "application/json",
-      },
-    });
+    return serveStaticR2Json(c, key);
   }
 
-  const payload = (await response.json()) as DiscoverTVByLanguageResponse;
-  return c.json(localizeDiscoverTVByLanguage(payload, locale));
+  const result = await readStaticR2Json(c, key);
+  if (!result.ok) return result.response;
+  const payload = result.data as DiscoverTVByLanguageResponse;
+  return c.json(localizeDiscoverTVByLanguage(payload, locale), 200, {
+    "Cache-Control": STATIC_JSON_CACHE_CONTROL,
+  });
 });
 
 app.get("/discover/tv-by-network", async (c) => {
-  const url = `https://${R2_CUSTOM_DOMAIN}/discover-tv-by-network.json`;
-  const response = await fetch(url);
-  if (!response.ok) {
-    return new Response(response.body, {
-      status: response.status,
-      headers: {
-        "Content-Type":
-          response.headers.get("Content-Type") || "application/json",
-      },
-    });
-  }
+  const result = await readStaticR2Json(c, "discover-tv-by-network.json");
+  if (!result.ok) return result.response;
+  const payload = result.data as DiscoverTVByNetworkResponse;
 
-  const payload = (await response.json()) as DiscoverTVByNetworkResponse;
   const data = (payload.data ?? []).map((item) => {
     const title = item.networkName || String(item.networkId);
     return {
@@ -622,11 +688,15 @@ app.get("/discover/tv-by-network", async (c) => {
     };
   });
 
-  return c.json({
-    ...payload,
-    count: payload.count ?? data.length,
-    data,
-  });
+  return c.json(
+    {
+      ...payload,
+      count: payload.count ?? data.length,
+      data,
+    },
+    200,
+    { "Cache-Control": STATIC_JSON_CACHE_CONTROL }
+  );
 });
 
 export default app;
