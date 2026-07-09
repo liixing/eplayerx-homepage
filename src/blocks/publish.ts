@@ -18,11 +18,10 @@
 
 import path from "node:path";
 import {
-	fetchImageMeta,
+	fetchDetailsWithEnrichment,
 	type SearchTmdbOptions,
 	searchTMDB,
 	type TmdbClient,
-	type TmdbSearchResult,
 } from "../crawler/tmdb-enrich.js";
 import { createTmdbClient } from "../tmdb/client.js";
 import { shortId } from "./runtime.js";
@@ -185,34 +184,37 @@ function buildQueries(item: PublishItem): string[] {
 }
 
 /** Details payload carries `genres` objects instead of search's `genre_ids`. */
-interface TmdbDetails extends TmdbSearchResult {
-	genres?: { id: number }[];
+interface TmdbSearchHit {
+	id?: number;
 }
 
-/** Fetch localized details directly when the source already knows the TMDB id. */
-async function fetchDetailsById(
-	tmdbId: number,
+async function resolveTmdbId(
+	item: PublishItem,
 	mediaType: MediaType,
-	language: string | undefined,
+	searchOptions: SearchTmdbOptions,
 	client: TmdbClient,
-): Promise<TmdbSearchResult | null> {
-	try {
-		const query = { language: language ?? "zh-CN" };
-		const result =
-			mediaType === "movie"
-				? await client.GET(`/3/movie/${tmdbId}`, {
-						params: { path: { movie_id: tmdbId }, query },
-					})
-				: await client.GET(`/3/tv/${tmdbId}`, {
-						params: { path: { series_id: tmdbId }, query },
-					});
-		const data = result.data as TmdbDetails | undefined;
-		if (!data?.id) return null;
-		return { ...data, genre_ids: data.genres?.map((g) => g.id) ?? [] };
-	} catch (error) {
-		console.error(`TMDB details error for ${mediaType}/${tmdbId}:`, error);
-		return null;
+): Promise<{ tmdbId: number; mediaType: MediaType } | null> {
+	const itemMediaType = item.mediaType ?? mediaType;
+	if (item.tmdbId) {
+		return { tmdbId: item.tmdbId, mediaType: itemMediaType };
 	}
+
+	let tmdbData: TmdbSearchHit | null = null;
+	const options = item.year
+		? { ...searchOptions, year: item.year }
+		: searchOptions;
+	for (const query of buildQueries(item)) {
+		tmdbData = await searchTMDB(query, itemMediaType, options, client);
+		if (tmdbData?.id) break;
+	}
+	if (!tmdbData?.id && item.year) {
+		for (const query of buildQueries(item)) {
+			tmdbData = await searchTMDB(query, itemMediaType, searchOptions, client);
+			if (tmdbData?.id) break;
+		}
+	}
+	if (!tmdbData?.id) return null;
+	return { tmdbId: tmdbData.id, mediaType: itemMediaType };
 }
 
 function dedupeByTmdbId(items: SnapshotItem[]): SnapshotItem[] {
@@ -230,62 +232,38 @@ async function resolveItem(
 	client: TmdbClient,
 	useTmdbTitle: boolean,
 ): Promise<SnapshotItem | null> {
-	let tmdbData: TmdbSearchResult | null = null;
-	const itemMediaType = item.mediaType ?? mediaType;
-	if (item.tmdbId) {
-		tmdbData = await fetchDetailsById(
-			item.tmdbId,
-			itemMediaType,
-			searchOptions.language,
-			client,
-		);
-		if (!tmdbData?.id) return null;
-	}
-	if (!tmdbData?.id) {
-		const options = item.year
-			? { ...searchOptions, year: item.year }
-			: searchOptions;
-		for (const query of buildQueries(item)) {
-			tmdbData = await searchTMDB(query, itemMediaType, options, client);
-			if (tmdbData?.id) break;
-		}
-	}
-	// Source years can drift from TMDB (re-releases, remakes mislabeled):
-	// retry once without the year filter before giving up.
-	if (!tmdbData?.id && item.year) {
-		for (const query of buildQueries(item)) {
-			tmdbData = await searchTMDB(query, itemMediaType, searchOptions, client);
-			if (tmdbData?.id) break;
-		}
-	}
-	if (!tmdbData?.id) return null;
+	const resolved = await resolveTmdbId(item, mediaType, searchOptions, client);
+	if (!resolved) return null;
 
-	const { thumb, logo, noLogoPoster } = await fetchImageMeta(
-		tmdbData.id,
-		itemMediaType,
-		tmdbData.backdrop_path,
-		tmdbData.poster_path,
+	const enriched = await fetchDetailsWithEnrichment(
+		resolved.tmdbId,
+		resolved.mediaType,
+		searchOptions.language,
 		client,
 	);
+	if (!enriched) return null;
 
+	const { tmdbData, externalIds, imageMeta } = enriched;
 	const title = useTmdbTitle
 		? tmdbData.name || tmdbData.title || item.title
 		: item.title;
 
 	return {
 		title,
-		tmdbId: tmdbData.id,
+		tmdbId: resolved.tmdbId,
+		imdbId: externalIds.imdbId,
+		tvdbId: externalIds.tvdbId,
 		vote_average: tmdbData.vote_average ?? null,
 		poster_path: tmdbData.poster_path ?? null,
 		backdrop_path: tmdbData.backdrop_path ?? null,
 		genre_ids: tmdbData.genre_ids ?? [],
-		media_type: itemMediaType,
+		media_type: resolved.mediaType,
 		release_date: tmdbData.release_date ?? null,
 		first_air_date: tmdbData.first_air_date ?? null,
 		overview: tmdbData.overview ?? null,
-		thumb,
-		logo,
-		noLogoPoster,
+		thumb: imageMeta.thumb,
+		logo: imageMeta.logo,
+		noLogoPoster: imageMeta.noLogoPoster,
 	};
 }
 

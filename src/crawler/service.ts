@@ -51,6 +51,8 @@ const r2Client = new S3Client({
 export interface ContentItem {
   title: string;
   tmdbId: number;
+  imdbId?: string | null;
+  tvdbId?: number | null;
   vote_average: number | null;
   poster_path?: string | null;
   backdrop_path?: string | null;

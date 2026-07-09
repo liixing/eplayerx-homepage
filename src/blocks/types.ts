@@ -56,6 +56,8 @@ export interface ScrapeOptions {
 export interface SnapshotItem {
 	title: string;
 	tmdbId: number;
+	imdbId?: string | null;
+	tvdbId?: number | null;
 	vote_average: number | null;
 	poster_path?: string | null;
 	backdrop_path?: string | null;

@@ -8,6 +8,7 @@
 
 import {
 	GetObjectCommand,
+	ListObjectsV2Command,
 	PutObjectCommand,
 	S3Client,
 } from "@aws-sdk/client-s3";
@@ -141,6 +142,11 @@ async function streamToString(body: unknown): Promise<string> {
 
 /** Read a public snapshot straight from the bucket (no CDN). */
 export async function getSnapshot(key: string): Promise<SnapshotBlob> {
+	return (await getRawJson(key)) as SnapshotBlob;
+}
+
+/** Read any JSON object from R2. */
+export async function getRawJson(key: string): Promise<unknown> {
 	if (!R2_BUCKET_NAME) {
 		throw new Error("R2_BUCKET_NAME is not configured");
 	}
@@ -148,7 +154,47 @@ export async function getSnapshot(key: string): Promise<SnapshotBlob> {
 		new GetObjectCommand({ Bucket: R2_BUCKET_NAME, Key: key }),
 	);
 	const text = await streamToString(result.Body);
-	return JSON.parse(text) as SnapshotBlob;
+	return JSON.parse(text) as unknown;
+}
+
+/** List object keys under a prefix (paginated). */
+export async function listR2Keys(prefix: string): Promise<string[]> {
+	if (!R2_BUCKET_NAME) {
+		throw new Error("R2_BUCKET_NAME is not configured");
+	}
+	const keys: string[] = [];
+	let continuationToken: string | undefined;
+	do {
+		const result = await r2().send(
+			new ListObjectsV2Command({
+				Bucket: R2_BUCKET_NAME,
+				Prefix: prefix,
+				ContinuationToken: continuationToken,
+			}),
+		);
+		for (const entry of result.Contents ?? []) {
+			if (entry.Key?.endsWith(".json")) keys.push(entry.Key);
+		}
+		continuationToken = result.IsTruncated
+			? result.NextContinuationToken
+			: undefined;
+	} while (continuationToken);
+	return keys;
+}
+
+/** Write arbitrary JSON back to R2 (used by one-off backfill scripts). */
+export async function putRawJson(key: string, payload: unknown): Promise<void> {
+	if (!R2_BUCKET_NAME) {
+		throw new Error("R2_BUCKET_NAME is not configured");
+	}
+	await r2().send(
+		new PutObjectCommand({
+			Bucket: R2_BUCKET_NAME,
+			Key: key,
+			Body: JSON.stringify(payload),
+			ContentType: "application/json",
+		}),
+	);
 }
 
 // MARK: - D1 queries

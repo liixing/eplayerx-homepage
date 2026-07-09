@@ -24,9 +24,10 @@ import {
 	saveTVSeries,
 } from "./service.js";
 import {
-	fetchImageMeta,
+	fetchDetailsWithEnrichment,
 	searchTMDB,
 	TMDB_TV_GENRE_ANIMATION,
+	type TmdbSearchResult,
 } from "./tmdb-enrich.js";
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -61,6 +62,43 @@ function deduplicateByTmdbId(items: ContentItem[]): ContentItem[] {
 	return Array.from(map.values());
 }
 
+async function buildContentItem(
+	title: string,
+	tmdbData: TmdbSearchResult,
+	mediaType: "movie" | "tv",
+): Promise<ContentItem | null> {
+	const tmdbId = tmdbData.id;
+	if (!tmdbId) return null;
+
+	const enriched = await fetchDetailsWithEnrichment(tmdbId, mediaType, "zh-CN");
+	const data = enriched?.tmdbData ?? tmdbData;
+	const externalIds = enriched?.externalIds ?? { imdbId: null, tvdbId: null };
+	const imageMeta = enriched?.imageMeta ?? {
+		thumb: data.backdrop_path || data.poster_path || null,
+		logo: null,
+		noLogoPoster: data.poster_path ?? null,
+	};
+
+	return {
+		title,
+		tmdbId,
+		imdbId: externalIds.imdbId,
+		tvdbId: externalIds.tvdbId,
+		vote_average: data.vote_average ?? null,
+		poster_path: data.poster_path,
+		backdrop_path: data.backdrop_path,
+		genre_ids: data.genre_ids || [],
+		media_type: mediaType,
+		release_date: data.release_date || null,
+		first_air_date: data.first_air_date,
+		overview: data.overview,
+		thumb: imageMeta.thumb,
+		logo: imageMeta.logo,
+		noLogoPoster: imageMeta.noLogoPoster,
+		crawledAt: new Date().toISOString(),
+	};
+}
+
 async function crawlDoubanTVSeriesCollection(options: CrawlTVSeriesOptions) {
 	console.log(`📺 Crawling ${options.label}...`);
 
@@ -75,30 +113,11 @@ async function crawlDoubanTVSeriesCollection(options: CrawlTVSeriesOptions) {
 		const tmdbData = await searchTMDB(item.title, "tv");
 
 		if (tmdbData) {
-			const tmdbId = tmdbData.id as number;
-			const { thumb, logo, noLogoPoster } = await fetchImageMeta(
-				tmdbId,
-				"tv",
-				tmdbData.backdrop_path,
-				tmdbData.poster_path,
-			);
-
-			results.push({
-				title: item.title,
-				tmdbId,
-				vote_average: tmdbData.vote_average ?? null,
-				poster_path: tmdbData.poster_path,
-				backdrop_path: tmdbData.backdrop_path,
-				genre_ids: tmdbData.genre_ids || [],
-				media_type: "tv",
-				first_air_date: tmdbData.first_air_date,
-				overview: tmdbData?.overview,
-				thumb,
-				logo,
-				noLogoPoster,
-				crawledAt: new Date().toISOString(),
-			});
-			console.log(`✅ ${tmdbId}`);
+			const content = await buildContentItem(item.title, tmdbData, "tv");
+			if (content) {
+				results.push(content);
+				console.log(`✅ ${content.tmdbId}`);
+			}
 		} else {
 			console.log(`❌ Not found`);
 		}
@@ -136,30 +155,11 @@ export async function crawlDoubanMovies() {
 		const tmdbData = await searchTMDB(item.title, "movie");
 
 		if (tmdbData) {
-			const tmdbId = tmdbData.id as number;
-			const { thumb, logo, noLogoPoster } = await fetchImageMeta(
-				tmdbId,
-				"movie",
-				tmdbData.backdrop_path,
-				tmdbData.poster_path,
-			);
-
-			results.push({
-				title: item.title,
-				tmdbId,
-				vote_average: tmdbData.vote_average ?? null,
-				poster_path: tmdbData.poster_path,
-				backdrop_path: tmdbData.backdrop_path,
-				genre_ids: tmdbData.genre_ids || [],
-				media_type: "movie",
-				release_date: tmdbData.release_date || null,
-				overview: tmdbData?.overview,
-				thumb,
-				logo,
-				noLogoPoster,
-				crawledAt: new Date().toISOString(),
-			});
-			console.log(`✅ ${tmdbId}`);
+			const content = await buildContentItem(item.title, tmdbData, "movie");
+			if (content) {
+				results.push(content);
+				console.log(`✅ ${content.tmdbId}`);
+			}
 		} else {
 			console.log(`❌ Not found`);
 		}
@@ -235,30 +235,11 @@ export async function crawlDoubanAnimation() {
 		});
 
 		if (tmdbData) {
-			const tmdbId = tmdbData.id as number;
-			const { thumb, logo, noLogoPoster } = await fetchImageMeta(
-				tmdbId,
-				"tv",
-				tmdbData.backdrop_path,
-				tmdbData.poster_path,
-			);
-
-			results.push({
-				title,
-				tmdbId,
-				vote_average: tmdbData.vote_average ?? null,
-				poster_path: tmdbData.poster_path,
-				backdrop_path: tmdbData.backdrop_path,
-				genre_ids: tmdbData.genre_ids || [],
-				media_type: "tv",
-				first_air_date: tmdbData.first_air_date,
-				overview: tmdbData?.overview,
-				thumb,
-				logo,
-				noLogoPoster,
-				crawledAt: new Date().toISOString(),
-			});
-			console.log(`✅ ${tmdbId}`);
+			const content = await buildContentItem(title, tmdbData, "tv");
+			if (content) {
+				results.push(content);
+				console.log(`✅ ${content.tmdbId}`);
+			}
 		} else {
 			console.log(`❌ Not found (Animation genre)`);
 		}
@@ -296,30 +277,11 @@ export async function crawlDoubanHotVarietyShows() {
 		const tmdbData = await searchTMDB(item.title, "tv");
 
 		if (tmdbData) {
-			const tmdbId = tmdbData.id as number;
-			const { thumb, logo, noLogoPoster } = await fetchImageMeta(
-				tmdbId,
-				"tv",
-				tmdbData.backdrop_path,
-				tmdbData.poster_path,
-			);
-
-			results.push({
-				title: item.title,
-				tmdbId,
-				vote_average: tmdbData.vote_average ?? null,
-				poster_path: tmdbData.poster_path,
-				backdrop_path: tmdbData.backdrop_path,
-				genre_ids: tmdbData.genre_ids || [],
-				media_type: "tv",
-				first_air_date: tmdbData.first_air_date,
-				overview: tmdbData?.overview,
-				thumb,
-				logo,
-				noLogoPoster,
-				crawledAt: new Date().toISOString(),
-			});
-			console.log(`✅ ${tmdbId}`);
+			const content = await buildContentItem(item.title, tmdbData, "tv");
+			if (content) {
+				results.push(content);
+				console.log(`✅ ${content.tmdbId}`);
+			}
 		} else {
 			console.log(`❌ Not found`);
 		}
@@ -360,30 +322,11 @@ export async function crawlBangumiAnimation() {
 		});
 
 		if (tmdbData) {
-			const tmdbId = tmdbData.id as number;
-			const { thumb, logo, noLogoPoster } = await fetchImageMeta(
-				tmdbId,
-				"tv",
-				tmdbData.backdrop_path,
-				tmdbData.poster_path,
-			);
-
-			results.push({
-				title,
-				tmdbId,
-				vote_average: tmdbData.vote_average ?? null,
-				poster_path: tmdbData.poster_path,
-				backdrop_path: tmdbData.backdrop_path,
-				genre_ids: tmdbData.genre_ids || [],
-				media_type: "tv",
-				first_air_date: tmdbData.first_air_date,
-				overview: tmdbData?.overview,
-				thumb,
-				logo,
-				noLogoPoster,
-				crawledAt: new Date().toISOString(),
-			});
-			console.log(`✅ ${tmdbId}`);
+			const content = await buildContentItem(title, tmdbData, "tv");
+			if (content) {
+				results.push(content);
+				console.log(`✅ ${content.tmdbId}`);
+			}
 		} else {
 			console.log(`❌ Not found (Animation genre)`);
 		}

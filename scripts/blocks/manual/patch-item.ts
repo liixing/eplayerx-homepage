@@ -11,14 +11,13 @@
  * (legacy two-arg form "<oldTmdbId> <newTmdbId>" still works)
  */
 
-import { fetchImageMeta } from "../../../src/crawler/tmdb-enrich.js";
+import { fetchDetailsWithEnrichment } from "../../../src/crawler/tmdb-enrich.js";
 import {
 	getSnapshot,
 	publicKey,
 	putSnapshot,
 } from "../../../src/blocks/storage.js";
 import type { MediaType, SnapshotItem } from "../../../src/blocks/types.js";
-import { tmdb } from "../../../src/tmdb/client.js";
 
 const TMDB_REQUEST_DELAY_MS = 300;
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -62,47 +61,33 @@ if (!blockId || (pairs.length === 0 && additions.length === 0)) {
 }
 
 async function buildItem(newTmdbId: number): Promise<SnapshotItem> {
-	const query = { language };
-	const result =
-		mediaType === "movie"
-			? await tmdb.GET(`/3/movie/${newTmdbId}`, {
-					params: { path: { movie_id: newTmdbId }, query },
-				})
-			: await tmdb.GET(`/3/tv/${newTmdbId}`, {
-					params: { path: { series_id: newTmdbId }, query },
-				});
-	const data = result.data as
-		| (SnapshotItem & {
-				id?: number;
-				name?: string;
-				genres?: { id: number }[];
-		  })
-		| undefined;
-	if (!data?.id) {
+	const enriched = await fetchDetailsWithEnrichment(
+		newTmdbId,
+		mediaType,
+		language,
+	);
+	if (!enriched?.tmdbData.id) {
 		throw new Error(`TMDB details not found for ${mediaType}/${newTmdbId}`);
 	}
 
-	const { thumb, logo, noLogoPoster } = await fetchImageMeta(
-		data.id,
-		mediaType,
-		data.backdrop_path,
-		data.poster_path,
-	);
+	const { tmdbData, externalIds, imageMeta } = enriched;
 
 	return {
-		title: data.name || data.title || String(newTmdbId),
-		tmdbId: data.id,
-		vote_average: data.vote_average ?? null,
-		poster_path: data.poster_path ?? null,
-		backdrop_path: data.backdrop_path ?? null,
-		genre_ids: data.genres?.map((g) => g.id) ?? [],
+		title: tmdbData.name || tmdbData.title || String(newTmdbId),
+		tmdbId: newTmdbId,
+		imdbId: externalIds.imdbId,
+		tvdbId: externalIds.tvdbId,
+		vote_average: tmdbData.vote_average ?? null,
+		poster_path: tmdbData.poster_path ?? null,
+		backdrop_path: tmdbData.backdrop_path ?? null,
+		genre_ids: tmdbData.genre_ids ?? [],
 		media_type: mediaType,
-		release_date: data.release_date ?? null,
-		first_air_date: data.first_air_date ?? null,
-		overview: data.overview ?? null,
-		thumb,
-		logo,
-		noLogoPoster,
+		release_date: tmdbData.release_date ?? null,
+		first_air_date: tmdbData.first_air_date ?? null,
+		overview: tmdbData.overview ?? null,
+		thumb: imageMeta.thumb,
+		logo: imageMeta.logo,
+		noLogoPoster: imageMeta.noLogoPoster,
 	};
 }
 

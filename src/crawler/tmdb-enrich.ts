@@ -47,6 +47,100 @@ export interface ImageMeta {
 	noLogoPoster: string | null;
 }
 
+export interface ExternalIds {
+	imdbId: string | null;
+	tvdbId: number | null;
+}
+
+interface TmdbImagesPayload {
+	backdrops?: ImageEntry[];
+	logos?: ImageEntry[];
+	posters?: ImageEntry[];
+}
+
+interface TmdbDetailsPayload extends TmdbSearchResult {
+	genres?: { id: number }[];
+	imdb_id?: unknown;
+	tvdb_id?: unknown;
+	external_ids?: { imdb_id?: unknown; tvdb_id?: unknown };
+	images?: TmdbImagesPayload;
+}
+
+function normalizeImdbId(value: unknown): string | null {
+	if (typeof value !== "string") return null;
+	const trimmed = value.trim();
+	return trimmed.length > 0 ? trimmed : null;
+}
+
+function normalizeTvdbId(value: unknown): number | null {
+	const n =
+		typeof value === "number" ? value : Number.parseInt(String(value), 10);
+	return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+/** Read imdb/tvdb from TMDB details or external_ids payloads. */
+export function externalIdsFromPayload(
+	mediaType: "movie" | "tv",
+	payload: {
+		imdb_id?: unknown;
+		tvdb_id?: unknown;
+		external_ids?: { imdb_id?: unknown; tvdb_id?: unknown };
+	},
+): ExternalIds {
+	const nested = payload.external_ids;
+	const imdb = payload.imdb_id ?? nested?.imdb_id;
+	const tvdb = mediaType === "tv" ? (payload.tvdb_id ?? nested?.tvdb_id) : null;
+	return {
+		imdbId: normalizeImdbId(imdb),
+		tvdbId: normalizeTvdbId(tvdb),
+	};
+}
+
+function imageMetaFromImagesPayload(
+	images: TmdbImagesPayload | undefined,
+	backdropPath?: string | null,
+	posterPath?: string | null,
+): ImageMeta {
+	const fallback: ImageMeta = {
+		thumb: backdropPath || posterPath || null,
+		logo: null,
+		noLogoPoster: posterPath ?? null,
+	};
+	if (!images) return fallback;
+
+	const backdrops = images.backdrops ?? [];
+	const thumb =
+		backdrops.find((b) => b.iso_639_1 === "zh")?.file_path ||
+		backdrops.find((b) => b.iso_639_1 === "en")?.file_path ||
+		backdrops.find((b) => b.iso_639_1 === null)?.file_path ||
+		backdrops[0]?.file_path ||
+		backdropPath ||
+		posterPath ||
+		null;
+
+	const logos = images.logos ?? [];
+	let logo: string | null = null;
+	if (logos.length) {
+		const regionMatches = logos.filter(
+			(l) => l.iso_639_1 === "zh" && l.iso_3166_1 === "CN",
+		);
+		const langMatches = logos.filter((l) => l.iso_639_1 === "zh");
+		const best =
+			bestByVote(regionMatches) ??
+			bestByVote(langMatches) ??
+			bestByVote(logos);
+		logo = best?.file_path ?? null;
+	}
+
+	const posters = images.posters ?? [];
+	const noLogoPoster =
+		bestByVote(posters.filter((p) => !p.iso_639_1))?.file_path ??
+		posterPath ??
+		null;
+
+	return { thumb, logo, noLogoPoster };
+}
+
 type ImageEntry = {
 	iso_639_1?: string | null;
 	iso_3166_1?: string;
@@ -140,43 +234,91 @@ export async function fetchImageMeta(
 						params: { path: { series_id: tmdbId } },
 					});
 
-		const images = result.data;
-
-		const backdrops = (images?.backdrops ?? []) as ImageEntry[];
-		const thumb =
-			backdrops.find((b) => b.iso_639_1 === "zh")?.file_path ||
-			backdrops.find((b) => b.iso_639_1 === "en")?.file_path ||
-			backdrops.find((b) => b.iso_639_1 === null)?.file_path ||
-			backdrops[0]?.file_path ||
-			backdropPath ||
-			posterPath ||
-			null;
-
-		const logos = (images?.logos ?? []) as ImageEntry[];
-		let logo: string | null = null;
-		if (logos.length) {
-			const regionMatches = logos.filter(
-				(l) => l.iso_639_1 === "zh" && l.iso_3166_1 === "CN",
-			);
-			const langMatches = logos.filter((l) => l.iso_639_1 === "zh");
-			const best =
-				bestByVote(regionMatches) ??
-				bestByVote(langMatches) ??
-				bestByVote(logos);
-			logo = best?.file_path ?? null;
-		}
-
-		const posters = (images?.posters ?? []) as ImageEntry[];
-		// No textless poster available: fall back to the regular poster so
-		// clients always have portrait art instead of a null slot.
-		const noLogoPoster =
-			bestByVote(posters.filter((p) => !p.iso_639_1))?.file_path ??
-			posterPath ??
-			null;
-
-		return { thumb, logo, noLogoPoster };
+		return imageMetaFromImagesPayload(
+			result.data as TmdbImagesPayload | undefined,
+			backdropPath,
+			posterPath,
+		);
 	} catch (error) {
 		console.error(`Failed to fetch images for ${mediaType}/${tmdbId}:`, error);
 		return fallback;
+	}
+}
+
+/** Lightweight lookup for one-time backfills (no details/images). */
+export async function fetchExternalIds(
+	tmdbId: number,
+	mediaType: "movie" | "tv",
+	client: TmdbClient = tmdb,
+): Promise<ExternalIds> {
+	try {
+		const result =
+			mediaType === "movie"
+				? await client.GET(`/3/movie/${tmdbId}/external_ids`, {
+						params: { path: { movie_id: tmdbId } },
+					})
+				: await client.GET(`/3/tv/${tmdbId}/external_ids`, {
+						params: { path: { series_id: tmdbId } },
+					});
+		return externalIdsFromPayload(
+			mediaType,
+			(result.data as TmdbDetailsPayload | undefined) ?? {},
+		);
+	} catch (error) {
+		console.error(
+			`Failed to fetch external ids for ${mediaType}/${tmdbId}:`,
+			error,
+		);
+		return { imdbId: null, tvdbId: null };
+	}
+}
+
+/**
+ * One TMDB details call with appended images (+ external_ids for TV).
+ * Replaces a separate /images request during publish/crawl.
+ */
+export async function fetchDetailsWithEnrichment(
+	tmdbId: number,
+	mediaType: "movie" | "tv",
+	language: string | undefined,
+	client: TmdbClient = tmdb,
+): Promise<{
+	tmdbData: TmdbSearchResult;
+	externalIds: ExternalIds;
+	imageMeta: ImageMeta;
+} | null> {
+	const lang = language ?? "zh-CN";
+	try {
+		const query = {
+			language: lang,
+			append_to_response:
+				mediaType === "tv" ? "external_ids,images" : "images",
+		};
+		const result =
+			mediaType === "movie"
+				? await client.GET(`/3/movie/${tmdbId}`, {
+						params: { path: { movie_id: tmdbId }, query },
+					})
+				: await client.GET(`/3/tv/${tmdbId}`, {
+						params: { path: { series_id: tmdbId }, query },
+					});
+		const data = result.data as TmdbDetailsPayload | undefined;
+		if (!data?.id) return null;
+
+		return {
+			tmdbData: {
+				...data,
+				genre_ids: data.genres?.map((g) => g.id) ?? data.genre_ids ?? [],
+			},
+			externalIds: externalIdsFromPayload(mediaType, data),
+			imageMeta: imageMetaFromImagesPayload(
+				data.images,
+				data.backdrop_path,
+				data.poster_path,
+			),
+		};
+	} catch (error) {
+		console.error(`TMDB details error for ${mediaType}/${tmdbId}:`, error);
+		return null;
 	}
 }
