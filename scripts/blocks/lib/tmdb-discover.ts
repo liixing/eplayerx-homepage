@@ -20,6 +20,10 @@ interface DiscoverResponse {
 export interface DiscoverFilter {
 	with_networks?: number;
 	with_companies?: number;
+	/** Comma-joined genre ids (AND). */
+	with_genres?: string;
+	/** Comma-joined keyword ids (AND). */
+	with_keywords?: string;
 	sortBy?: string;
 }
 
@@ -43,6 +47,12 @@ export async function fetchTmdbDiscoverItems(
 		}
 		if (filter.with_companies != null) {
 			params.set("with_companies", String(filter.with_companies));
+		}
+		if (filter.with_genres) {
+			params.set("with_genres", filter.with_genres);
+		}
+		if (filter.with_keywords) {
+			params.set("with_keywords", filter.with_keywords);
 		}
 
 		const url = `https://api.themoviedb.org/3/discover/${mediaType}?${params}`;
