@@ -96,8 +96,14 @@ export function externalIdsFromPayload(
 	};
 }
 
+function preferredImageRegion(language: string, languageCode: string) {
+	if (languageCode !== "zh") return undefined;
+	return language.includes("TW") ? "TW" : "CN";
+}
+
 function imageMetaFromImagesPayload(
 	images: TmdbImagesPayload | undefined,
+	language: string,
 	backdropPath?: string | null,
 	posterPath?: string | null,
 ): ImageMeta {
@@ -108,10 +114,15 @@ function imageMetaFromImagesPayload(
 	};
 	if (!images) return fallback;
 
+	const languageCode = language.split("-")[0] || "zh";
+	const preferredRegion = preferredImageRegion(language, languageCode);
+
 	const backdrops = images.backdrops ?? [];
 	const thumb =
-		backdrops.find((b) => b.iso_639_1 === "zh")?.file_path ||
-		backdrops.find((b) => b.iso_639_1 === "en")?.file_path ||
+		backdrops.find((b) => b.iso_639_1 === languageCode)?.file_path ||
+		(languageCode !== "en"
+			? backdrops.find((b) => b.iso_639_1 === "en")?.file_path
+			: undefined) ||
 		backdrops.find((b) => b.iso_639_1 === null)?.file_path ||
 		backdrops[0]?.file_path ||
 		backdropPath ||
@@ -121,10 +132,14 @@ function imageMetaFromImagesPayload(
 	const logos = images.logos ?? [];
 	let logo: string | null = null;
 	if (logos.length) {
-		const regionMatches = logos.filter(
-			(l) => l.iso_639_1 === "zh" && l.iso_3166_1 === "CN",
-		);
-		const langMatches = logos.filter((l) => l.iso_639_1 === "zh");
+		const regionMatches = preferredRegion
+			? logos.filter(
+					(l) =>
+						l.iso_639_1 === languageCode &&
+						l.iso_3166_1 === preferredRegion,
+				)
+			: [];
+		const langMatches = logos.filter((l) => l.iso_639_1 === languageCode);
 		const best =
 			bestByVote(regionMatches) ??
 			bestByVote(langMatches) ??
@@ -216,6 +231,7 @@ export async function fetchImageMeta(
 	mediaType: "movie" | "tv",
 	backdropPath?: string | null,
 	posterPath?: string | null,
+	language = "zh-CN",
 	client: TmdbClient = tmdb,
 ): Promise<ImageMeta> {
 	const fallback: ImageMeta = {
@@ -236,6 +252,7 @@ export async function fetchImageMeta(
 
 		return imageMetaFromImagesPayload(
 			result.data as TmdbImagesPayload | undefined,
+			language,
 			backdropPath,
 			posterPath,
 		);
@@ -288,11 +305,24 @@ export async function fetchDetailsWithEnrichment(
 	imageMeta: ImageMeta;
 } | null> {
 	const lang = language ?? "zh-CN";
+	// language filters appended images; include en + null so thumb/logo
+	// fallbacks in imageMetaFromImagesPayload can actually see them.
+	const langCode = lang.split("-")[0] || "zh";
+	const includeImageLanguage = [...new Set([langCode, "en", "null"])].join(
+		",",
+	);
 	try {
+		// include_image_language is valid with append_to_response=images but
+		// missing from the generated details OpenAPI query types.
 		const query = {
 			language: lang,
 			append_to_response:
 				mediaType === "tv" ? "external_ids,images" : "images",
+			include_image_language: includeImageLanguage,
+		} as {
+			language: string;
+			append_to_response: string;
+			include_image_language: string;
 		};
 		const result =
 			mediaType === "movie"
@@ -313,6 +343,7 @@ export async function fetchDetailsWithEnrichment(
 			externalIds: externalIdsFromPayload(mediaType, data),
 			imageMeta: imageMetaFromImagesPayload(
 				data.images,
+				lang,
 				data.backdrop_path,
 				data.poster_path,
 			),
