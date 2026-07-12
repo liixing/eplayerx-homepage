@@ -675,12 +675,9 @@ tmdbApp.get("/tv/on_the_air", async (c) => {
     return c.json({ error: result.error }, 500);
   }
   if (result.data?.results?.length) {
-    const first10 = (result.data.results as Record<string, unknown>[]).slice(
-      0,
-      10
-    );
-    const rest = (result.data.results as Record<string, unknown>[]).slice(10);
-    const enriched = await enrichWithImages(first10, language, "tv");
+    const top = (result.data.results as Record<string, unknown>[]).slice(0, 20);
+    const rest = (result.data.results as Record<string, unknown>[]).slice(20);
+    const enriched = await enrichWithImages(top, language, "tv");
     return c.json({ ...result.data, results: [...enriched, ...rest] });
   }
   return c.json(result.data);
@@ -812,8 +809,8 @@ tmdbApp.get("/trending/movie", async (c) => {
   }
   if (page === 1 && result.data?.results?.length) {
     const results = result.data.results as Record<string, unknown>[];
-    const top = results.slice(0, 10);
-    const rest = results.slice(10);
+    const top = results.slice(0, 20);
+    const rest = results.slice(20);
     const enriched = await enrichWithImages(top, language, "movie");
     return c.json({ ...result.data, results: [...enriched, ...rest] });
   }
@@ -842,8 +839,8 @@ tmdbApp.get("/trending/tv", async (c) => {
 
   if (page === 1 && result.data?.results?.length) {
     const results = result.data.results as Record<string, unknown>[];
-    const top = results.slice(0, 10);
-    const rest = results.slice(10);
+    const top = results.slice(0, 20);
+    const rest = results.slice(20);
     const enriched = await enrichWithImages(top, language, "tv");
     return c.json({ ...result.data, results: [...enriched, ...rest] });
   }
