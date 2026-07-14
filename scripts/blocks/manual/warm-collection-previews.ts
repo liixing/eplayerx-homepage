@@ -3,11 +3,13 @@
  *
  * **When to run**
  * - One-time backfill for collections published before preview-at-publish shipped.
- * - After `--force` rebuild when many child snapshots were refreshed.
+ * - Emergency `--force` rebuild if a deploy missed the publish→preview hook.
  *
  * **When NOT needed**
  * - New collections created via `register-*-collections.ts` or admin
  *   `/admin/collections/create` — those paths warm the preview automatically.
+ * - Daily/weekly child republishes — `POST /admin/api/report` rebuilds every
+ *   parent `collection_preview` after `putSnapshot`.
  *
  * Writes directly to R2 via local credentials — does NOT hit the public
  * `/blocks/data/:id` lazy-build route.

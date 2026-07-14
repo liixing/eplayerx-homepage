@@ -12,16 +12,17 @@ import {
 	PutObjectCommand,
 	S3Client,
 } from "@aws-sdk/client-s3";
-import type {
-	BlockCategory,
-	BlockCollectionRow,
-	CollectionPreviewBlob,
-	CommunityBlockRow,
-	MediaType,
-	SnapshotBlob,
-	SnapshotItem,
-	SubmissionRow,
-	SubmissionStatus,
+import {
+	type BlockCategory,
+	type BlockCollectionRow,
+	COLLECTION_PRESET,
+	type CollectionPreviewBlob,
+	type CommunityBlockRow,
+	type MediaType,
+	type SnapshotBlob,
+	type SnapshotItem,
+	type SubmissionRow,
+	type SubmissionStatus,
 } from "./types.js";
 
 const R2_BUCKET_NAME = process.env.R2_BUCKET_NAME;
@@ -512,6 +513,25 @@ export async function getCommunityBlock(
 		.prepare(`SELECT * FROM community_blocks WHERE block_id = ?`)
 		.bind(blockId)
 		.first<CommunityBlockRow>();
+}
+
+/**
+ * Collection blocks whose frozen JSON mentions `childBlockId` as a child
+ * chart id. LIKE narrows the scan; callers must still parse `block_json` to
+ * confirm membership (avoids rare substring false positives).
+ */
+export async function listCollectionBlocksPossiblyContainingChild(
+	db: D1Database,
+	childBlockId: string,
+): Promise<CommunityBlockRow[]> {
+	if (!/^[a-zA-Z0-9_-]+$/.test(childBlockId)) return [];
+	const result = await db
+		.prepare(
+			`SELECT * FROM community_blocks WHERE preset = ? AND block_json LIKE ?`,
+		)
+		.bind(COLLECTION_PRESET, `%"id":"${childBlockId}"%`)
+		.all<CommunityBlockRow>();
+	return result.results ?? [];
 }
 
 export async function deleteCommunityBlock(

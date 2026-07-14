@@ -134,7 +134,8 @@ async function fetchBlockTitle(blockId: string): Promise<string | undefined> {
 	}
 }
 
-/** Register the publish in D1 via the worker (admin console reads this). */
+/** Register the publish in D1 via the worker (admin console reads this).
+ *  Also rebuilds any parent collection_preview blobs that embed this child. */
 async function reportPublish(
 	blockId: string,
 	itemCount: number,
@@ -150,6 +151,15 @@ async function reportPublish(
 	if (!res.ok) {
 		const text = await res.text().catch(() => "");
 		throw new Error(`report failed (HTTP ${res.status}): ${text}`);
+	}
+	try {
+		const body = (await res.json()) as { collectionPreviews?: string[] };
+		const cols = body.collectionPreviews ?? [];
+		if (cols.length > 0) {
+			console.log(`🔄 collection preview refreshed: ${cols.join(", ")}`);
+		}
+	} catch {
+		// older workers omit the field — ignore
 	}
 }
 

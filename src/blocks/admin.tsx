@@ -18,6 +18,7 @@ import {
 	makeCollectionBlock,
 	parseCollectionInput,
 	parseCollectionStyle,
+	refreshCollectionPreviewsForChild,
 	resolveCollectionChildren,
 	resolveCollectionStyle,
 } from "./collections.js";
@@ -217,7 +218,18 @@ app.post("/api/report", async (c) => {
 	if (await communityBlockExists(db, blockId)) {
 		await updateCommunityBlockItemCount(db, blockId, itemCount);
 	}
-	return c.json({ ok: true, blockId, itemCount });
+	// Child snapshots feed into frozen collection_preview blobs — rebuild
+	// every parent so the home feed doesn't keep serving yesterday's art.
+	let collectionPreviews: string[] = [];
+	try {
+		collectionPreviews = await refreshCollectionPreviewsForChild(db, blockId);
+	} catch (error) {
+		console.error(
+			`collection preview refresh failed for ${blockId}:`,
+			error,
+		);
+	}
+	return c.json({ ok: true, blockId, itemCount, collectionPreviews });
 });
 
 interface RegisterHiddenBody {

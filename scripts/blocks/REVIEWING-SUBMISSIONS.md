@@ -146,8 +146,9 @@ curl -s -X POST "https://api.eplayerx.com/admin/<投稿ID>/approve" \
    - register 脚本末尾会 `warmCollectionPreviewR2` 直写 R2，避免线上 lazy-build
 3. **投稿标记**（如有）— SQL 更新 `submissions.status='approved'`
 
-`warm-collection-previews.ts` 仅用于**历史合集一次性补预热**或子榜单大规模
-刷新后 `--force` 重建；新合集不必再跑。
+`warm-collection-previews.ts` 仅用于**历史合集一次性补预热**或紧急
+`--force` 重建。日常子榜单 `publishBlock` 会走 `POST /admin/api/report`，
+worker 会自动重建引用该 child 的所有 `collection_preview`；新合集不必再跑。
 
 ### 手动 register-hidden 示例
 

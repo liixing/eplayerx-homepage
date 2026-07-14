@@ -10,6 +10,7 @@ import {
 	getCommunityBlock,
 	getCommunityBlocksByIds,
 	getSnapshot,
+	listCollectionBlocksPossiblyContainingChild,
 	publicKey,
 	putCollectionPreviewBlob,
 } from "./storage.js";
@@ -144,6 +145,39 @@ export async function ensureCollectionPreviewBlob(
 		title: block.title,
 		children: previewChildren,
 	};
+}
+
+/**
+ * After a child chart snapshot is republished, rebuild every parent
+ * collection's merged preview so the home feed's single-R2-read path
+ * stays in sync with `/blocks/data/:childId?limit=6`.
+ */
+export async function refreshCollectionPreviewsForChild(
+	db: D1Database,
+	childBlockId: string,
+): Promise<string[]> {
+	const candidates = await listCollectionBlocksPossiblyContainingChild(
+		db,
+		childBlockId,
+	);
+	const refreshed: string[] = [];
+	for (const row of candidates) {
+		let block: CollectionBlock;
+		try {
+			block = JSON.parse(row.block_json) as CollectionBlock;
+		} catch {
+			continue;
+		}
+		if (
+			block.preset !== COLLECTION_PRESET ||
+			!block.children?.some((ch) => ch.id === childBlockId)
+		) {
+			continue;
+		}
+		const preview = await ensureCollectionPreviewBlob(db, row.block_id);
+		if (preview) refreshed.push(row.block_id);
+	}
+	return refreshed;
 }
 
 export function absoluteSourcePath(path: string): string {
