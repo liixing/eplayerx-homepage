@@ -35,6 +35,9 @@ export const TMDB_LANGUAGES: { code: string; label: string }[] = [
 	{ code: "pt-BR", label: "Português (BR)" },
 	{ code: "th-TH", label: "ไทย" },
 	{ code: "vi-VN", label: "Tiếng Việt" },
+	{ code: "id-ID", label: "Bahasa Indonesia" },
+	{ code: "hi-IN", label: "हिन्दी" },
+	{ code: "tr-TR", label: "Türkçe" },
 	{ code: "ar-SA", label: "العربية" },
 ];
 

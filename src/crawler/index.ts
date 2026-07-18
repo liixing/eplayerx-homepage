@@ -333,6 +333,46 @@ const LANGUAGE_NAME_TRANSLATIONS: Record<string, Record<Locale, string>> = {
     es: "Italiano",
     ar: "الإيطالية",
   },
+  de: {
+    en: "German",
+    zh: "德语",
+    "zh-Hant": "德語",
+    ja: "ドイツ語",
+    es: "Alemán",
+    ar: "الألمانية",
+  },
+  ru: {
+    en: "Russian",
+    zh: "俄语",
+    "zh-Hant": "俄語",
+    ja: "ロシア語",
+    es: "Ruso",
+    ar: "الروسية",
+  },
+  pt: {
+    en: "Portuguese",
+    zh: "葡萄牙语",
+    "zh-Hant": "葡萄牙語",
+    ja: "ポルトガル語",
+    es: "Portugués",
+    ar: "البرتغالية",
+  },
+  vi: {
+    en: "Vietnamese",
+    zh: "越南语",
+    "zh-Hant": "越南語",
+    ja: "ベトナム語",
+    es: "Vietnamita",
+    ar: "الفيتنامية",
+  },
+  id: {
+    en: "Indonesian",
+    zh: "印尼语",
+    "zh-Hant": "印尼語",
+    ja: "インドネシア語",
+    es: "Indonesio",
+    ar: "الإندونيسية",
+  },
 };
 
 const GENRE_TRANSLATIONS: Record<GenreKey, Record<Locale, string>> = {

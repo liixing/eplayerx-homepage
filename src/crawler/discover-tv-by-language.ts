@@ -1,6 +1,7 @@
 /**
- * Discover TV shows by original language from TMDB
- * Fetches the first TV show for each language: en, zh, ja, ko, es, th, hi
+ * Discover TV shows by original language from TMDB.
+ * Codes align with TMDB_LANGUAGES in blocks/types.ts (ISO 639-1, region stripped;
+ * zh-CN/TW/HK collapse to zh).
  */
 
 import { tmdb } from "../tmdb/client.js";
@@ -9,19 +10,24 @@ import {
   saveDiscoverTVByLanguage,
 } from "./service.js";
 
-// Language codes mapping
+// Keep in sync with unique language prefixes of TMDB_LANGUAGES.
 const LANGUAGES = [
-  { code: "en", name: "English" },
   { code: "zh", name: "Chinese" },
+  { code: "en", name: "English" },
   { code: "ja", name: "Japanese" },
   { code: "ko", name: "Korean" },
   { code: "es", name: "Spanish" },
+  { code: "fr", name: "French" },
+  { code: "de", name: "German" },
+  { code: "it", name: "Italian" },
+  { code: "ru", name: "Russian" },
+  { code: "pt", name: "Portuguese" },
   { code: "th", name: "Thai" },
+  { code: "vi", name: "Vietnamese" },
+  { code: "id", name: "Indonesian" },
   { code: "hi", name: "Hindi" },
   { code: "tr", name: "Turkish" },
   { code: "ar", name: "Arabic" },
-  { code: "fr", name: "French" },
-  { code: "it", name: "Italian" },
 ] as const;
 
 /**
