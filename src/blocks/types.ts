@@ -30,6 +30,7 @@ export const TMDB_LANGUAGES: { code: string; label: string }[] = [
 	{ code: "es-ES", label: "Español" },
 	{ code: "fr-FR", label: "Français" },
 	{ code: "de-DE", label: "Deutsch" },
+	{ code: "nl-NL", label: "Nederlands" },
 	{ code: "it-IT", label: "Italiano" },
 	{ code: "ru-RU", label: "Русский" },
 	{ code: "pt-BR", label: "Português (BR)" },

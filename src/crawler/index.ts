@@ -341,6 +341,14 @@ const LANGUAGE_NAME_TRANSLATIONS: Record<string, Record<Locale, string>> = {
     es: "Alemán",
     ar: "الألمانية",
   },
+  nl: {
+    en: "Dutch",
+    zh: "荷兰语",
+    "zh-Hant": "荷蘭語",
+    ja: "オランダ語",
+    es: "Neerlandés",
+    ar: "الهولندية",
+  },
   ru: {
     en: "Russian",
     zh: "俄语",

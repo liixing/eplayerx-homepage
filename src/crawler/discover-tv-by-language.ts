@@ -19,6 +19,7 @@ const LANGUAGES = [
   { code: "es", name: "Spanish" },
   { code: "fr", name: "French" },
   { code: "de", name: "German" },
+  { code: "nl", name: "Dutch" },
   { code: "it", name: "Italian" },
   { code: "ru", name: "Russian" },
   { code: "pt", name: "Portuguese" },
