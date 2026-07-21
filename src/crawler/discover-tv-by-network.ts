@@ -8,6 +8,7 @@ import {
   type DiscoverTVByNetworkItem,
   saveDiscoverTVByNetwork,
 } from "./service.js";
+import { fetchImageMeta } from "./tmdb-enrich.js";
 
 // Streaming platform network IDs
 const NETWORKS = [
@@ -57,6 +58,13 @@ async function fetchTVByNetwork(
     if (result.data?.results?.[0]) {
       const tv = result.data.results[0];
       const network = NETWORKS.find((n) => n.id === networkId);
+      const imageMeta = await fetchImageMeta(
+        tv.id as number,
+        "tv",
+        tv.backdrop_path,
+        tv.poster_path,
+        "zh-CN",
+      );
 
       return {
         networkId,
@@ -66,7 +74,7 @@ async function fetchTVByNetwork(
         name: tv.name || "",
         original_name: tv.original_name || "",
         overview: tv.overview || null,
-        poster_path: tv.poster_path || null,
+        poster_path: imageMeta.noLogoPoster,
         backdrop_path: tv.backdrop_path || null,
         first_air_date: tv.first_air_date || null,
         vote_average: tv.vote_average || 0,
