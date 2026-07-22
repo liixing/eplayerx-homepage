@@ -327,6 +327,9 @@ function createDefaultBlockTemplates(
       preset: "thumb-list",
       source: {
         path: "/crawler/popular/douban/animation",
+        query: {
+          language,
+        },
         itemEnvelope: "data",
       },
       metadata: { isAnime: true },
@@ -338,6 +341,9 @@ function createDefaultBlockTemplates(
       preset: "thumb-list",
       source: {
         path: "/crawler/popular/bangumi/animation",
+        query: {
+          language,
+        },
         itemEnvelope: "data",
       },
       metadata: { isAnime: true },
@@ -363,6 +369,9 @@ function createDefaultBlockTemplates(
       preset: "thumb-list",
       source: {
         path: "/crawler/popular/douban/tv",
+        query: {
+          language,
+        },
         itemEnvelope: "data",
       },
       showOverview: true,
@@ -374,6 +383,9 @@ function createDefaultBlockTemplates(
       preset: "thumb-list",
       source: {
         path: "/crawler/popular/douban/korean-tv",
+        query: {
+          language,
+        },
         itemEnvelope: "data",
       },
     },
@@ -384,6 +396,9 @@ function createDefaultBlockTemplates(
       preset: "thumb-list",
       source: {
         path: "/crawler/popular/douban/japanese-tv",
+        query: {
+          language,
+        },
         itemEnvelope: "data",
       },
     },
@@ -437,6 +452,9 @@ function createDefaultBlockTemplates(
       preset: "thumb-list",
       source: {
         path: "/crawler/popular/douban/movies",
+        query: {
+          language,
+        },
         itemEnvelope: "data",
       },
       showOverview: true,
@@ -448,6 +466,9 @@ function createDefaultBlockTemplates(
       preset: "thumb-list",
       source: {
         path: "/crawler/popular/douban/hot-variety-shows",
+        query: {
+          language,
+        },
         itemEnvelope: "data",
       },
       showOverview: true,

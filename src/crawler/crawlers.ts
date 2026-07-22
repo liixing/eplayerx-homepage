@@ -14,6 +14,7 @@ import {
 import { fetchHamiTaiwaneseTVSeries } from "./hami-scraper.js";
 import {
 	type ContentItem,
+	type ContentItemTranslation,
 	saveBangumiAnimation,
 	saveDoubanAnimation,
 	saveHamiTaiwaneseTVSeries,
@@ -29,6 +30,8 @@ import {
 	TMDB_TV_GENRE_ANIMATION,
 	type TmdbSearchResult,
 } from "./tmdb-enrich.js";
+
+const EXTRA_ENRICH_LANGUAGES = ["en-US", "ar-SA"] as const;
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -62,6 +65,22 @@ function deduplicateByTmdbId(items: ContentItem[]): ContentItem[] {
 	return Array.from(map.values());
 }
 
+function translationFromEnrichment(
+	enriched: NonNullable<Awaited<ReturnType<typeof fetchDetailsWithEnrichment>>>,
+): ContentItemTranslation {
+	const data = enriched.tmdbData;
+	const title = data.title || data.name || "";
+	return {
+		title,
+		overview: data.overview ?? null,
+		thumb: enriched.imageMeta.thumb,
+		logo: enriched.imageMeta.logo,
+		noLogoPoster: enriched.imageMeta.noLogoPoster,
+		poster_path: data.poster_path ?? null,
+		backdrop_path: data.backdrop_path ?? null,
+	};
+}
+
 async function buildContentItem(
 	title: string,
 	tmdbData: TmdbSearchResult,
@@ -79,6 +98,28 @@ async function buildContentItem(
 		noLogoPoster: data.poster_path ?? null,
 	};
 
+	const translations: NonNullable<ContentItem["translations"]> = {};
+	for (const language of EXTRA_ENRICH_LANGUAGES) {
+		const localeKey = language.startsWith("ar") ? "ar" : "en";
+		try {
+			const localized = await fetchDetailsWithEnrichment(
+				tmdbId,
+				mediaType,
+				language,
+			);
+			if (!localized) continue;
+			const translation = translationFromEnrichment(localized);
+			if (!translation.title) continue;
+			translations[localeKey] = translation;
+		} catch (error) {
+			console.error(
+				`Failed to enrich ${mediaType}/${tmdbId} for ${language}:`,
+				error,
+			);
+		}
+		await delay(150);
+	}
+
 	return {
 		title,
 		tmdbId,
@@ -95,6 +136,7 @@ async function buildContentItem(
 		thumb: imageMeta.thumb,
 		logo: imageMeta.logo,
 		noLogoPoster: imageMeta.noLogoPoster,
+		...(Object.keys(translations).length > 0 ? { translations } : {}),
 		crawledAt: new Date().toISOString(),
 	};
 }

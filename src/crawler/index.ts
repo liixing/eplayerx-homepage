@@ -10,6 +10,7 @@ import {
   crawlDoubanTVSeries,
   crawlHamiTaiwaneseTVSeries,
 } from "./crawlers.js";
+import type { ContentItem, ContentItemTranslation } from "./service.js";
 
 const R2_CUSTOM_DOMAIN = process.env.R2_CUSTOM_DOMAIN || "assets.eplayerx.com";
 
@@ -520,6 +521,77 @@ function resolveRequestLocale(c: Context): Locale | null {
   return language ? resolveLocale(language) : null;
 }
 
+interface PopularBlobPayload {
+  platform?: string;
+  type?: string;
+  count?: number;
+  lastUpdated?: string;
+  data?: ContentItem[];
+}
+
+function pickContentTranslation(
+  item: ContentItem,
+  locale: Locale
+): ContentItemTranslation | undefined {
+  const translations = item.translations;
+  if (!translations) return undefined;
+  if (locale === "zh" || locale === "zh-Hant") return undefined;
+  if (locale === "ar") {
+    return translations.ar ?? translations.en;
+  }
+  return translations.en;
+}
+
+function localizeContentItem(item: ContentItem, locale: Locale): ContentItem {
+  const translation = pickContentTranslation(item, locale);
+  if (!translation) {
+    const { translations: _omit, ...rest } = item;
+    return rest;
+  }
+  const { translations: _omit, ...rest } = item;
+  return {
+    ...rest,
+    title: translation.title || rest.title,
+    overview: translation.overview ?? rest.overview,
+    thumb: translation.thumb ?? rest.thumb,
+    logo: translation.logo ?? rest.logo,
+    noLogoPoster: translation.noLogoPoster ?? rest.noLogoPoster,
+    poster_path: translation.poster_path ?? rest.poster_path,
+    backdrop_path: translation.backdrop_path ?? rest.backdrop_path,
+  };
+}
+
+function localizePopularPayload(
+  payload: PopularBlobPayload,
+  locale: Locale
+): PopularBlobPayload {
+  const data = (payload.data ?? []).map((item) =>
+    localizeContentItem(item, locale)
+  );
+  return {
+    ...payload,
+    count: payload.count ?? data.length,
+    data,
+  };
+}
+
+async function servePopularJson(
+  c: CrawlerContext,
+  key: string
+): Promise<Response> {
+  const locale = resolveRequestLocale(c);
+  if (!locale) {
+    return serveStaticR2Json(c, key);
+  }
+
+  const result = await readStaticR2Json(c, key);
+  if (!result.ok) return result.response;
+  const payload = result.data as PopularBlobPayload;
+  return c.json(localizePopularPayload(payload, locale), 200, {
+    "Cache-Control": STATIC_JSON_CACHE_CONTROL,
+  });
+}
+
 function localizeDiscoverTVByLanguage(
   payload: DiscoverTVByLanguageResponse,
   locale: Locale
@@ -665,33 +737,33 @@ app.get("/cron/crawl-all", async (c) => {
 });
 
 app.get("/popular/douban/movies", (c) =>
-  serveStaticR2Json(c, "douban-movies.json")
+  servePopularJson(c, "douban-movies.json")
 );
 
-app.get("/popular/douban/tv", (c) => serveStaticR2Json(c, "douban-tv.json"));
+app.get("/popular/douban/tv", (c) => servePopularJson(c, "douban-tv.json"));
 
 app.get("/popular/douban/korean-tv", (c) =>
-  serveStaticR2Json(c, "douban-korean-tv.json")
+  servePopularJson(c, "douban-korean-tv.json")
 );
 
 app.get("/popular/douban/japanese-tv", (c) =>
-  serveStaticR2Json(c, "douban-japanese-tv.json")
+  servePopularJson(c, "douban-japanese-tv.json")
 );
 
 app.get("/popular/hami/taiwanese-tv", (c) =>
-  serveStaticR2Json(c, "hami-taiwanese-tv.json")
+  servePopularJson(c, "hami-taiwanese-tv.json")
 );
 
 app.get("/popular/douban/animation", (c) =>
-  serveStaticR2Json(c, "douban-animation.json")
+  servePopularJson(c, "douban-animation.json")
 );
 
 app.get("/popular/douban/hot-variety-shows", (c) =>
-  serveStaticR2Json(c, "douban-hot-variety-shows.json")
+  servePopularJson(c, "douban-hot-variety-shows.json")
 );
 
 app.get("/popular/bangumi/animation", (c) =>
-  serveStaticR2Json(c, "bangumi-animation.json")
+  servePopularJson(c, "bangumi-animation.json")
 );
 
 app.get("/discover/genres", (c) => {
