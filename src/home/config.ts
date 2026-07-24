@@ -452,9 +452,6 @@ function createDefaultBlockTemplates(
       preset: "thumb-list",
       source: {
         path: "/crawler/popular/douban/movies",
-        query: {
-          language,
-        },
         itemEnvelope: "data",
       },
       showOverview: true,
@@ -466,9 +463,6 @@ function createDefaultBlockTemplates(
       preset: "thumb-list",
       source: {
         path: "/crawler/popular/douban/hot-variety-shows",
-        query: {
-          language,
-        },
         itemEnvelope: "data",
       },
       showOverview: true,
