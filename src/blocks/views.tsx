@@ -6,6 +6,11 @@
 
 import { raw } from "hono/html";
 import {
+	clientI18nBootScript,
+	clientI18nRuntimeScript,
+	UI_LOCALES,
+} from "./i18n.js";
+import {
 	type BlockCategory,
 	DEFAULT_LANGUAGE,
 	type DisplayBlock,
@@ -32,7 +37,11 @@ a{color:var(--acc);text-decoration:none}
 .nav a.active{color:var(--fg)}
 .nav a.active::after{content:"";position:absolute;left:0;right:0;bottom:-15px;height:2px;border-radius:2px;background:var(--grad)}
 .nav .spacer{flex:1}
+.nav .uilang{width:auto;min-width:7.5rem;max-width:9.5rem;padding:6px 10px;font-size:12px;border-radius:999px;background:var(--card2);border:1px solid var(--line);color:var(--mut)}
+.nav .uilang:focus{color:var(--fg)}
 .nav .cta{color:#062a20!important;background:var(--grad);padding:8px 16px!important;border-radius:999px;font-weight:700;font-size:13px}
+html[dir=rtl] .nav{flex-direction:row-reverse}
+html[dir=rtl] .nav .spacer{flex:1}
 h1{font-size:26px;margin:26px 0 6px;letter-spacing:-.3px}
 .gradtext{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
 .sub{color:var(--mut);margin:0 0 24px}
@@ -352,9 +361,20 @@ interface LayoutProps {
 	active: NavKey;
 	description?: string;
 	children?: unknown;
+	/** Skip public i18n chrome (admin). */
+	noI18n?: boolean;
+	/** Document title i18n key (public pages). */
+	titleKey?: string;
 }
 
-const Layout = ({ title, active, description, children }: LayoutProps) => (
+const Layout = ({
+	title,
+	active,
+	description,
+	children,
+	noI18n,
+	titleKey,
+}: LayoutProps) => (
 	<html lang="zh">
 		<head>
 			<meta charset="utf-8" />
@@ -366,9 +386,20 @@ const Layout = ({ title, active, description, children }: LayoutProps) => (
 				<meta property="og:description" content={description} />
 			) : null}
 			<meta property="og:type" content="website" />
-			<title>{title} · EplayerX Blocks</title>
+			<title
+				{...(titleKey && !noI18n ? { "data-i18n-doc-title": titleKey } : {})}
+			>
+				{title} · EplayerX Blocks
+			</title>
 			<link rel="icon" href={FAVICON} />
 			<style dangerouslySetInnerHTML={{ __html: STYLES }} />
+			{noI18n ? null : (
+				<script
+					dangerouslySetInnerHTML={{
+						__html: raw(clientI18nBootScript()) as unknown as string,
+					}}
+				/>
+			)}
 		</head>
 		<body>
 			<nav class="nav">
@@ -383,15 +414,42 @@ const Layout = ({ title, active, description, children }: LayoutProps) => (
 						<b>EplayerX</b> <span class="sfx">Blocks</span>
 					</span>
 				</a>
-				<a href="/blocks" class={active === "explore" ? "active" : ""}>
+				<a
+					href="/blocks"
+					class={active === "explore" ? "active" : ""}
+					{...(noI18n ? {} : { "data-i18n": "nav.explore" })}
+				>
 					社区库
 				</a>
 				<span class="spacer" />
-				<a href="/blocks/submit" class="cta">
+				{noI18n ? null : (
+					<select
+						id="uiLangSel"
+						class="uilang"
+						aria-label="Language"
+						data-i18n-aria="nav.ui_lang"
+					>
+						{UI_LOCALES.map((l) => (
+							<option value={l.code}>{l.label}</option>
+						))}
+					</select>
+				)}
+				<a
+					href="/blocks/submit"
+					class="cta"
+					{...(noI18n ? {} : { "data-i18n": "nav.submit" })}
+				>
 					+ 投稿
 				</a>
 			</nav>
 			<div class="wrap">{children}</div>
+			{noI18n ? null : (
+				<script
+					dangerouslySetInnerHTML={{
+						__html: raw(clientI18nRuntimeScript()) as unknown as string,
+					}}
+				/>
+			)}
 		</body>
 	</html>
 );
@@ -485,6 +543,7 @@ const BlockSection = ({ b, hidden }: { b: DisplayBlock; hidden?: boolean }) => (
 		data-title={b.title}
 		data-author={b.author ?? ""}
 		data-lang={b.language ?? ""}
+		data-official={b.official ? "1" : ""}
 		data-kind={b.collectionChildren ? "collection" : "chart"}
 		data-mode={b.collectionMode ?? ""}
 		data-colstyle={b.collectionStyle ?? ""}
@@ -506,16 +565,32 @@ const BlockSection = ({ b, hidden }: { b: DisplayBlock; hidden?: boolean }) => (
 			<span class="pick" />
 			<span class="bt">{b.title}</span>
 			<span class="chev">›</span>
-			{b.collectionChildren ? <span class="tag tag-official">合集</span> : null}
+			{b.collectionChildren ? (
+				<span class="tag tag-official" data-i18n="tag.collection">
+					合集
+				</span>
+			) : null}
 			<span class="meta-inline">
-				{b.collectionChildren
-					? `${b.collectionChildren.length} 个榜单 · 安装 ${b.installs ?? 0}`
-					: b.official
-						? ""
-						: `${b.itemCount ?? 0} 项 · 安装 ${b.installs ?? 0}`}
+				{b.collectionChildren ? (
+					<span
+						data-i18n="block.meta_charts"
+						data-i18n-n={String(b.collectionChildren.length)}
+						data-i18n-installs={String(b.installs ?? 0)}
+					>
+						{`${b.collectionChildren.length} 个榜单 · 安装 ${b.installs ?? 0}`}
+					</span>
+				) : b.official ? null : (
+					<span
+						data-i18n="block.meta_items"
+						data-i18n-n={String(b.itemCount ?? 0)}
+						data-i18n-installs={String(b.installs ?? 0)}
+					>
+						{`${b.itemCount ?? 0} 项 · 安装 ${b.installs ?? 0}`}
+					</span>
+				)}
 				{b.author ? ` · @${b.author}` : ""}
 			</span>
-			<button class="share" type="button" data-share={b.id}>
+			<button class="share" type="button" data-share={b.id} data-i18n="block.install">
 				安装
 			</button>
 		</div>
@@ -545,8 +620,15 @@ const HomepageCard = ({
 		<div class="blk-head">
 			<span class="bt">{hp.title}</span>
 			<span class="chev">›</span>
-			<span class="tag tag-official">首页</span>
-			<span class="meta-inline">
+			<span class="tag tag-official" data-i18n="tag.homepage">
+				首页
+			</span>
+			<span
+				class="meta-inline"
+				data-i18n="block.meta_home"
+				data-i18n-n={String(hp.blockCount)}
+				data-i18n-installs={String(hp.installs)}
+			>
 				{hp.blockCount} 个区块 · 安装 {hp.installs}
 			</span>
 		</div>
@@ -675,21 +757,36 @@ export const ExplorePage = ({
 	pagination,
 	isAdmin,
 }: ExploreProps) => (
-	<Layout title="社区库" active="explore">
-		<h1 class="gradtext">社区 Blocks</h1>
-		<p class="sub">官方默认板块与社区共建板块,挑你喜欢的加进客户端首页。</p>
+	<Layout title="社区库" active="explore" titleKey="nav.explore">
+		<h1 class="gradtext" data-i18n="explore.title">
+			社区 Blocks
+		</h1>
+		<p class="sub" data-i18n="explore.sub">
+			官方默认板块与社区共建板块,挑你喜欢的加进客户端首页。
+		</p>
 
 		<div class="pack-pick-head hide" id="packPickHead">
 			<div class="pp-toolbar">
-				<button type="button" class="btn sec" id="packPickCancel">
+				<button
+					type="button"
+					class="btn sec"
+					id="packPickCancel"
+					data-i18n="explore.cancel"
+				>
 					取消
 				</button>
 				<div class="pp-mid">
-					<div class="pp-sub" id="packPickSub">
+					<div class="pp-sub" id="packPickSub" data-i18n="explore.pick_hint">
 						挑选区块 · 点击加入，可跨页翻页
 					</div>
 				</div>
-				<button type="button" class="btn" id="packPickDone" disabled>
+				<button
+					type="button"
+					class="btn"
+					id="packPickDone"
+					disabled
+					data-i18n="explore.done"
+				>
 					完成
 				</button>
 			</div>
@@ -697,49 +794,74 @@ export const ExplorePage = ({
 
 		<div class="filters">
 			<select id="catSel">
-				{EXPLORE_FILTERS.map((t) => (
-					<option value={t.id} selected={category === t.id}>
-						{t.label}
+				{EXPLORE_FILTERS.map((f) => (
+					<option
+						value={f.id}
+						selected={category === f.id}
+						data-i18n={`explore.cat.${f.id}`}
+					>
+						{f.label}
 					</option>
 				))}
 			</select>
-			<input id="q" type="search" placeholder="搜索标题 / 作者" />
+			<input
+				id="q"
+				type="search"
+				placeholder="搜索标题 / 作者"
+				data-i18n-placeholder="explore.search_ph"
+			/>
 			<select id="langSel">
-				<option value="">全部语言</option>
+				<option value="" data-i18n="explore.all_langs">
+					全部语言
+				</option>
 				{languages.map((code) => (
 					<option value={code}>{languageLabel(code)}</option>
 				))}
 			</select>
 			{isAdmin ? (
-				<button type="button" class="mkbtn" id="makeGroupBtn">
+				<button
+					type="button"
+					class="mkbtn"
+					id="makeGroupBtn"
+					data-i18n="explore.make_group"
+				>
 					生成合集
 				</button>
 			) : null}
-			<button type="button" class="mkbtn" id="makeHomeBtn">
+			<button
+				type="button"
+				class="mkbtn"
+				id="makeHomeBtn"
+				data-i18n="explore.make_home"
+			>
 				生成首页
 			</button>
 		</div>
 
 		<div class="pack-steps hide" id="packSteps">
-			<span class="step on" id="packStepPick">
+			<span class="step on" id="packStepPick" data-i18n="explore.step_pick">
 				1. 挑选
 			</span>
-			<span class="step" id="packStepEdit">
+			<span class="step" id="packStepEdit" data-i18n="explore.step_edit">
 				2. 编辑
 			</span>
-			<span class="step" id="packStepPreview">
+			<span class="step" id="packStepPreview" data-i18n="explore.step_preview">
 				3. 预览
 			</span>
 		</div>
 
 		<div class="hide" id="packSelectedBar">
-			<span class="slabel">已选</span>
+			<span class="slabel" data-i18n="explore.selected">
+				已选
+			</span>
 			<div class="chips" id="packSelectedChips" />
 		</div>
 
 		{blocks.length === 0 ? (
 			<div class="card">
-				<p class="meta">这个分类还没有板块,去投稿一个吧。</p>
+				<p class="meta" data-i18n="explore.empty_cat">
+					这个分类还没有板块,去投稿一个吧。
+				</p>
 			</div>
 		) : (
 			blocks.map((b) => (
@@ -750,21 +872,41 @@ export const ExplorePage = ({
 			<HomepageCard hp={hp} hidden={category !== "homepage"} />
 		))}
 		{category !== "homepage" && (pagination.prevHref || pagination.nextHref) ? (
-			<nav class="pager" aria-label="分页">
+			<nav class="pager" aria-label="分页" data-i18n-aria="explore.pager">
 				{pagination.prevHref ? (
-					<a class="pbtn" href={pagination.prevHref} data-page-link>
+					<a
+						class="pbtn"
+						href={pagination.prevHref}
+						data-page-link
+						data-i18n="explore.prev"
+					>
 						上一页
 					</a>
 				) : (
-					<span class="pbtn off">上一页</span>
+					<span class="pbtn off" data-i18n="explore.prev">
+						上一页
+					</span>
 				)}
-				<span class="pnum">第 {pagination.page} 页</span>
+				<span
+					class="pnum"
+					data-i18n="explore.page_n"
+					data-i18n-n={String(pagination.page)}
+				>
+					第 {pagination.page} 页
+				</span>
 				{pagination.nextHref ? (
-					<a class="pbtn" href={pagination.nextHref} data-page-link>
+					<a
+						class="pbtn"
+						href={pagination.nextHref}
+						data-page-link
+						data-i18n="explore.next"
+					>
 						下一页
 					</a>
 				) : (
-					<span class="pbtn off">下一页</span>
+					<span class="pbtn off" data-i18n="explore.next">
+						下一页
+					</span>
 				)}
 			</nav>
 		) : null}
@@ -774,7 +916,9 @@ export const ExplorePage = ({
 			}`}
 			id="hpEmpty"
 		>
-			<p class="meta">还没有已发布的首页,选中几个区块点「生成首页」试试。</p>
+			<p class="meta" data-i18n="explore.empty_home">
+				还没有已发布的首页,选中几个区块点「生成首页」试试。
+			</p>
 		</div>
 
 		<div class="selbar hide" id="selbar">
@@ -783,11 +927,21 @@ export const ExplorePage = ({
 					已选 0
 				</span>
 				{isAdmin ? (
-					<button class="btn" id="groupBtn" type="button">
+					<button
+						class="btn"
+						id="groupBtn"
+						type="button"
+						data-i18n="sel.publish_group"
+					>
 						发布合集
 					</button>
 				) : null}
-				<button class="btn sec" id="selCancelBtn" type="button">
+				<button
+					class="btn sec"
+					id="selCancelBtn"
+					type="button"
+					data-i18n="explore.cancel"
+				>
 					取消
 				</button>
 				<div class="msg" id="colMsg" />
@@ -798,47 +952,63 @@ export const ExplorePage = ({
 							<input
 								id="grpTitle"
 								placeholder="合集标题,如 每日新番榜"
+								data-i18n-placeholder="group.title_ph"
 								maxlength={40}
 							/>
 							<div class="chips" id="grpMode">
-								<div class="chip on" data-v="custom">
+								<div class="chip on" data-v="custom" data-i18n="group.mode_custom">
 									自定义
 								</div>
-								<div class="chip" data-v="weekday">
+								<div class="chip" data-v="weekday" data-i18n="group.mode_weekday">
 									按星期
 								</div>
 							</div>
 						</div>
 						<div class="gfoot" style="margin:0 0 10px">
-							<span class="hint">合集样式</span>
+							<span class="hint" data-i18n="group.style_label">
+								合集样式
+							</span>
 							<div class="chips" id="grpStyle">
-								<div class="chip on" data-v="">
+								<div class="chip on" data-v="" data-i18n="group.style_capsule">
 									胶囊
 								</div>
-								<div class="chip" data-v="rank">
+								<div class="chip" data-v="rank" data-i18n="group.style_rank">
 									排行
 								</div>
-								<div class="chip" data-v="banner">
+								<div class="chip" data-v="banner" data-i18n="group.style_banner">
 									横幅
 								</div>
-								<div class="chip" data-v="image">
+								<div class="chip" data-v="image" data-i18n="group.style_image">
 									图片
 								</div>
-								<div class="chip" data-v="image-landscape">
+								<div
+									class="chip"
+									data-v="image-landscape"
+									data-i18n="group.style_landscape"
+								>
 									横图
 								</div>
-								<div class="chip" data-v="image-portrait">
+								<div
+									class="chip"
+									data-v="image-portrait"
+									data-i18n="group.style_portrait"
+								>
 									竖图
 								</div>
 							</div>
 						</div>
 						<div id="grpRows" />
 						<div class="gfoot">
-							<button class="btn" id="grpSubmitBtn" type="button">
+							<button
+								class="btn"
+								id="grpSubmitBtn"
+								type="button"
+								data-i18n="group.create"
+							>
 								创建并发布
 							</button>
 						</div>
-						<div class="hint">
+						<div class="hint" data-i18n="group.admin_hint">
 							管理员操作:合集直接发布上架社区库,以一行胶囊卡片展示在首页。
 						</div>
 					</div>
@@ -848,14 +1018,28 @@ export const ExplorePage = ({
 
 		<div class="pack-editor hide" id="packEditor">
 			<header class="pe-head">
-				<button type="button" class="btn sec" id="packEditorBack">
+				<button
+					type="button"
+					class="btn sec"
+					id="packEditorBack"
+					data-i18n="pack.back_pick"
+				>
 					继续挑选
 				</button>
 				<div class="pe-mid" id="packEditorMid">
-					<div class="pe-title">编辑首页</div>
-					<div class="pe-sub">⋮⋮ 拖动排序 · 下方可改样式</div>
+					<div class="pe-title" data-i18n="pack.edit_title">
+						编辑首页
+					</div>
+					<div class="pe-sub" data-i18n="pack.edit_sub">
+						⋮⋮ 拖动排序 · 下方可改样式
+					</div>
 				</div>
-				<button type="button" class="btn" id="packGoPreviewHead">
+				<button
+					type="button"
+					class="btn"
+					id="packGoPreviewHead"
+					data-i18n="pack.preview"
+				>
 					预览
 				</button>
 			</header>
@@ -869,32 +1053,46 @@ export const ExplorePage = ({
 				<div class="inner pe-edit-only">
 					<div class="pe-meta">
 						<div class="pe-field">
-							<label for="packTitle">标题</label>
+							<label for="packTitle" data-i18n="pack.label_title">
+								标题
+							</label>
 							<input
 								id="packTitle"
 								placeholder="如 周末片单"
+								data-i18n-placeholder="pack.title_ph"
 								maxlength={40}
 							/>
 						</div>
 						<div class="pe-field">
-							<label for="packAuthor">作者</label>
+							<label for="packAuthor" data-i18n="pack.label_author">
+								作者
+							</label>
 							<input
 								id="packAuthor"
 								placeholder="可选"
+								data-i18n-placeholder="pack.optional_ph"
 								maxlength={40}
 							/>
 						</div>
 						<div class="pe-field pe-field-wide">
-							<label for="packDesc">简介</label>
+							<label for="packDesc" data-i18n="pack.label_desc">
+								简介
+							</label>
 							<input
 								id="packDesc"
 								placeholder="可选"
+								data-i18n-placeholder="pack.optional_ph"
 								maxlength={160}
 							/>
 						</div>
 					</div>
 					<div class="pe-actions">
-						<button class="btn" id="packGoPreviewBtn" type="button">
+						<button
+							class="btn"
+							id="packGoPreviewBtn"
+							type="button"
+							data-i18n="pack.preview_home"
+						>
 							预览首页
 						</button>
 					</div>
@@ -902,19 +1100,39 @@ export const ExplorePage = ({
 				</div>
 				<div class="inner pe-preview-only hide" id="packPreviewFoot">
 					<div class="gfoot">
-						<button class="btn sec" id="packBackEditBtn" type="button">
+						<button
+							class="btn sec"
+							id="packBackEditBtn"
+							type="button"
+							data-i18n="pack.back_edit"
+						>
 							返回编辑
 						</button>
-						<button class="btn" id="makePackBtn" type="button">
+						<button
+							class="btn"
+							id="makePackBtn"
+							type="button"
+							data-i18n="pack.confirm"
+						>
 							确认发布
 						</button>
 					</div>
 					<div class="colresult hide" id="colResult">
 						<div class="srcbox mono" id="colUrl" />
-						<button class="btn sec" id="copyColBtn" type="button">
+						<button
+							class="btn sec"
+							id="copyColBtn"
+							type="button"
+							data-i18n="pack.copy_link"
+						>
 							复制链接
 						</button>
-						<a class="btn sec" id="viewHpBtn" href="#">
+						<a
+							class="btn sec"
+							id="viewHpBtn"
+							href="#"
+							data-i18n="pack.view_home"
+						>
 							查看首页
 						</a>
 					</div>
@@ -961,7 +1179,12 @@ export const HomepageDetailPage = ({
 			{homepage.description ? (
 				<div class="hp-byline">{homepage.description}</div>
 			) : null}
-			<p class="sub">
+			<p
+				class="sub"
+				data-i18n="hp.sub"
+				data-i18n-n={String(homepage.blockCount)}
+				data-i18n-installs={String(homepage.installs)}
+			>
 				{homepage.blockCount} 个区块 · 安装 {homepage.installs}
 				。在 iPhone 上安装后会作为一个新首页出现在客户端。
 			</p>
@@ -971,6 +1194,7 @@ export const HomepageDetailPage = ({
 					href={importUrl}
 					id="hpInstallBtn"
 					data-cid={homepage.collectionId}
+					data-i18n="hp.install"
 				>
 					安装到 App
 				</a>
@@ -979,6 +1203,7 @@ export const HomepageDetailPage = ({
 					id="copyHpBtn"
 					type="button"
 					data-url={importUrl}
+					data-i18n="hp.copy"
 				>
 					复制链接
 				</button>
@@ -999,45 +1224,62 @@ export const HomepageDetailPage = ({
 // MARK: - Submit
 
 export const SubmitPage = () => (
-	<Layout title="投稿" active="submit">
-		<h1 class="gradtext">投稿一个 Block</h1>
-		<p class="sub">
+	<Layout title="投稿" active="submit" titleKey="nav.submit_short">
+		<h1 class="gradtext" data-i18n="submit.title">
+			投稿一个 Block
+		</h1>
+		<p class="sub" data-i18n="submit.sub">
 			填一个数据源和展示信息,提交后由管理员抓取审核,通过即进社区库。
 		</p>
 
 		<div class="card">
-			<label>TMDB API Token（必填,投稿凭证,管理员抓取时使用）</label>
-			<input id="token" placeholder="以 eyJ 开头的 Read Access Token" />
+			<label data-i18n="submit.token">
+				TMDB API Token（必填,投稿凭证,管理员抓取时使用）
+			</label>
+			<input
+				id="token"
+				placeholder="以 eyJ 开头的 Read Access Token"
+				data-i18n-placeholder="submit.token_ph"
+			/>
 			<div class="hint">
-				提交时会校验有效性。没有的话去
+				<span data-i18n="submit.token_hint_before">
+					提交时会校验有效性。没有的话去
+				</span>
 				<a
 					href="https://www.themoviedb.org/settings/api"
 					target="_blank"
 					rel="noreferrer"
+					data-i18n="submit.token_hint_link"
 				>
 					{" "}
 					TMDB 申请
 				</a>
-				。
+				<span data-i18n="submit.token_hint_after">。</span>
 			</div>
 
-			<label>分类</label>
+			<label data-i18n="submit.category">分类</label>
 			<div class="chips" id="category">
-				<div class="chip on" data-v="movie">
+				<div class="chip on" data-v="movie" data-i18n="explore.cat.movie">
 					电影
 				</div>
-				<div class="chip" data-v="tv">
+				<div class="chip" data-v="tv" data-i18n="explore.cat.tv">
 					电视剧
 				</div>
-				<div class="chip" data-v="anime">
+				<div class="chip" data-v="anime" data-i18n="explore.cat.anime">
 					动漫
 				</div>
 			</div>
 
-			<label>名称</label>
-			<input id="title" placeholder="如 高分悬疑剧精选" />
+			<label data-i18n="submit.name">名称</label>
+			<input
+				id="title"
+				placeholder="如 高分悬疑剧精选"
+				data-i18n-placeholder="submit.name_ph"
+			/>
 
-			<label>语言（TMDB 返回标题/简介的语言）</label>
+			<label data-i18n="submit.language">
+				语言（TMDB 返回标题/简介的语言）
+			</label>
 			<select id="language">
 				{TMDB_LANGUAGES.map((l) => (
 					<option value={l.code} selected={l.code === DEFAULT_LANGUAGE}>
@@ -1046,7 +1288,7 @@ export const SubmitPage = () => (
 				))}
 			</select>
 
-			<label>榜单地址 / 数据</label>
+			<label data-i18n="submit.source">榜单地址 / 数据</label>
 			<textarea
 				id="source"
 				class="mono"
@@ -1055,21 +1297,22 @@ export const SubmitPage = () => (
 					"填一个榜单接口地址,如 /tmdb/trending/movie 或完整 URL\n" +
 					'或直接粘贴 JSON 数据,如 [{"id":603,"title":"黑客帝国"}, ...]'
 				}
+				data-i18n-placeholder="submit.source_ph"
 			/>
-			<div class="hint">
+			<div class="hint" data-i18n="submit.source_hint">
 				只需给一个能拿到榜单的地址,或把整段 JSON
 				数据贴进来。抓取与整理由管理员处理。
 			</div>
 
-			<label>展示样式</label>
+			<label data-i18n="submit.preset">展示样式</label>
 			<div class="chips" id="preset">
-				<div class="chip on" data-v="thumb-list">
+				<div class="chip on" data-v="thumb-list" data-i18n="submit.preset_thumb">
 					横图流
 				</div>
-				<div class="chip" data-v="poster-list">
+				<div class="chip" data-v="poster-list" data-i18n="submit.preset_poster">
 					竖图流
 				</div>
-				<div class="chip" data-v="hero-list">
+				<div class="chip" data-v="hero-list" data-i18n="submit.preset_hero">
 					大图流
 				</div>
 			</div>
@@ -1077,7 +1320,12 @@ export const SubmitPage = () => (
 			<div class="preview-wrap">
 				<div class="scroller" id="presetPreview" />
 			</div>
-			<div class="hint" id="ovNote" style="display:none">
+			<div
+				class="hint"
+				id="ovNote"
+				style="display:none"
+				data-i18n="submit.ov_note"
+			>
 				简介仅在「缩略图流」下展示,海报流/大图流不显示简介。
 			</div>
 
@@ -1085,22 +1333,26 @@ export const SubmitPage = () => (
 				<div>
 					<label class="check">
 						<input type="checkbox" id="m_rank" />
-						显示排行序号
+						<span data-i18n="submit.show_rank">显示排行序号</span>
 					</label>
 				</div>
 				<div>
 					<label class="check">
 						<input type="checkbox" id="m_overview" />
-						显示简介
+						<span data-i18n="submit.show_overview">显示简介</span>
 					</label>
 				</div>
 			</div>
 
-			<label>署名（可选）</label>
-			<input id="m_author" placeholder="昵称,可留空" />
+			<label data-i18n="submit.author">署名（可选）</label>
+			<input
+				id="m_author"
+				placeholder="昵称,可留空"
+				data-i18n-placeholder="submit.author_ph"
+			/>
 
 			<div style="margin-top:20px">
-				<button class="btn" id="submitBtn" type="button">
+				<button class="btn" id="submitBtn" type="button" data-i18n="submit.btn">
 					提交审核
 				</button>
 			</div>
@@ -1133,7 +1385,11 @@ export const ImportLandingPage = ({
 }: ImportLandingProps) => (
 	<Layout title={title} active="none">
 		<h1 class="gradtext">{title}</h1>
-		<p class="sub">
+		<p
+			class="sub"
+			data-i18n="import.sub"
+			data-i18n-n={String(blockTitles.length)}
+		>
 			{blockTitles.length} 个区块 · 在 iPhone 上打开本页即可导入 EplayerX
 			并生成新首页。
 		</p>
@@ -1143,10 +1399,14 @@ export const ImportLandingPage = ({
 			))}
 		</div>
 		<p style="display:flex;gap:10px;flex-wrap:wrap">
-			<a class="btn" href={importUrl} id="openAppBtn">
+			<a class="btn" href={importUrl} id="openAppBtn" data-i18n="import.open">
 				在 App 中导入
 			</a>
-			<a class="btn sec" href={`https://apps.apple.com/app/id${APP_STORE_ID}`}>
+			<a
+				class="btn sec"
+				href={`https://apps.apple.com/app/id${APP_STORE_ID}`}
+				data-i18n="import.download"
+			>
 				下载 EplayerX
 			</a>
 		</p>
@@ -1175,7 +1435,7 @@ if(btn)btn.addEventListener('click',e=>{
 `;
 
 export const AdminLoginPage = ({ error }: { error?: boolean }) => (
-	<Layout title="审核" active="none">
+	<Layout title="审核" active="none" noI18n>
 		<h1 class="gradtext">审核登录</h1>
 		<div class="card" style="max-width:420px">
 			<form method="post" action="/admin/login">
@@ -1258,7 +1518,7 @@ const PendingCollectionCard = ({ s }: { s: SubmissionRow }) => (
 );
 
 export const AdminPage = ({ pending, collections }: AdminPageProps) => (
-	<Layout title="审核" active="none">
+	<Layout title="审核" active="none" noI18n>
 		<h1 class="gradtext">管理后台</h1>
 		<div class="tabs" id="adminTabs">
 			<button class="tab on" type="button" data-tab="pending">
@@ -1761,10 +2021,10 @@ async function toggleCapsule(sec,cap){
   try{
     const fresh=await fetchFresh(src,20);
     if(!cap.classList.contains('on'))return;
-    if(!fresh.length&&!cached){prev.innerHTML='<div class="prev-empty">预览暂不可用</div>';return;}
+    if(!fresh.length&&!cached){prev.innerHTML='<div class="prev-empty">'+t('msg.preview_unavailable')+'</div>';return;}
     if(!sameItems(cached,fresh))render(prev,fresh.slice(0,12),'poster-list',false,false,!cached);
   }catch(e){
-    if(!cached)prev.innerHTML='<div class="prev-empty">预览暂不可用</div>';
+    if(!cached)prev.innerHTML='<div class="prev-empty">'+t('msg.preview_unavailable')+'</div>';
   }
 }
 // Stale-while-revalidate: paint the cached preview instantly (no skeleton),
@@ -1774,7 +2034,7 @@ async function load(sec){
   if(sec.dataset.kind==='collection'){loadCollection(sec);return;}
   const sc=sec.querySelector('.scroller');
   const src=sec.dataset.src;const preset=sec.dataset.preset||'thumb-list';
-  if(!src){sc.innerHTML='<div class="prev-empty">此区块会在 App 内展示</div>';return;}
+  if(!src){sc.innerHTML='<div class="prev-empty">'+t('msg.preview_in_app')+'</div>';return;}
   const rank=sec.dataset.rank==='1';const ov=sec.dataset.ov==='1';
   const cached=readCache(src);
   if(cached)render(sc,cached,preset,rank,ov,false);
@@ -1784,7 +2044,7 @@ async function load(sec){
     if(!sameItems(cached,fresh))render(sc,fresh,preset,rank,ov,!cached);
   }catch(e){
     if(cached)return; // stale preview is better than an error
-    sc.dataset.loaded='';sec.dataset.loaded='';sc.innerHTML='<div class="prev-empty">预览暂不可用</div>';
+    sc.dataset.loaded='';sec.dataset.loaded='';sc.innerHTML='<div class="prev-empty">'+t('msg.preview_unavailable')+'</div>';
   }
 }
 // Universal links never fire on same-domain taps, so try the custom scheme
@@ -1853,7 +2113,7 @@ document.querySelectorAll('.share[data-share]').forEach(btn=>{
  */
 const ADMIN_GROUP_JS = `
 // ── Admin collection builder: select charts, publish directly ───────
-const WD_LABELS=['周一','周二','周三','周四','周五','周六','周日'];
+function wdLabels(){return [t('wd.1'),t('wd.2'),t('wd.3'),t('wd.4'),t('wd.5'),t('wd.6'),t('wd.7')];}
 let grpModeV='custom';
 let grpStyleV='';
 const GRP_TITLE_DEFAULT_STYLE={Directors:'image-landscape',Decades:'image-landscape',Awards:'image-landscape'};
@@ -1871,18 +2131,19 @@ function buildGroupRows(){
   const rows=document.getElementById('grpRows');
   rows.innerHTML='';
   let idx=0;
+  const WDs=wdLabels();
   selected.forEach(id=>{
     const sec=document.querySelector('.blk[data-id="'+CSS.escape(id)+'"]');
     const title=(sec&&sec.dataset.title)||id;
     const row=document.createElement('div');row.className='grow';
     if(sec&&sec.dataset.kind==='collection'){
-      row.innerHTML='<span class="gt">'+esc(title)+'（合集不可嵌套,已忽略）</span>';
+      row.innerHTML='<span class="gt">'+esc(title)+t('msg.collection_nested')+'</span>';
       rows.appendChild(row);return;
     }
     const i=idx++;
-    row.innerHTML='<span class="gt">'+esc(title)+'</span><input maxlength="14" data-gid="'+esc(id)+'" placeholder="标签">';
+    row.innerHTML='<span class="gt">'+esc(title)+'</span><input maxlength="14" data-gid="'+esc(id)+'" placeholder="'+esc(t('group.label_ph'))+'">';
     rows.appendChild(row);
-    row.querySelector('input').value=grpModeV==='weekday'?(WD_LABELS[i]||''):String(title).slice(0,14);
+    row.querySelector('input').value=grpModeV==='weekday'?(WDs[i]||''):String(title).slice(0,14);
   });
 }
 makeGroupBtn.onclick=()=>setSelMode(selKind==='group'?'':'group');
@@ -1916,29 +2177,29 @@ function groupCategory(){
 }
 document.getElementById('grpSubmitBtn').onclick=async()=>{
   const title=document.getElementById('grpTitle').value.trim();
-  if(!title)return colShow('err','请填写合集标题');
+  if(!title)return colShow('err',t('msg.need_group_title'));
   const inputs=Array.from(document.querySelectorAll('#grpRows input[data-gid]'));
-  if(inputs.length<2)return colShow('err','合集至少需要 2 个榜单');
-  if(grpModeV==='weekday'&&inputs.length>7)return colShow('err','按星期模式最多 7 个榜单');
+  if(inputs.length<2)return colShow('err',t('msg.group_min2'));
+  if(grpModeV==='weekday'&&inputs.length>7)return colShow('err',t('msg.group_max7'));
   const children=inputs.map((inp,i)=>{
     const ch={blockId:inp.dataset.gid,label:inp.value.trim()};
     if(grpModeV==='weekday')ch.weekday=i+1;
     return ch;
   });
-  if(children.some(ch=>!ch.label))return colShow('err','请为每个榜单填写标签');
+  if(children.some(ch=>!ch.label))return colShow('err',t('msg.need_labels'));
   const btn=document.getElementById('grpSubmitBtn');
-  btn.disabled=true;btn.innerHTML='<span class="spin"></span> 发布中…';
+  btn.disabled=true;btn.innerHTML='<span class="spin"></span> '+t('msg.publishing');
   colShow('','');
   try{
     const r=await fetch('/admin/collections/create',{method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({title,mode:grpModeV,style:grpStyleV,category:groupCategory(),children})});
     const j=await r.json();
-    if(!r.ok){colShow('err',j.error||'发布失败');btn.disabled=false;btn.textContent='创建并发布';return;}
-    colShow('ok','已发布 · '+j.blockId+'（刷新页面查看）');
+    if(!r.ok){colShow('err',j.error||t('msg.publish_fail'));btn.disabled=false;btn.textContent=t('group.create');return;}
+    colShow('ok',t('msg.group_published',{id:j.blockId}));
     showPanel('');
-    btn.disabled=false;btn.textContent='创建并发布';
-  }catch(e){colShow('err','网络错误');btn.disabled=false;btn.textContent='创建并发布';}
+    btn.disabled=false;btn.textContent=t('group.create');
+  }catch(e){colShow('err',t('msg.network'));btn.disabled=false;btn.textContent=t('group.create');}
 };
 `;
 
@@ -1980,7 +2241,7 @@ function applyFilters(){
         else if(curCat==='collection')catOk=s.dataset.kind==='collection';
         else catOk=curCat==='all'||s.dataset.category===curCat;
         if(selKind==='group'&&s.dataset.kind==='collection')catOk=false;
-        const langOk=!lang||s.dataset.lang===lang;
+        const langOk=!lang||s.dataset.official==='1'||s.dataset.lang===lang;
         const text=((s.dataset.title||'')+' '+(s.dataset.author||'')).toLowerCase();
         const qOk=!q||text.indexOf(q)>=0;
         show=catOk&&langOk&&qOk;
@@ -2013,7 +2274,36 @@ function applyCategory(cat){
 }
 catSel.addEventListener('change',()=>applyCategory(catSel.value));
 qInput.addEventListener('input',applyFilters);
-langSel.addEventListener('change',applyFilters);
+function initContentLangFilter(){
+  if(!langSel)return;
+  const I=window.__BLOCKS_I18N__;
+  if(!I)return;
+  const opts=Array.from(langSel.options).map(o=>o.value).filter(Boolean);
+  let target;
+  if(I.contentSaved!==null){
+    target=I.contentSaved;
+  }else{
+    target=I.contentPreferred||'';
+    // Prefer exact match; else same language prefix (zh-CN ↔ zh-TW).
+    if(target&&opts.indexOf(target)<0){
+      const pref=String(target).split('-')[0].toLowerCase();
+      const alt=opts.find(c=>c.toLowerCase().split('-')[0]===pref);
+      target=alt||'';
+    }
+  }
+  if(target&&opts.indexOf(target)<0)target='';
+  langSel.value=target||'';
+}
+langSel.addEventListener('change',()=>{
+  const I=window.__BLOCKS_I18N__;
+  try{if(I)localStorage.setItem(I.contentKey,langSel.value);}catch(e){}
+  if(langSel.value&&I&&typeof window.setBlocksUiLang==='function'){
+    const ui=I.contentToUi(langSel.value);
+    if(ui)window.setBlocksUiLang(ui);
+  }
+  applyFilters();
+});
+initContentLangFilter();
 // Homepage cards open the detail page (full block list + install).
 document.querySelectorAll('.hp-card').forEach(c=>{
   c.addEventListener('click',()=>{location.href='/blocks/homepages/'+c.dataset.hp;});
@@ -2043,8 +2333,8 @@ const packFinalHeader=document.getElementById('packFinalHeader');
 const makeGroupBtn=document.getElementById('makeGroupBtn');
 const groupBtn=document.getElementById('groupBtn');
 const groupPanel=document.getElementById('groupPanel');
-const CHART_STYLES=[{v:'thumb',l:'横图'},{v:'poster',l:'竖图'},{v:'hero',l:'大图'}];
-const PACK_COL_STYLES=[{v:'',l:'胶囊'},{v:'rank',l:'排行'},{v:'banner',l:'横幅'},{v:'image',l:'图片'},{v:'image-landscape',l:'横图'},{v:'image-portrait',l:'竖图'}];
+function chartStyles(){return [{v:'thumb',l:t('style.thumb')},{v:'poster',l:t('style.poster')},{v:'hero',l:t('style.hero')}];}
+function packColStyles(){return [{v:'',l:t('group.style_capsule')},{v:'rank',l:t('group.style_rank')},{v:'banner',l:t('group.style_banner')},{v:'image',l:t('group.style_image')},{v:'image-landscape',l:t('group.style_landscape')},{v:'image-portrait',l:t('group.style_portrait')}];}
 function presetToStyle(preset){
   if(preset==='poster-list')return 'poster';
   if(preset==='hero-list')return 'hero';
@@ -2122,7 +2412,7 @@ function renderSelectedChips(){
   box.innerHTML=selectedOrder.map(id=>{
     const title=packLabels.get(id)||id;
     const onPage=!!document.querySelector('.blk[data-id="'+CSS.escape(id)+'"]:not(.pack-slot)');
-    return '<div class="chip on" data-rmid="'+esc(id)+'">'+esc(title)+(onPage?'':' · 其他页')+'<span class="x">×</span></div>';
+    return '<div class="chip on" data-rmid="'+esc(id)+'">'+esc(title)+(onPage?'':t('chip.other_page'))+'<span class="x">×</span></div>';
   }).join('');
   box.querySelectorAll('[data-rmid]').forEach(ch=>{
     ch.onclick=(e)=>{
@@ -2187,11 +2477,11 @@ function renderStyleBar(sec){
     sec.querySelector('.blk-head').after(bar);
   }
   if(sec.dataset.kind==='collection'){
-    bar.innerHTML='<span class="slabel">合集样式</span><div class="chips">'+styleChips(id,PACK_COL_STYLES,cfg.style,'style')+'</div>';
+    bar.innerHTML='<span class="slabel">'+t('group.style_label')+'</span><div class="chips">'+styleChips(id,packColStyles(),cfg.style,'style')+'</div>';
   }else{
-    bar.innerHTML='<span class="slabel">展示</span><div class="chips">'+styleChips(id,CHART_STYLES,cfg.style,'style')+'</div>'
-      +'<label class="tog"><input type="checkbox" data-kind="rank" data-bid="'+esc(id)+'"'+(cfg.showRank?' checked':'')+'>序号</label>'
-      +'<label class="tog"><input type="checkbox" data-kind="ov" data-bid="'+esc(id)+'"'+(cfg.showOverview?' checked':'')+'>简介</label>';
+    bar.innerHTML='<span class="slabel">'+t('style.show')+'</span><div class="chips">'+styleChips(id,chartStyles(),cfg.style,'style')+'</div>'
+      +'<label class="tog"><input type="checkbox" data-kind="rank" data-bid="'+esc(id)+'"'+(cfg.showRank?' checked':'')+'>'+t('style.rank_num')+'</label>'
+      +'<label class="tog"><input type="checkbox" data-kind="ov" data-bid="'+esc(id)+'"'+(cfg.showOverview?' checked':'')+'>'+t('style.overview')+'</label>';
   }
   bar.querySelectorAll('.chip').forEach(c=>{
     c.onclick=(e)=>{
@@ -2237,7 +2527,7 @@ function ensurePackDragHandles(list){
     handle.type='button';
     handle.className='drag-handle';
     handle.textContent='⋮⋮';
-    handle.setAttribute('aria-label','拖拽排序');
+    handle.setAttribute('aria-label',t('style.drag'));
     slot.querySelector('.blk-head')?.prepend(handle);
   });
 }
@@ -2276,7 +2566,7 @@ async function buildEditPreview(){
     return;
   }
   destroyPackSortable();
-  packPreviewList.innerHTML='<div class="prev-empty">加载首页预览…</div>';
+  packPreviewList.innerHTML='<div class="prev-empty">'+t('msg.loading_preview')+'</div>';
   try{
     const lang=langSel.value||'zh-CN';
     const r=await fetch('/blocks/pick-blocks?ids='+encodeURIComponent(selectedOrder.join(','))+'&language='+encodeURIComponent(lang));
@@ -2304,22 +2594,22 @@ async function buildEditPreview(){
     });
     bindPackReorder(packPreviewList);
   }catch(e){
-    packPreviewList.innerHTML='<div class="prev-empty">预览加载失败</div>';
+    packPreviewList.innerHTML='<div class="prev-empty">'+t('msg.preview_fail')+'</div>';
   }
 }
 function updateFinalHeader(){
   if(!packFinalHeader)return;
-  const title=document.getElementById('packTitle').value.trim()||'未命名首页';
+  const title=document.getElementById('packTitle').value.trim()||t('msg.untitled_home');
   const author=document.getElementById('packAuthor').value.trim();
   const desc=document.getElementById('packDesc').value.trim();
   packFinalHeader.innerHTML='<h1 class="gradtext">'+esc(title)+'</h1>'
     +(author?'<div class="hp-byline">by '+esc(author)+'</div>':'')
     +(desc?'<div class="hp-byline">'+esc(desc)+'</div>':'')
-    +'<div class="hp-meta">'+selectedOrder.length+' 个区块 · 确认无误后发布</div>';
+    +'<div class="hp-meta">'+t('msg.home_meta_confirm',{n:selectedOrder.length})+'</div>';
 }
 function goPreview(){
-  if(!document.getElementById('packTitle').value.trim()){packShow('err','请填写首页标题');return;}
-  if(!selectedOrder.length){packShow('err','请先选择区块');return;}
+  if(!document.getElementById('packTitle').value.trim()){packShow('err',t('msg.need_home_title'));return;}
+  if(!selectedOrder.length){packShow('err',t('msg.pick_blocks_first'));return;}
   packShow('','');
   setPackPhase('preview');
 }
@@ -2337,13 +2627,11 @@ function setPackPhase(phase){
   placePackSteps();
   const peTitle=document.querySelector('#packEditor .pe-title');
   const peSub=document.querySelector('#packEditor .pe-sub');
-  if(peTitle)peTitle.textContent=phase==='preview'?'首页预览':'编辑首页';
-  if(peSub)peSub.textContent=phase==='preview'
-    ? '与发布后详情页相同 · 确认后即可发布'
-    : '⋮⋮ 拖动排序 · 下方可改样式';
+  if(peTitle)peTitle.textContent=phase==='preview'?t('pack.preview_title'):t('pack.edit_title');
+  if(peSub)peSub.textContent=phase==='preview'?t('pack.preview_sub'):t('pack.edit_sub');
   document.getElementById('packGoPreviewHead')?.classList.toggle('hide',phase!=='edit');
   const backBtn=document.getElementById('packEditorBack');
-  if(backBtn)backBtn.textContent=phase==='preview'?'返回编辑':'继续挑选';
+  if(backBtn)backBtn.textContent=phase==='preview'?t('pack.back_edit'):t('pack.back_pick');
   packFinalHeader?.classList.toggle('hide',phase!=='preview');
   document.getElementById('packPreviewFoot')?.classList.toggle('hide',phase!=='preview');
   if(phase==='edit'){
@@ -2415,14 +2703,12 @@ function setSelMode(kind){
 function updateSelCount(){
   const n=selected.size;
   const selCount=document.getElementById('selCount');
-  if(selCount)selCount.textContent='已选 '+n+'（可跨页）';
+  if(selCount)selCount.textContent=t('sel.selected_cross',{n:n});
   if(packPickDone)packPickDone.disabled=n===0;
   const sub=document.getElementById('packPickSub');
   if(sub&&packPhase==='pick'){
     sub.style.color='var(--mut)';
-    sub.textContent=n
-      ? '已选 '+n+' 个 · 翻页不丢 · 点完成进入编辑'
-      : '挑选区块 · 点击加入，可跨页翻页';
+    sub.textContent=n?t('explore.pick_hint_n',{n:n}):t('explore.pick_hint');
   }
 }
 function toggleSelect(sec){
@@ -2464,8 +2750,8 @@ function requireSelection(){
   if(selected.size===0){
     if(selKind==='pack'&&packPhase==='pick'){
       const sub=document.getElementById('packPickSub');
-      if(sub){sub.style.color='var(--danger)';sub.textContent='请至少选一个区块';}
-    }else colShow('err','请先选择区块');
+      if(sub){sub.style.color='var(--danger)';sub.textContent=t('msg.need_one_block');}
+    }else colShow('err',t('msg.pick_blocks_first'));
     return false;
   }
   colShow('','');return true;
@@ -2493,8 +2779,8 @@ function packShow(cls,text){
 }
 document.getElementById('makePackBtn').onclick=async()=>{
   const title=document.getElementById('packTitle').value.trim();
-  if(!title)return packShow('err','请填写首页标题');
-  if(!selectedOrder.length)return packShow('err','请先选择区块');
+  if(!title)return packShow('err',t('msg.need_home_title'));
+  if(!selectedOrder.length)return packShow('err',t('msg.pick_blocks_first'));
   const authorName=document.getElementById('packAuthor').value.trim();
   const description=document.getElementById('packDesc').value.trim();
   const entries=selectedOrder.map(id=>{
@@ -2508,7 +2794,7 @@ document.getElementById('makePackBtn').onclick=async()=>{
     return entry;
   });
   const btn=document.getElementById('makePackBtn');
-  btn.disabled=true;btn.innerHTML='<span class="spin"></span> 发布中…';
+  btn.disabled=true;btn.innerHTML='<span class="spin"></span> '+t('msg.publishing');
   packShow('','');
   colShow('','');
   try{
@@ -2522,18 +2808,18 @@ document.getElementById('makePackBtn').onclick=async()=>{
         entries,
       })});
     const j=await r.json();
-    if(!r.ok){packShow('err',j.error||'发布失败');btn.disabled=false;btn.textContent='发布首页';return;}
+    if(!r.ok){packShow('err',j.error||t('msg.publish_fail'));btn.disabled=false;btn.textContent=t('pack.publish_home');return;}
     document.getElementById('colUrl').textContent=j.importUrl;
     const viewHp=document.getElementById('viewHpBtn');
     if(viewHp)viewHp.href=j.detailUrl||('/blocks/homepages/'+j.collectionId);
     colResult.classList.remove('hide');
-    packShow('ok','首页已发布,可在「首页」分类查看,或在 iPhone 上打开链接导入。');
-    btn.disabled=false;btn.textContent='发布首页';
-  }catch(e){packShow('err','网络错误');btn.disabled=false;btn.textContent='发布首页';}
+    packShow('ok',t('msg.home_published'));
+    btn.disabled=false;btn.textContent=t('pack.publish_home');
+  }catch(e){packShow('err',t('msg.network'));btn.disabled=false;btn.textContent=t('pack.publish_home');}
 };
 document.getElementById('copyColBtn').onclick=async()=>{
   const url=document.getElementById('colUrl').textContent;
-  if(url&&await copyText(url))packShow('ok','已复制导入链接');
+  if(url&&await copyText(url))packShow('ok',t('msg.copied_import'));
 };
 document.querySelectorAll('[data-page-link]').forEach(a=>{
   a.addEventListener('click',()=>{if(selKind==='pack')savePackState();});
@@ -2576,6 +2862,13 @@ document.querySelectorAll('[data-page-link]').forEach(a=>{
   }
 })();
 window.addEventListener('resize',()=>{if(packPhase==='pick')syncPickChromeHeight();});
+applyFilters();
+window.onBlocksUiLangChange=function(){
+  updateSelCount();
+  if(selKind==='pack'&&(packPhase==='edit'||packPhase==='preview')){
+    document.querySelectorAll('.pack-slot').forEach(renderStyleBar);
+  }
+};
 ${isAdmin ? ADMIN_GROUP_JS : ""}
 `;
 }
@@ -2593,7 +2886,7 @@ const hpCopy=document.getElementById('copyHpBtn');
 if(hpCopy)hpCopy.onclick=async()=>{
   if(await copyText(hpCopy.dataset.url)){
     const msg=document.getElementById('hpMsg');
-    msg.className='msg ok';msg.textContent='已复制导入链接';
+    msg.className='msg ok';msg.textContent=t('msg.copied_import');
   }
 };
 `;
@@ -2639,6 +2932,20 @@ chips('category','category');chips('preset','preset',renderPreview);
 $('#m_rank').addEventListener('change',renderPreview);
 $('#m_overview').addEventListener('change',renderPreview);
 renderPreview();
+// Default submission language to browser / saved content preference.
+(function(){
+  const I=window.__BLOCKS_I18N__;
+  const sel=document.getElementById('language');
+  if(!I||!sel)return;
+  let code=I.contentSaved||I.contentPreferred||'';
+  if(!code)return;
+  const opts=Array.from(sel.options).map(o=>o.value);
+  if(opts.indexOf(code)<0){
+    const pref=String(code).split('-')[0].toLowerCase();
+    code=opts.find(c=>c.toLowerCase().split('-')[0]===pref)||'';
+  }
+  if(code)sel.value=code;
+})();
 // Remember the TMDB token locally so returning submitters don't retype it.
 const TOKEN_KEY='eplayerx_tmdb_token';
 try{const saved=localStorage.getItem(TOKEN_KEY);if(saved)$('#token').value=saved;}catch(e){}
@@ -2647,10 +2954,10 @@ $('#submitBtn').onclick=async()=>{
   const token=$('#token').value.trim();
   const title=$('#title').value.trim();
   const source=$('#source').value.trim();
-  if(!token)return show('err','请填写 TMDB Token');
-  if(!title)return show('err','请填写名称');
-  if(!source)return show('err','请填写榜单地址或粘贴数据');
-  const btn=$('#submitBtn');btn.disabled=true;btn.innerHTML='<span class="spin"></span> 提交中…';
+  if(!token)return show('err',t('submit.err_token'));
+  if(!title)return show('err',t('submit.err_title'));
+  if(!source)return show('err',t('submit.err_source'));
+  const btn=$('#submitBtn');btn.disabled=true;btn.innerHTML='<span class="spin"></span> '+t('submit.submitting');
   show('','');
   try{
     const r=await fetch('/blocks/submit',{method:'POST',headers:{'Content-Type':'application/json'},
@@ -2659,11 +2966,11 @@ $('#submitBtn').onclick=async()=>{
         showRank:$('#m_rank').checked,showOverview:$('#m_overview').checked,
         author:$('#m_author').value.trim(),source})});
     const j=await r.json();
-    if(!r.ok){show('err',j.error||'提交失败');btn.disabled=false;btn.textContent='提交审核';return;}
+    if(!r.ok){show('err',j.error||t('submit.err_fail'));btn.disabled=false;btn.textContent=t('submit.btn');return;}
     try{localStorage.setItem(TOKEN_KEY,token);}catch(e){}
-    show('ok','已提交审核,通过后会出现在社区库,感谢投稿!');
-    btn.textContent='已提交';
-  }catch(e){show('err','网络错误');btn.disabled=false;btn.textContent='提交审核';}
+    show('ok',t('submit.ok'));
+    btn.textContent=t('submit.submitted');
+  }catch(e){show('err',t('msg.network'));btn.disabled=false;btn.textContent=t('submit.btn');}
 };
 `;
 
