@@ -436,6 +436,13 @@ tmdbApp.get("/movie/top_rated", async (c) => {
   if (result.response.status !== 200) {
     return c.json({ error: result.error }, 500);
   }
+  if (page === 1 && result.data?.results?.length) {
+    const results = result.data.results as Record<string, unknown>[];
+    const top = results.slice(0, 20);
+    const rest = results.slice(20);
+    const enriched = await enrichWithImages(top, language, "movie");
+    return c.json({ ...result.data, results: [...enriched, ...rest] });
+  }
   return c.json(result.data);
 });
 
@@ -656,6 +663,13 @@ tmdbApp.get("/tv/top_rated", async (c) => {
   });
   if (result.response.status !== 200) {
     return c.json({ error: result.error }, 500);
+  }
+  if (page === 1 && result.data?.results?.length) {
+    const results = result.data.results as Record<string, unknown>[];
+    const top = results.slice(0, 20);
+    const rest = results.slice(20);
+    const enriched = await enrichWithImages(top, language, "tv");
+    return c.json({ ...result.data, results: [...enriched, ...rest] });
   }
   return c.json(result.data);
 });
