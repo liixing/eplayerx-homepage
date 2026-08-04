@@ -208,6 +208,96 @@ export function fusionBlockSuffix(title: string): string {
 		.replace(/^-|-$/g, "");
 }
 
+// --- AIOMetadata / MDBList addonCatalog widget exports (0-nj/EplayerX) ---
+
+export interface FusionAddonSource {
+	catalogId: string;
+	/** Stremio media type from the export payload: movie | series */
+	type: string;
+}
+
+export interface FusionAddonWidgetItem {
+	title: string;
+	imageURL?: string;
+	/** poster | wide | square — maps to collection style */
+	imageAspect?: string;
+	sources: FusionAddonSource[];
+}
+
+interface FusionAddonPayload {
+	addonId?: string;
+	catalogId?: string;
+	type?: string;
+}
+
+interface FusionAddonWidgetEntry {
+	title: string;
+	imageURL?: string;
+	imageAspect?: string;
+	dataSources?: Array<{ kind: string; payload?: FusionAddonPayload }>;
+}
+
+interface FusionAddonWidgetExport {
+	widgets: Array<{
+		title?: string;
+		dataSource?: {
+			kind: string;
+			payload?: { items?: FusionAddonWidgetEntry[] };
+		};
+	}>;
+}
+
+/** Items from a fusion widget export backed by Stremio addonCatalog (MDBList etc.). */
+export async function fetchFusionAddonWidgetItems(
+	url: string,
+): Promise<FusionAddonWidgetItem[]> {
+	const res = await fetch(url);
+	if (!res.ok) throw new Error(`Fusion widget fetch error: ${res.status}`);
+	const data = (await res.json()) as FusionAddonWidgetExport;
+	const items = data.widgets[0]?.dataSource?.payload?.items;
+	if (!items?.length) throw new Error("No widget items in fusion export");
+
+	const out: FusionAddonWidgetItem[] = [];
+	for (const item of items) {
+		const sources: FusionAddonSource[] = [];
+		for (const ds of item.dataSources ?? []) {
+			if (ds.kind !== "addonCatalog") continue;
+			const catalogId = ds.payload?.catalogId?.trim();
+			if (!catalogId) continue;
+			sources.push({
+				catalogId,
+				type: ds.payload?.type ?? "movie",
+			});
+		}
+		if (!sources.length) {
+			throw new Error(`Missing addonCatalog on item "${item.title}"`);
+		}
+		out.push({
+			title: item.title,
+			imageURL: item.imageURL,
+			imageAspect: item.imageAspect,
+			sources,
+		});
+	}
+	return out;
+}
+
+/** Map fusion imageAspect to collection style. */
+export function fusionAspectToStyle(
+	aspect?: string,
+): "image-portrait" | "image-landscape" | "image" | undefined {
+	switch (aspect) {
+		case "poster":
+			return "image-portrait";
+		case "wide":
+			return "image-landscape";
+		case "square":
+			return "image";
+		default:
+			return undefined;
+	}
+}
+
 /** Normalize platform titles so "Hbomax2" dedupes against "Hbomax". */
 function fusionPlatformKey(title: string): string {
 	return fusionBlockSuffix(title.replace(/\d+$/, ""));
