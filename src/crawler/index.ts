@@ -137,6 +137,11 @@ async function staticJsonCacheMiddleware(
   if (c.req.method !== "GET" && c.req.method !== "HEAD") {
     return next();
   }
+  // Genre list embeds CDN asset filenames; skip long-lived worker cache so
+  // artwork renames show up without waiting for s-maxage / SWR.
+  if (c.req.path.endsWith("/genres") || c.req.path.endsWith("/discover/genres")) {
+    return next();
+  }
   const cache = defaultCache();
   if (!cache) {
     return next();
@@ -769,8 +774,9 @@ app.get("/popular/bangumi/animation", (c) =>
 app.get("/discover/genres", (c) => {
   const locale = resolveRequestLocale(c) ?? "en";
   const body = createDiscoverGenres(locale);
+  // Shorter TTL than other static charts — artwork filenames change on redesign.
   return c.json(body, 200, {
-    "Cache-Control": STATIC_JSON_CACHE_CONTROL,
+    "Cache-Control": "public, max-age=300, s-maxage=300, stale-while-revalidate=600",
   });
 });
 

@@ -475,6 +475,8 @@ function createDefaultBlockTemplates(
         path: "/crawler/discover/genres",
         query: {
           language,
+          // Bust edge cache when genre artwork assets change.
+          av: "1",
         },
         itemEnvelope: "data",
       },
