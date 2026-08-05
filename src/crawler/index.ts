@@ -476,17 +476,17 @@ const GENRE_TRANSLATIONS: Record<GenreKey, Record<Locale, string>> = {
 };
 
 const GENRE_ITEMS: { id: string; key: GenreKey; imageName: string }[] = [
-  { id: "18", key: "drama", imageName: "Drama-1.png" },
-  { id: "35", key: "comedy", imageName: "Comedy-1.png" },
-  { id: "9648,53", key: "thriller", imageName: "Thriller-1.png" },
-  { id: "28", key: "action", imageName: "Action-1.png" },
-  { id: "878", key: "scifi", imageName: "Sci-fi-1.png" },
-  { id: "16", key: "animation", imageName: "Animation-1.png" },
-  { id: "80", key: "crime", imageName: "Crime-1.png" },
-  { id: "10749", key: "romance", imageName: "Romance-1.png" },
-  { id: "10752", key: "war", imageName: "War-1.png" },
-  { id: "99", key: "documentary", imageName: "Documentary-1.png" },
-  { id: "10751", key: "kids", imageName: "Kid-1.png" },
+  { id: "18", key: "drama", imageName: "Drama-0.webp" },
+  { id: "35", key: "comedy", imageName: "Comedy-0.webp" },
+  { id: "9648,53", key: "thriller", imageName: "Thriller-0.webp" },
+  { id: "28", key: "action", imageName: "Action-0.webp" },
+  { id: "878", key: "scifi", imageName: "Sci-fi-0.webp" },
+  { id: "16", key: "animation", imageName: "Animation-0.webp" },
+  { id: "80", key: "crime", imageName: "Crime-0.webp" },
+  { id: "10749", key: "romance", imageName: "Romance-0.webp" },
+  { id: "10752", key: "war", imageName: "War-0.webp" },
+  { id: "99", key: "documentary", imageName: "Documentary-0.webp" },
+  { id: "10751", key: "kids", imageName: "Kid-0.webp" },
 ];
 
 function createTmdbListRoute(
