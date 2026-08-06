@@ -228,13 +228,20 @@ interface FusionAddonPayload {
 	addonId?: string;
 	catalogId?: string;
 	type?: string;
+	/** Some collection exports use catalogType instead of type. */
+	catalogType?: string;
 }
 
 interface FusionAddonWidgetEntry {
-	title: string;
+	title?: string;
+	name?: string;
 	imageURL?: string;
+	backgroundImageURL?: string;
 	imageAspect?: string;
+	/** Poster | Landscape | … from collection-style exports. */
+	layout?: string;
 	dataSources?: Array<{ kind: string; payload?: FusionAddonPayload }>;
+	dataSource?: { kind: string; payload?: FusionAddonPayload };
 }
 
 interface FusionAddonWidgetExport {
@@ -247,39 +254,96 @@ interface FusionAddonWidgetExport {
 	}>;
 }
 
-/** Items from a fusion widget export backed by Stremio addonCatalog (MDBList etc.). */
+/** github.com/…/blob/… image links → raw.githubusercontent.com for R2/clients. */
+export function normalizeFusionImageUrl(url?: string): string | undefined {
+	if (!url) return undefined;
+	const blob = url.match(
+		/^https?:\/\/github\.com\/([^/]+)\/([^/]+)\/blob\/([^/]+)\/(.+?)(?:\?.*)?$/i,
+	);
+	if (blob) {
+		const [, owner, repo, branch, path] = blob;
+		return `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${path}`;
+	}
+	return url;
+}
+
+function layoutToAspect(layout?: string): string | undefined {
+	if (!layout) return undefined;
+	const l = layout.toLowerCase();
+	if (l === "poster") return "poster";
+	if (l === "landscape" || l === "wide" || l === "banner") return "wide";
+	if (l === "square") return "square";
+	return undefined;
+}
+
+function entrySources(item: FusionAddonWidgetEntry): FusionAddonSource[] {
+	const sources: FusionAddonSource[] = [];
+	const list = item.dataSources?.length
+		? item.dataSources
+		: item.dataSource
+			? [item.dataSource]
+			: [];
+	for (const ds of list) {
+		if (ds.kind !== "addonCatalog") continue;
+		const catalogId = ds.payload?.catalogId?.trim();
+		if (!catalogId) continue;
+		const type =
+			ds.payload?.type ?? ds.payload?.catalogType ?? "movie";
+		sources.push({ catalogId, type });
+	}
+	return sources;
+}
+
+function mapAddonEntries(
+	items: FusionAddonWidgetEntry[],
+): FusionAddonWidgetItem[] {
+	const out: FusionAddonWidgetItem[] = [];
+	for (const item of items) {
+		const title = (item.title ?? item.name ?? "").trim();
+		const sources = entrySources(item);
+		if (!sources.length) {
+			throw new Error(`Missing addonCatalog on item "${title || "?"}"`);
+		}
+		if (!title) {
+			throw new Error("Addon catalog entry missing title/name");
+		}
+		const imageURL = normalizeFusionImageUrl(
+			item.imageURL ?? item.backgroundImageURL,
+		);
+		const imageAspect =
+			item.imageAspect ?? layoutToAspect(item.layout);
+		out.push({
+			title,
+			...(imageURL ? { imageURL } : {}),
+			...(imageAspect ? { imageAspect } : {}),
+			sources,
+		});
+	}
+	return out;
+}
+
+/**
+ * Items from a fusion export backed by Stremio addonCatalog (MDBList etc.).
+ * Accepts either a full fusionWidgets export or a flat collection array
+ * (e.g. 0-nj/EplayerX Genres — each row has name + dataSources).
+ */
 export async function fetchFusionAddonWidgetItems(
 	url: string,
 ): Promise<FusionAddonWidgetItem[]> {
 	const res = await fetch(url);
 	if (!res.ok) throw new Error(`Fusion widget fetch error: ${res.status}`);
-	const data = (await res.json()) as FusionAddonWidgetExport;
-	const items = data.widgets[0]?.dataSource?.payload?.items;
-	if (!items?.length) throw new Error("No widget items in fusion export");
+	const data = (await res.json()) as
+		| FusionAddonWidgetExport
+		| FusionAddonWidgetEntry[];
 
-	const out: FusionAddonWidgetItem[] = [];
-	for (const item of items) {
-		const sources: FusionAddonSource[] = [];
-		for (const ds of item.dataSources ?? []) {
-			if (ds.kind !== "addonCatalog") continue;
-			const catalogId = ds.payload?.catalogId?.trim();
-			if (!catalogId) continue;
-			sources.push({
-				catalogId,
-				type: ds.payload?.type ?? "movie",
-			});
-		}
-		if (!sources.length) {
-			throw new Error(`Missing addonCatalog on item "${item.title}"`);
-		}
-		out.push({
-			title: item.title,
-			imageURL: item.imageURL,
-			imageAspect: item.imageAspect,
-			sources,
-		});
+	let items: FusionAddonWidgetEntry[] | undefined;
+	if (Array.isArray(data)) {
+		items = data;
+	} else {
+		items = data.widgets[0]?.dataSource?.payload?.items;
 	}
-	return out;
+	if (!items?.length) throw new Error("No widget items in fusion export");
+	return mapAddonEntries(items);
 }
 
 /** Map fusion imageAspect to collection style. */

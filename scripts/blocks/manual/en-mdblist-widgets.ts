@@ -105,6 +105,18 @@ const TARGETS: WidgetTarget[] = [
 		category: "movie",
 		style: "image-landscape",
 	},
+	{
+		key: "genres",
+		submissionId: "c9fb91269733",
+		title: "Genres",
+		sourceUrl:
+			"https://raw.githubusercontent.com/0-nj/EplayerX/refs/heads/main/Genres",
+		blockIdPrefix: "community-en-mdblist-genres",
+		language: "en-US",
+		category: "movie",
+		// Flat collection export: layout Poster → image-portrait
+		style: "image-portrait",
+	},
 ];
 
 function resolveTargets(): WidgetTarget[] {
