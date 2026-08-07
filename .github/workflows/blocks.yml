@@ -7,9 +7,10 @@ name: Refresh blocks
 #   scripts/blocks/manual/   -> only via workflow_dispatch
 on:
   schedule:
-    - cron: "0 20 * * *" # daily group
-    - cron: "0 21 * * 0" # weekly group (Sunday)
-    - cron: "0 22 1 * *" # monthly group (1st)
+    # Off-peak UTC, staggered after crawler (02:17) to reduce hosted-runner contention
+    - cron: "23 3 * * *" # daily group  (~11:23 CST)
+    - cron: "23 4 * * 0" # weekly group (~12:23 CST Sunday)
+    - cron: "23 5 1 * *" # monthly group (~13:23 CST 1st)
   workflow_dispatch:
     inputs:
       target:
@@ -48,8 +49,8 @@ jobs:
         run: |
           case "${{ github.event_name }}/${{ github.event.schedule }}" in
             workflow_dispatch/*) target="${{ github.event.inputs.target }}" ;;
-            */"0 20 * * *") target="daily" ;;
-            */"0 21 * * 0") target="weekly" ;;
+            */"23 3 * * *") target="daily" ;;
+            */"23 4 * * 0") target="weekly" ;;
             *) target="monthly" ;;
           esac
           echo "Target: $target"
