@@ -2,6 +2,7 @@
  * Main crawler: Douban -> TMDB -> JSON file
  */
 
+import { cachedRatings, getRatingsCache } from "../ratings/cache.js";
 import { fetchBangumiHotAnime } from "./bangumi-scraper.js";
 import {
 	fetchDoubanHotAnimation,
@@ -120,12 +121,15 @@ async function buildContentItem(
 		await delay(150);
 	}
 
+	const ratings = cachedRatings(await getRatingsCache(), mediaType, tmdbId);
+
 	return {
 		title,
 		tmdbId,
 		imdbId: externalIds.imdbId,
 		tvdbId: externalIds.tvdbId,
 		vote_average: data.vote_average ?? null,
+		...(ratings ? { ratings } : {}),
 		poster_path: data.poster_path,
 		backdrop_path: data.backdrop_path,
 		genre_ids: data.genre_ids || [],

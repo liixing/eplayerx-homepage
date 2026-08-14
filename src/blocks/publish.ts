@@ -23,6 +23,7 @@ import {
 	searchTMDB,
 	type TmdbClient,
 } from "../crawler/tmdb-enrich.js";
+import { cachedRatings, getRatingsCache } from "../ratings/cache.js";
 import { createTmdbClient } from "../tmdb/client.js";
 import { shortId } from "./runtime.js";
 import { publicDataUrl, publicKey, putSnapshot } from "./storage.js";
@@ -257,6 +258,11 @@ async function resolveItem(
 	const title = useTmdbTitle
 		? tmdbData.name || tmdbData.title || item.title
 		: item.title;
+	const ratings = cachedRatings(
+		await getRatingsCache(),
+		resolved.mediaType,
+		resolved.tmdbId,
+	);
 
 	return {
 		title,
@@ -264,6 +270,7 @@ async function resolveItem(
 		imdbId: externalIds.imdbId,
 		tvdbId: externalIds.tvdbId,
 		vote_average: tmdbData.vote_average ?? null,
+		...(ratings ? { ratings } : {}),
 		poster_path: tmdbData.poster_path ?? null,
 		backdrop_path: tmdbData.backdrop_path ?? null,
 		genre_ids: tmdbData.genre_ids ?? [],

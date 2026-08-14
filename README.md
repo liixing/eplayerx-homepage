@@ -55,6 +55,7 @@ npm run deploy:cf
 ## ✨ 功能特性
 
 - 🎬 **TMDB API 代理** - 电影、电视剧搜索、详情、图片、演职人员等
+- ⭐ **多源评分** - 按 TMDB / IMDb id 查询 IMDb、烂番茄、Metacritic 等（MDBList）
 - 🔥 **豆瓣热门内容** - 爬取豆瓣热门电影、电视剧、动画、综艺节目
 - 📡 **发现功能** - 按语言、平台发现电视剧内容
 - 🖼️ **图片代理** - TMDB 图片代理服务，支持缓存
@@ -78,6 +79,7 @@ bun run dev:cf
 | 变量名                  | 必需 | 说明                                            |
 | ----------------------- | ---- | ----------------------------------------------- |
 | `TMDB_API_TOKEN`        | ✅   | TMDB API 读取令牌                               |
+| `MDBLIST_API_KEY`       | ❌   | MDBList API key（`/ratings` 多源评分）          |
 | `R2_ACCESS_KEY_ID`      | ❌   | Cloudflare R2 访问密钥                          |
 | `R2_SECRET_ACCESS_KEY`  | ❌   | Cloudflare R2 秘密密钥                          |
 | `R2_BUCKET_NAME`        | ❌   | R2 存储桶名称                                   |

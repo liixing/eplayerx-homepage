@@ -7,6 +7,7 @@ import {
   PutObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3";
+import type { ItemRatings } from "../ratings/types.js";
 
 const MOVIES_BLOB_KEY = "douban-movies.json";
 const TV_BLOB_KEY = "douban-tv.json";
@@ -65,6 +66,7 @@ export interface ContentItem {
   imdbId?: string | null;
   tvdbId?: number | null;
   vote_average: number | null;
+  ratings?: ItemRatings;
   poster_path?: string | null;
   backdrop_path?: string | null;
   genre_ids: number[];

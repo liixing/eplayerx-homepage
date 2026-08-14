@@ -7,6 +7,10 @@
  * listed block the client renders with no code changes.
  */
 
+import type { ItemRatings } from "../ratings/types.js";
+
+export type { ItemRatings } from "../ratings/types.js";
+
 export type BlockCategory = "movie" | "tv" | "anime";
 
 export type MediaType = "movie" | "tv";
@@ -63,6 +67,8 @@ export interface SnapshotItem {
 	imdbId?: string | null;
 	tvdbId?: number | null;
 	vote_average: number | null;
+	/** Multi-source scores from MDBList. Missing means not backfilled yet. */
+	ratings?: ItemRatings;
 	poster_path?: string | null;
 	backdrop_path?: string | null;
 	genre_ids: number[];

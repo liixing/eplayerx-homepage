@@ -11,13 +11,14 @@
  * (legacy two-arg form "<oldTmdbId> <newTmdbId>" still works)
  */
 
-import { fetchDetailsWithEnrichment } from "../../../src/crawler/tmdb-enrich.js";
 import {
 	getSnapshot,
 	publicKey,
 	putSnapshot,
 } from "../../../src/blocks/storage.js";
 import type { MediaType, SnapshotItem } from "../../../src/blocks/types.js";
+import { fetchDetailsWithEnrichment } from "../../../src/crawler/tmdb-enrich.js";
+import { cachedRatings, getRatingsCache } from "../../../src/ratings/cache.js";
 
 const TMDB_REQUEST_DELAY_MS = 300;
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -71,6 +72,7 @@ async function buildItem(newTmdbId: number): Promise<SnapshotItem> {
 	}
 
 	const { tmdbData, externalIds, imageMeta } = enriched;
+	const ratings = cachedRatings(await getRatingsCache(), mediaType, newTmdbId);
 
 	return {
 		title: tmdbData.name || tmdbData.title || String(newTmdbId),
@@ -78,6 +80,7 @@ async function buildItem(newTmdbId: number): Promise<SnapshotItem> {
 		imdbId: externalIds.imdbId,
 		tvdbId: externalIds.tvdbId,
 		vote_average: tmdbData.vote_average ?? null,
+		...(ratings ? { ratings } : {}),
 		poster_path: tmdbData.poster_path ?? null,
 		backdrop_path: tmdbData.backdrop_path ?? null,
 		genre_ids: tmdbData.genre_ids ?? [],
