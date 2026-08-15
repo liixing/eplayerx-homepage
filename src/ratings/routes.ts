@@ -7,9 +7,9 @@ import {
 
 const ratingsApp = new Hono();
 
-/** Ratings drift slowly; 7d cache keeps the 1000/day MDBList quota usable. */
+/** Ratings drift slowly; 14d cache keeps the 1000/day MDBList quota usable. */
 const CACHE_CONTROL =
-	"public, max-age=604800, s-maxage=604800, stale-while-revalidate=604800";
+	"public, max-age=1209600, s-maxage=1209600, stale-while-revalidate=1209600";
 
 function defaultCache(): Cache | null {
 	if (typeof caches === "undefined") return null;

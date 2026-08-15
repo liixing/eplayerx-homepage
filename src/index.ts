@@ -27,6 +27,7 @@ app.use("/tmdb/*", publicCors);
 app.use("/tmdb/*", tmdbCacheMiddleware);
 app.use("/ratings", publicCors);
 app.use("/ratings", ratingsCacheMiddleware);
+app.use("/home/*", publicCors);
 app.use("/crawler/*", publicCors);
 app.use("/blocks/community", publicCors);
 app.use("/blocks/data/*", publicCors);
