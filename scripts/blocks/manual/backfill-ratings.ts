@@ -1,11 +1,12 @@
 /**
  * Backfill MDBList ratings onto official crawler JSON and community block
  * snapshots. Unique tmdbIds are cached in R2 (`mdblist-ratings-cache.json`)
- * so each title is queried at most once. Free MDBList quota is 1000/day;
- * this script uses 900 and leaves the rest for GET /ratings.
+ * so each title is queried at most once. Each MDBList key gets 1000/day;
+ * this script uses 900 per key and leaves the rest for GET /ratings.
+ * Put any number of keys in `MDBLIST_API_KEY`, comma-separated.
  *
- * Resume: re-run tomorrow (or via the daily workflow). Already-cached ids
- * are skipped; remaining titles are filled until the daily budget is spent.
+ * Resume: re-run locally. Already-cached ids are skipped; remaining titles
+ * are filled until the daily budget is spent.
  *
  * Run:
  *   bun run scripts/blocks/manual/backfill-ratings.ts
@@ -33,8 +34,10 @@ import {
 	saveRatingsCache,
 } from "../../../src/ratings/cache.js";
 import {
+	defaultBackfillLimit,
 	fetchItemRatings,
 	MdblistRateLimitError,
+	mdblistKeyCount,
 } from "../../../src/ratings/mdblist.js";
 import {
 	type ItemRatings,
@@ -43,7 +46,6 @@ import {
 
 const REQUEST_DELAY_MS = 250;
 const CACHE_SAVE_EVERY = 50;
-const DEFAULT_DAILY_LIMIT = 900;
 const SCAN_CONCURRENCY = 8;
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -67,7 +69,7 @@ const limitArg = process.argv.find((arg) => arg.startsWith("--limit="));
 const dailyLimit = Number.parseInt(
 	limitArg?.slice("--limit=".length) ||
 		process.env.MDBLIST_DAILY_LIMIT ||
-		String(DEFAULT_DAILY_LIMIT),
+		String(defaultBackfillLimit()),
 	10,
 );
 
@@ -152,17 +154,20 @@ async function mapPool<T>(
 	fn: (item: T) => Promise<void>,
 ): Promise<void> {
 	let next = 0;
-	const workers = Array.from({ length: Math.min(concurrency, items.length) }, async () => {
-		while (next < items.length) {
-			const index = next;
-			next += 1;
-			await fn(items[index]);
-		}
-	});
+	const workers = Array.from(
+		{ length: Math.min(concurrency, items.length) },
+		async () => {
+			while (next < items.length) {
+				const index = next;
+				next += 1;
+				await fn(items[index]);
+			}
+		},
+	);
 	await Promise.all(workers);
 }
 
-if (!process.env.MDBLIST_API_KEY && !dryRun) {
+if (mdblistKeyCount() === 0 && !dryRun) {
 	throw new Error("MDBLIST_API_KEY is not set");
 }
 
@@ -171,7 +176,7 @@ const blockKeys = await listR2Keys("blocks/public/");
 const keys = [...OFFICIAL_CRAWLER_KEYS, ...blockKeys];
 
 console.log(
-	`📋 ${keys.length} blob(s), ${cache.size} cached id(s), budget ${dailyLimit}/day${dryRun ? " (dry run)" : ""}`,
+	`📋 ${keys.length} blob(s), ${cache.size} cached id(s), ${mdblistKeyCount()} key(s), budget ${dailyLimit}/day${dryRun ? " (dry run)" : ""}`,
 );
 
 const missing = new Map<string, { tmdbId: number; mediaType: MediaType }>();

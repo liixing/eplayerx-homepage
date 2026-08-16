@@ -3,13 +3,14 @@ import {
 	fetchMdblistPayload,
 	itemRatingsFromPayload,
 	MdblistRateLimitError,
+	parseMdblistApiKeys,
 } from "./mdblist.js";
 
 const ratingsApp = new Hono();
 
-/** Ratings drift slowly; 14d cache keeps the 1000/day MDBList quota usable. */
+/** Ratings drift slowly; 1d cache, 6h stale-while-revalidate. */
 const CACHE_CONTROL =
-	"public, max-age=1209600, s-maxage=1209600, stale-while-revalidate=1209600";
+	"public, max-age=86400, s-maxage=86400, stale-while-revalidate=21600";
 
 function defaultCache(): Cache | null {
 	if (typeof caches === "undefined") return null;
@@ -76,7 +77,7 @@ function copyRateLimitHeaders(c: Context, upstream: Response) {
 }
 
 ratingsApp.get("/", async (c) => {
-	if (!process.env.MDBLIST_API_KEY) {
+	if (parseMdblistApiKeys().length === 0) {
 		return c.json({ error: "MDBLIST_API_KEY is not set" }, 503);
 	}
 

@@ -10,6 +10,49 @@ export class MdblistRateLimitError extends Error {
 	}
 }
 
+const PER_KEY_BACKFILL_BUDGET = 900;
+
+/** Comma / whitespace / newline separated keys in `MDBLIST_API_KEY`. */
+export function parseMdblistApiKeys(
+	raw = process.env.MDBLIST_API_KEY,
+): string[] {
+	if (!raw) return [];
+	const seen = new Set<string>();
+	const keys: string[] = [];
+	for (const part of raw.split(/[\s,;]+/)) {
+		const key = part.trim();
+		if (!key || seen.has(key)) continue;
+		seen.add(key);
+		keys.push(key);
+	}
+	return keys;
+}
+
+export function mdblistKeyCount(): number {
+	return parseMdblistApiKeys().length;
+}
+
+/** 900 lookups per key, leaving headroom on each for GET /ratings. */
+export function defaultBackfillLimit(): number {
+	return Math.max(mdblistKeyCount(), 1) * PER_KEY_BACKFILL_BUDGET;
+}
+
+let nextKeyIndex = 0;
+const exhaustedKeys = new Set<string>();
+
+function nextApiKey(): string {
+	const keys = parseMdblistApiKeys();
+	if (keys.length === 0) {
+		throw new Error("MDBLIST_API_KEY is not set");
+	}
+	for (let i = 0; i < keys.length; i++) {
+		const key = keys[nextKeyIndex % keys.length];
+		nextKeyIndex += 1;
+		if (!exhaustedKeys.has(key)) return key;
+	}
+	throw new MdblistRateLimitError();
+}
+
 export interface MdblistRating {
 	source?: string;
 	value?: number | null;
@@ -105,26 +148,15 @@ export interface FetchMdblistOptions {
 	apiKey?: string;
 }
 
-export async function fetchMdblistPayload(
-	options: FetchMdblistOptions,
+async function fetchOnce(
+	path: string,
+	apiKey: string,
 ): Promise<{ data: MdblistPayload; upstream: Response }> {
-	const apiKey = options.apiKey ?? process.env.MDBLIST_API_KEY;
-	if (!apiKey) {
-		throw new Error("MDBLIST_API_KEY is not set");
-	}
-	if (!options.tmdbId && !options.imdbId) {
-		throw new Error("tmdbId or imdbId is required");
-	}
-
-	const media = mdblistMedia(options.mediaType);
-	const path = options.tmdbId
-		? `/tmdb/${media}/${options.tmdbId}`
-		: `/imdb/${media}/${options.imdbId}`;
 	const url = new URL(path, MDBLIST_BASE);
 	url.searchParams.set("apikey", apiKey);
-
 	const upstream = await fetchMdblist(url.toString());
-	if (upstream.status === 429) {
+	if (upstream.status === 429 || upstream.status === 401) {
+		exhaustedKeys.add(apiKey);
 		throw new MdblistRateLimitError();
 	}
 
@@ -147,6 +179,43 @@ export async function fetchMdblistPayload(
 		throw Object.assign(new Error(String(data.error)), { status: 404 });
 	}
 	return { data, upstream };
+}
+
+export async function fetchMdblistPayload(
+	options: FetchMdblistOptions,
+): Promise<{ data: MdblistPayload; upstream: Response }> {
+	if (!options.tmdbId && !options.imdbId) {
+		throw new Error("tmdbId or imdbId is required");
+	}
+
+	const media = mdblistMedia(options.mediaType);
+	const path = options.tmdbId
+		? `/tmdb/${media}/${options.tmdbId}`
+		: `/imdb/${media}/${options.imdbId}`;
+
+	if (options.apiKey) {
+		return fetchOnce(path, options.apiKey);
+	}
+
+	const keys = parseMdblistApiKeys();
+	if (keys.length === 0) {
+		throw new Error("MDBLIST_API_KEY is not set");
+	}
+
+	let lastRateLimit: MdblistRateLimitError | null = null;
+	for (let attempt = 0; attempt < keys.length; attempt++) {
+		const apiKey = nextApiKey();
+		try {
+			return await fetchOnce(path, apiKey);
+		} catch (error) {
+			if (error instanceof MdblistRateLimitError) {
+				lastRateLimit = error;
+				continue;
+			}
+			throw error;
+		}
+	}
+	throw lastRateLimit ?? new MdblistRateLimitError();
 }
 
 /** Fetch compact ratings for one title. Empty object means found but no scores. */
