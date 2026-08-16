@@ -17,6 +17,8 @@ const R2_CUSTOM_DOMAIN = process.env.R2_CUSTOM_DOMAIN || "assets.eplayerx.com";
 /** Cron-refreshed charts — long edge TTL is safe. */
 const STATIC_JSON_CACHE_CONTROL =
   "public, max-age=3600, s-maxage=3600, stale-while-revalidate=21600";
+/** Bump to drop Cache API entries after a static blob rewrite. */
+const STATIC_JSON_CACHE_EPOCH = "20260816-networks-hbo";
 
 type CrawlerBindings = {
   ASSETS?: R2Bucket;
@@ -141,7 +143,9 @@ async function staticJsonCacheMiddleware(
   if (!cache) {
     return next();
   }
-  const cacheKey = new Request(c.req.url, { method: "GET" });
+  const cacheKey = new Request(`${c.req.url}#${STATIC_JSON_CACHE_EPOCH}`, {
+    method: "GET",
+  });
   const hit = await cache.match(cacheKey);
   if (hit) {
     const headers = new Headers(hit.headers);
@@ -177,6 +181,8 @@ interface TmdbListRoute {
     language?: string;
     network?: string;
     networkName?: string;
+    watchProvider?: string;
+    watchRegion?: string;
   };
 }
 
@@ -248,6 +254,9 @@ interface DiscoverTVByNetworkItem {
   networkName: string;
   title?: string;
   route?: TmdbListRoute;
+  network?: string;
+  watchProvider?: string;
+  watchRegion?: string;
   [key: string]: unknown;
 }
 
@@ -859,14 +868,24 @@ app.get("/discover/tv-by-network", async (c) => {
 
   const data = (payload.data ?? []).map((item) => {
     const title = item.networkName || String(item.networkId);
+    const watchProvider =
+      typeof item.watchProvider === "string" ? item.watchProvider : undefined;
+    const watchRegion =
+      typeof item.watchRegion === "string" ? item.watchRegion : undefined;
+    const network =
+      typeof item.network === "string" && item.network
+        ? item.network
+        : String(item.networkId);
     return {
       ...item,
       title,
       route: createTmdbListRoute(title, {
         category: "discover",
         type: "tv",
-        network: String(item.networkId),
         networkName: title,
+        ...(watchProvider
+          ? { watchProvider, watchRegion: watchRegion ?? "US" }
+          : { network }),
       }),
     };
   });

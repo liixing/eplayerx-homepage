@@ -579,6 +579,9 @@ export interface DiscoverTVByNetworkItem {
   networkId: number;
   networkName: string;
   networkLogoPath: string | null;
+  network?: string;
+  watchProvider?: string;
+  watchRegion?: string;
   id: number;
   name: string;
   original_name: string;

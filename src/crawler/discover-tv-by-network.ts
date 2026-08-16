@@ -10,8 +10,19 @@ import {
 } from "./service.js";
 import { fetchImageMeta } from "./tmdb-enrich.js";
 
+type NetworkSpec = {
+  id: number;
+  name: string;
+  logo_path: string;
+  /** TMDB `with_networks` — pipe (`|`) for OR. Defaults to `id`. */
+  network?: string;
+  /** TMDB `with_watch_providers` — used when the network id catalog is too thin. */
+  watchProvider?: string;
+  watchRegion?: string;
+};
+
 // Streaming platform network IDs
-const NETWORKS = [
+const NETWORKS: NetworkSpec[] = [
   {
     id: 213,
     name: "Netflix",
@@ -20,7 +31,13 @@ const NETWORKS = [
   { id: 453, name: "Hulu", logo_path: "/pqUTCleNUiTLAVlelGxUgWn1ELh.png" },
   { id: 2552, name: "Apple TV", logo_path: "/bngHRFi794mnMq34gfVcm9nDxN1.png" },
   { id: 2739, name: "Disney+", logo_path: "/1edZOYAfoyZyZ3rklNSiUpXX30Q.png" },
-  { id: 8304, name: "HBO Max", logo_path: "/gqWI9y0owo9sxgzZD7TXOeILYI9.png" },
+  {
+    id: 8304,
+    name: "HBO Max",
+    logo_path: "/gqWI9y0owo9sxgzZD7TXOeILYI9.png",
+    // Same OR as community fusion streaming: Max originals + HBO prestige.
+    network: "8304|49",
+  },
   { id: 3353, name: "Peacock", logo_path: "/gIAcGTjKKr0KOHL5s4O36roJ8p7.png" },
   {
     id: 1024,
@@ -36,40 +53,79 @@ const NETWORKS = [
   { id: 1419, name: "Youku", logo_path: "/w2TeR3fvPZ9a617tNIF1oOfyPtk.png" },
   { id: 1631, name: "Mango TV", logo_path: "/c6GPQWwbXDuD59pGGutCBQ1T711.png" },
   { id: 1605, name: "bilibili", logo_path: "/mtmMg3PD4YGfrlmqpEiO6NL2ch9.png" },
-] as const;
+  {
+    id: 4330,
+    name: "Paramount+",
+    logo_path: "/fi83B1oztoS47xxcemFdPMhIzK.png",
+  },
+  {
+    id: 4353,
+    name: "Discovery+",
+    logo_path: "/1D1bS3Dyw4ScYnFWTlBOvJXC3nb.png",
+  },
+  {
+    id: 1112,
+    name: "Crunchyroll",
+    logo_path: "/qqyXcZlJQKlRmAD1TCKV7mGLQlt.png",
+    // Network 1112 only has ~20 tagged shows; watch providers cover the catalog.
+    watchProvider: "283|1968",
+    watchRegion: "US",
+  },
+  { id: 67, name: "Showtime", logo_path: "/Allse9kbjiP6ExaQrnSpIhkurEi.png" },
+  { id: 318, name: "STARZ", logo_path: "/qx3Y9LCaK4mq1ykFuDIfjshlo3U.png" },
+  { id: 866, name: "tvN", logo_path: "/4iJILrndsUAvriueBVHe8u0nVqo.png" },
+  { id: 885, name: "JTBC", logo_path: "/44I4aVlasm8Blb8WPGXTkMYuZJF.png" },
+  { id: 3897, name: "TVING", logo_path: "/cfMtt9sNl2bDyHuoPSZouEqDB9N.png" },
+  { id: 3357, name: "wavve", logo_path: "/13a2E9fbpRtQrQgfb9UCNWZcM2O.png" },
+];
 
 /**
  * Fetch top TV show by network
  */
 async function fetchTVByNetwork(
-  networkId: number
+  network: NetworkSpec
 ): Promise<DiscoverTVByNetworkItem | null> {
   try {
     const result = await tmdb.GET("/3/discover/tv", {
       params: {
-        query: {
-          language: "zh-CN",
-          with_networks: networkId,
-          page: 1,
-        },
+        query: network.watchProvider
+          ? {
+              language: "zh-CN",
+              with_watch_providers: network.watchProvider,
+              watch_region: network.watchRegion ?? "US",
+              page: 1,
+            }
+          : {
+              language: "zh-CN",
+              // TMDB accepts pipe-OR; generated types only list a single id.
+              with_networks: (network.network ?? network.id) as number,
+              page: 1,
+            },
       },
     });
 
     if (result.data?.results?.[0]) {
       const tv = result.data.results[0];
-      const network = NETWORKS.find((n) => n.id === networkId);
       const imageMeta = await fetchImageMeta(
         tv.id as number,
         "tv",
         tv.backdrop_path,
         tv.poster_path,
-        "zh-CN",
+        "zh-CN"
       );
 
       return {
-        networkId,
-        networkName: network?.name || String(networkId),
-        networkLogoPath: network?.logo_path || null,
+        networkId: network.id,
+        networkName: network.name,
+        networkLogoPath: network.logo_path,
+        ...(network.watchProvider
+          ? {
+              watchProvider: network.watchProvider,
+              watchRegion: network.watchRegion ?? "US",
+            }
+          : network.network
+            ? { network: network.network }
+            : {}),
         id: tv.id as number,
         name: tv.name || "",
         original_name: tv.original_name || "",
@@ -85,7 +141,7 @@ async function fetchTVByNetwork(
 
     return null;
   } catch (error) {
-    console.error(`Error fetching TV for network "${networkId}":`, error);
+    console.error(`Error fetching TV for network "${network.id}":`, error);
     return null;
   }
 }
@@ -103,7 +159,7 @@ export async function discoverTVByNetworks(): Promise<
   for (const network of NETWORKS) {
     console.log(`🔍 Fetching ${network.name} (${network.id})...`);
 
-    const tv = await fetchTVByNetwork(network.id);
+    const tv = await fetchTVByNetwork(network);
 
     if (tv) {
       results.push(tv);
