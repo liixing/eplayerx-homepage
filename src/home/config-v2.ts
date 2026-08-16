@@ -501,6 +501,7 @@ function createV2BlockTemplates(language: string, timezone: string): V2Section[]
 				path: "/tmdb/discover/tv",
 				query: {
 					with_original_language: "ja",
+					without_genres: 16,
 					sort_by: "popularity.desc",
 					language,
 					page: 1,
