@@ -7,6 +7,7 @@
  * that mirrors the crawler output the client already decodes.
  */
 
+import { pickPreferredLogo } from "../crawler/tmdb-enrich.js";
 import type { MediaType, ScrapeOptions, SnapshotItem } from "./types.js";
 
 const TMDB_BASE =
@@ -128,6 +129,9 @@ interface ImageEntry {
 	iso_3166_1?: string;
 	file_path?: string;
 	vote_average?: number;
+	aspect_ratio?: number;
+	width?: number;
+	height?: number;
 }
 
 interface TmdbImagesResponse {
@@ -172,10 +176,7 @@ async function enrichItem(
 
 		const logos = images.logos ?? [];
 		const logo =
-			(
-				bestByVote(logos.filter((l) => l.iso_639_1 === languageCode)) ??
-				bestByVote(logos)
-			)?.file_path ?? null;
+			pickPreferredLogo(logos, languageCode)?.file_path ?? null;
 
 		const posters = images.posters ?? [];
 		// No textless poster available: fall back to the regular poster so

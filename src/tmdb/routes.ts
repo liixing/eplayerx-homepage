@@ -1,4 +1,5 @@
 import { Hono, type Context } from "hono";
+import { pickPreferredLogo } from "../crawler/tmdb-enrich.js";
 import { tmdb } from "./client.js";
 
 const tmdbApp = new Hono();
@@ -702,6 +703,9 @@ type ImageEntry = {
   iso_3166_1?: string;
   file_path?: string;
   vote_average?: number;
+  aspect_ratio?: number;
+  width?: number;
+  height?: number;
 };
 
 function bestByVote<T extends { vote_average?: number }>(items: T[]) {
@@ -738,21 +742,8 @@ async function enrichWithImages(
       const images = imagesResult.data;
 
       const logos = (images?.logos ?? []) as ImageEntry[];
-      let logo: string | undefined;
-      if (logos.length) {
-        const regionMatches = preferredRegion
-          ? logos.filter(
-              (l) =>
-                l.iso_639_1 === languageCode && l.iso_3166_1 === preferredRegion
-            )
-          : [];
-        const langMatches = logos.filter((l) => l.iso_639_1 === languageCode);
-        const best =
-          bestByVote(regionMatches) ??
-          bestByVote(langMatches) ??
-          bestByVote(logos);
-        logo = best?.file_path;
-      }
+      const logo = pickPreferredLogo(logos, languageCode, preferredRegion)
+        ?.file_path;
 
       const posters = (images?.posters ?? []) as ImageEntry[];
       const noLogoPoster = bestByVote(

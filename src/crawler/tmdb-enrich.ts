@@ -130,22 +130,7 @@ function imageMetaFromImagesPayload(
 		null;
 
 	const logos = images.logos ?? [];
-	let logo: string | null = null;
-	if (logos.length) {
-		const regionMatches = preferredRegion
-			? logos.filter(
-					(l) =>
-						l.iso_639_1 === languageCode &&
-						l.iso_3166_1 === preferredRegion,
-				)
-			: [];
-		const langMatches = logos.filter((l) => l.iso_639_1 === languageCode);
-		const best =
-			bestByVote(regionMatches) ??
-			bestByVote(langMatches) ??
-			bestByVote(logos);
-		logo = best?.file_path ?? null;
-	}
+	const logo = pickPreferredLogo(logos, languageCode, preferredRegion)?.file_path ?? null;
 
 	const posters = images.posters ?? [];
 	const noLogoPoster =
@@ -161,12 +146,52 @@ type ImageEntry = {
 	iso_3166_1?: string;
 	file_path?: string;
 	vote_average?: number;
+	aspect_ratio?: number;
+	width?: number;
+	height?: number;
 };
 
 function bestByVote(items: ImageEntry[]) {
 	return items.length
 		? items.sort((a, b) => (b.vote_average ?? 0) - (a.vote_average ?? 0))[0]
 		: undefined;
+}
+
+function logoAspectRatio(logo: ImageEntry): number {
+	if (logo.aspect_ratio && logo.aspect_ratio > 0) return logo.aspect_ratio;
+	if (logo.width && logo.height && logo.height > 0) {
+		return logo.width / logo.height;
+	}
+	return 0;
+}
+
+function isLandscapeLogo(logo: ImageEntry): boolean {
+	return logoAspectRatio(logo) > 1;
+}
+
+/** Prefer a wide wordmark that fits the carousel / hero overlay. */
+export function pickPreferredLogo(
+	logos: ImageEntry[],
+	languageCode: string,
+	preferredRegion?: string,
+): ImageEntry | undefined {
+	if (!logos.length) return undefined;
+	const regionMatches = preferredRegion
+		? logos.filter(
+				(l) =>
+					l.iso_639_1 === languageCode && l.iso_3166_1 === preferredRegion,
+			)
+		: [];
+	const langMatches = logos.filter((l) => l.iso_639_1 === languageCode);
+	const landscape = (items: ImageEntry[]) => items.filter(isLandscapeLogo);
+	return (
+		bestByVote(landscape(regionMatches)) ??
+		bestByVote(landscape(langMatches)) ??
+		bestByVote(landscape(logos)) ??
+		bestByVote(regionMatches) ??
+		bestByVote(langMatches) ??
+		bestByVote(logos)
+	);
 }
 
 export async function searchTMDB(

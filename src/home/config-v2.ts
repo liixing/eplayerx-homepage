@@ -24,7 +24,17 @@ type HomeTitleKey =
 	| "home.tmdb_discover_genres"
 	| "home.classic_decades"
 	| "home.tmdb_discover_networks"
-	| "home.tmdb_discover_languages";
+	| "home.tmdb_discover_languages"
+	| "home.tmdb_on_the_air_tv_shows"
+	| "home.popular_domestic_anime"
+	| "home.bangumi_popular_anime"
+	| "home.popular_korean_tv_shows"
+	| "home.popular_japanese_tv_shows"
+	| "home.popular_spanish_tv_shows"
+	| "home.popular_taiwanese_tv_shows"
+	| "home.popular_variety_shows"
+	| "home.tmdb_top_rated_movies"
+	| "home.tmdb_top_rated_tv_shows";
 
 type SourceQueryValue = string | number | boolean;
 
@@ -150,6 +160,86 @@ const TITLE_TRANSLATIONS: Record<HomeTitleKey, Record<Locale, string>> = {
 		es: "Explorar por Idioma",
 		ar: "حسب اللغة",
 	},
+	"home.tmdb_on_the_air_tv_shows": {
+		en: "On The Air TV Shows",
+		zh: "正在热播",
+		"zh-Hant": "正在熱播",
+		ja: "放送中",
+		es: "En Emisión",
+		ar: "يعرض الآن",
+	},
+	"home.popular_domestic_anime": {
+		en: "Popular Domestic Anime",
+		zh: "热门国产动漫",
+		"zh-Hant": "熱門國產動漫",
+		ja: "人気の国内アニメ",
+		es: "Anime Doméstico Popular",
+		ar: "أنمي محلي",
+	},
+	"home.bangumi_popular_anime": {
+		en: "Today's Popular Bangumi",
+		zh: "今日热门番剧",
+		"zh-Hant": "今日熱門番劇",
+		ja: "今日の人気番組",
+		es: "Bangumi Populares de Hoy",
+		ar: "بانغومي شائع",
+	},
+	"home.popular_korean_tv_shows": {
+		en: "Popular Korean Dramas",
+		zh: "备受欢迎的韩剧推荐",
+		"zh-Hant": "備受歡迎的韓劇推薦",
+		ja: "人気の韓国ドラマ",
+		es: "Dramas Coreanos Populares",
+		ar: "دراما كورية شائعة",
+	},
+	"home.popular_japanese_tv_shows": {
+		en: "Trending Japanese Dramas",
+		zh: "近期最流行日剧榜单",
+		"zh-Hant": "近期最流行日劇榜單",
+		ja: "最近人気の日本ドラマ",
+		es: "Dramas Japoneses en Tendencia",
+		ar: "دراما يابانية رائجة",
+	},
+	"home.popular_spanish_tv_shows": {
+		en: "Trending Spanish-Language Series",
+		zh: "时下流行的西语剧集",
+		"zh-Hant": "時下流行的西語劇集",
+		ja: "話題のスペイン語シリーズ",
+		es: "Series en Español en Tendencia",
+		ar: "مسلسلات إسبانية رائجة",
+	},
+	"home.popular_taiwanese_tv_shows": {
+		en: "Popular Taiwanese Dramas",
+		zh: "台剧当然也不能落下",
+		"zh-Hant": "台劇當然也不能落下",
+		ja: "人気の台湾ドラマ",
+		es: "Dramas Taiwaneses Populares",
+		ar: "دراما تايوانية شائعة",
+	},
+	"home.popular_variety_shows": {
+		en: "Today's Popular Variety Shows",
+		zh: "实时热门综艺",
+		"zh-Hant": "實時熱門綜藝",
+		ja: "今日の人気バラエティ",
+		es: "Programas de Variedades Populares de Hoy",
+		ar: "برامج منوعة",
+	},
+	"home.tmdb_top_rated_movies": {
+		en: "Top Rated Movies",
+		zh: "高分电影",
+		"zh-Hant": "高分電影",
+		ja: "高評価映画",
+		es: "Películas Mejor Valoradas",
+		ar: "الأعلى تقييماً",
+	},
+	"home.tmdb_top_rated_tv_shows": {
+		en: "Top Rated TV Shows",
+		zh: "高分电视剧",
+		"zh-Hant": "高分電視劇",
+		ja: "高評価テレビ番組",
+		es: "Series Mejor Valoradas",
+		ar: "المسلسلات الأعلى تقييماً",
+	},
 };
 
 const TMDB_LIST_ROUTE_PARAMS: Partial<Record<string, TmdbListRouteParams>> = {
@@ -163,11 +253,8 @@ const TMDB_LIST_ROUTE_PARAMS: Partial<Record<string, TmdbListRouteParams>> = {
 	},
 };
 
-/** Language-specific decades collection in the community library. */
-const DECADES_COLLECTION_IDS: Record<"zh" | "ar", string> = {
-	zh: "col-9e37cdc1f13d",
-	ar: "col-d8ca1fd02a45",
-};
+/** Decades collection. Child charts are TMDB; only the section title is localized. */
+const DECADES_COLLECTION_ID = "col-9e37cdc1f13d";
 
 function resolveLocale(language: string): Locale {
 	const normalized = language.toLowerCase();
@@ -188,13 +275,6 @@ function resolveLocale(language: string): Locale {
 function isChineseLocale(language: string): boolean {
 	const locale = resolveLocale(language);
 	return locale === "zh" || locale === "zh-Hant";
-}
-
-function decadesCollectionLocale(language: string): "zh" | "ar" | null {
-	const locale = resolveLocale(language);
-	if (locale === "zh" || locale === "zh-Hant") return "zh";
-	if (locale === "ar") return "ar";
-	return null;
 }
 
 function resolveTitle(titleKey: HomeTitleKey, language: string): string {
@@ -218,8 +298,9 @@ function isDecadesCollectionSlot(
 	return "type" in section && section.type === "decades-collection";
 }
 
-function createV2BlockTemplates(language: string): V2Section[] {
-	const doubanBlocks: V2Section[] = isChineseLocale(language)
+function createV2BlockTemplates(language: string, timezone: string): V2Section[] {
+	const chineseOnly = isChineseLocale(language);
+	const doubanHeadBlocks: V2Section[] = chineseOnly
 		? [
 				{
 					id: "douban-popular-tv-shows",
@@ -243,6 +324,55 @@ function createV2BlockTemplates(language: string): V2Section[] {
 					showRank: true,
 					source: {
 						path: "/crawler/popular/douban/movies",
+						itemEnvelope: "data",
+					},
+				},
+			]
+		: [];
+	const chineseAnimeBlocks: V2Section[] = chineseOnly
+		? [
+				{
+					id: "douban-popular-anime",
+					mediaType: "tv",
+					titleKey: "home.popular_domestic_anime",
+					preset: "poster-list",
+					showRank: true,
+					source: {
+						path: "/crawler/popular/douban/animation",
+						query: {
+							language,
+						},
+						itemEnvelope: "data",
+					},
+					metadata: { isAnime: true },
+				},
+				{
+					id: "bangumi-popular-anime",
+					mediaType: "tv",
+					titleKey: "home.bangumi_popular_anime",
+					preset: "poster-list",
+					showRank: true,
+					source: {
+						path: "/crawler/popular/bangumi/animation",
+						query: {
+							language,
+						},
+						itemEnvelope: "data",
+					},
+					metadata: { isAnime: true },
+				},
+			]
+		: [];
+	const doubanTailBlocks: V2Section[] = chineseOnly
+		? [
+				{
+					id: "douban-popular-variety-shows",
+					mediaType: "tv",
+					titleKey: "home.popular_variety_shows",
+					preset: "poster-list",
+					showRank: true,
+					source: {
+						path: "/crawler/popular/douban/hot-variety-shows",
 						itemEnvelope: "data",
 					},
 				},
@@ -289,7 +419,7 @@ function createV2BlockTemplates(language: string): V2Section[] {
 				},
 			},
 		},
-		...doubanBlocks,
+		...doubanHeadBlocks,
 		{
 			id: "tmdb-discover-genres",
 			titleKey: "home.tmdb_discover_genres",
@@ -322,6 +452,147 @@ function createV2BlockTemplates(language: string): V2Section[] {
 					language,
 				},
 				itemEnvelope: "data",
+			},
+		},
+		{
+			id: "tmdb-on-the-air-tv-shows",
+			mediaType: "tv",
+			titleKey: "home.tmdb_on_the_air_tv_shows",
+			preset: "hero-list",
+			source: {
+				path: "/tmdb/tv/on_the_air",
+				query: {
+					language,
+					timezone,
+				},
+				itemEnvelope: "results",
+			},
+		},
+		...chineseAnimeBlocks,
+		...doubanTailBlocks,
+		{
+			id: "tmdb-popular-korean-tv-shows",
+			mediaType: "tv",
+			titleKey: "home.popular_korean_tv_shows",
+			preset: "poster-list",
+			showRank: true,
+			source: {
+				path: "/tmdb/discover/tv",
+				query: {
+					with_original_language: "ko",
+					sort_by: "popularity.desc",
+					language,
+					page: 1,
+				},
+				itemEnvelope: "results",
+				pagination: {
+					pageParam: "page",
+					startPage: 1,
+				},
+			},
+		},
+		{
+			id: "tmdb-popular-japanese-tv-shows",
+			mediaType: "tv",
+			titleKey: "home.popular_japanese_tv_shows",
+			preset: "poster-list",
+			showRank: true,
+			source: {
+				path: "/tmdb/discover/tv",
+				query: {
+					with_original_language: "ja",
+					sort_by: "popularity.desc",
+					language,
+					page: 1,
+				},
+				itemEnvelope: "results",
+				pagination: {
+					pageParam: "page",
+					startPage: 1,
+				},
+			},
+		},
+		{
+			id: "tmdb-popular-spanish-tv-shows",
+			mediaType: "tv",
+			titleKey: "home.popular_spanish_tv_shows",
+			preset: "poster-list",
+			showRank: true,
+			source: {
+				path: "/tmdb/discover/tv",
+				query: {
+					with_original_language: "es",
+					sort_by: "popularity.desc",
+					language,
+					page: 1,
+				},
+				itemEnvelope: "results",
+				pagination: {
+					pageParam: "page",
+					startPage: 1,
+				},
+			},
+		},
+		{
+			id: "tmdb-popular-taiwanese-tv-shows",
+			mediaType: "tv",
+			titleKey: "home.popular_taiwanese_tv_shows",
+			preset: "poster-list",
+			showRank: true,
+			source: {
+				path: "/tmdb/discover/tv",
+				query: {
+					with_original_language: "zh",
+					with_origin_country: "TW",
+					sort_by: "popularity.desc",
+					"first_air_date.gte": "2021-01-01",
+					"vote_count.gte": 5,
+					language,
+					page: 1,
+				},
+				itemEnvelope: "results",
+				pagination: {
+					pageParam: "page",
+					startPage: 1,
+				},
+			},
+		},
+		{
+			id: "tmdb-top-rated-movies",
+			titleKey: "home.tmdb_top_rated_movies",
+			mediaType: "movie",
+			preset: "poster-list",
+			source: {
+				path: "/tmdb/movie/top_rated",
+				query: {
+					language,
+					page: 1,
+					limit: 20,
+				},
+				itemEnvelope: "results",
+				pagination: {
+					pageParam: "page",
+					startPage: 1,
+				},
+			},
+		},
+		{
+			id: "tmdb-top-rated-tv-shows",
+			titleKey: "home.tmdb_top_rated_tv_shows",
+			mediaType: "tv",
+			preset: "poster-list",
+			source: {
+				path: "/tmdb/tv/top_rated",
+				query: {
+					language,
+					page: 1,
+					limit: 20,
+				},
+				itemEnvelope: "results",
+				pagination: {
+					pageParam: "page",
+					startPage: 1,
+				},
 			},
 		},
 	];
@@ -369,15 +640,13 @@ async function resolveDecadesCollection(
 	db: D1Database | undefined,
 	language: string,
 ): Promise<CollectionBlock | null> {
-	const locale = decadesCollectionLocale(language);
-	if (!db || !locale) return null;
-	const id = DECADES_COLLECTION_IDS[locale];
+	if (!db) return null;
 
 	try {
-		const rows = await getCommunityBlocksByIds(db, [id]);
-		const row = rows.get(id);
+		const rows = await getCommunityBlocksByIds(db, [DECADES_COLLECTION_ID]);
+		const row = rows.get(DECADES_COLLECTION_ID);
 		if (!row) return null;
-		return parseDecadesCollection(id, row.block_json, language);
+		return parseDecadesCollection(DECADES_COLLECTION_ID, row.block_json, language);
 	} catch {
 		return null;
 	}
@@ -389,7 +658,10 @@ export async function createHomeConfigV2(
 	const decades = await resolveDecadesCollection(options.db, options.language);
 	const blocks: HomeConfigV2Block[] = [];
 
-	for (const section of createV2BlockTemplates(options.language)) {
+	for (const section of createV2BlockTemplates(
+		options.language,
+		options.timezone,
+	)) {
 		if (isDecadesCollectionSlot(section)) {
 			if (decades) blocks.push(decades);
 			continue;
