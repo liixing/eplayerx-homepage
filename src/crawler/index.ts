@@ -230,6 +230,19 @@ interface DiscoverGenresResponse {
   data: DiscoverGenreItem[];
 }
 
+interface DiscoverLanguageItem {
+  id: string;
+  title: string;
+  imageUri: string;
+  route: TmdbListRoute;
+}
+
+interface DiscoverLanguagesResponse {
+  type: "discover_languages";
+  count: number;
+  data: DiscoverLanguageItem[];
+}
+
 interface DiscoverTVByNetworkItem {
   networkId: number;
   networkName: string;
@@ -475,6 +488,26 @@ const GENRE_TRANSLATIONS: Record<GenreKey, Record<Locale, string>> = {
   },
 };
 
+const LANGUAGE_ITEMS = [
+  "zh",
+  "en",
+  "ja",
+  "ko",
+  "es",
+  "fr",
+  "de",
+  "nl",
+  "it",
+  "ru",
+  "pt",
+  "th",
+  "vi",
+  "id",
+  "hi",
+  "tr",
+  "ar",
+] as const;
+
 const GENRE_ITEMS: { id: string; key: GenreKey; imageName: string }[] = [
   { id: "18", key: "drama", imageName: "Drama-1.webp" },
   { id: "35", key: "comedy", imageName: "Comedy-1.webp" },
@@ -616,6 +649,29 @@ function localizeDiscoverTVByLanguage(
   return {
     ...payload,
     count: payload.count ?? data.length,
+    data,
+  };
+}
+
+function createDiscoverLanguages(locale: Locale): DiscoverLanguagesResponse {
+  const data = LANGUAGE_ITEMS.map((code) => {
+    const title =
+      LANGUAGE_NAME_TRANSLATIONS[code]?.[locale] || code;
+    return {
+      id: code,
+      title,
+      imageUri: `https://${R2_CUSTOM_DOMAIN}/languages/${code}.webp?v=2`,
+      route: createTmdbListRoute(title, {
+        category: "discover",
+        type: "movie",
+        language: code,
+      }),
+    };
+  });
+
+  return {
+    type: "discover_languages",
+    count: data.length,
     data,
   };
 }
@@ -785,6 +841,13 @@ app.get("/discover/tv-by-language", async (c) => {
   if (!result.ok) return result.response;
   const payload = result.data as DiscoverTVByLanguageResponse;
   return c.json(localizeDiscoverTVByLanguage(payload, locale), 200, {
+    "Cache-Control": STATIC_JSON_CACHE_CONTROL,
+  });
+});
+
+app.get("/discover/tv-by-language/v2", (c) => {
+  const locale = resolveRequestLocale(c) ?? "en";
+  return c.json(createDiscoverLanguages(locale), 200, {
     "Cache-Control": STATIC_JSON_CACHE_CONTROL,
   });
 });
