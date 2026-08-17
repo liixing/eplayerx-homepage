@@ -5,7 +5,7 @@ import { tmdb } from "./client.js";
 const tmdbApp = new Hono();
 
 /** Bump to drop Cache API entries after discover filter changes. */
-const TMDB_CACHE_EPOCH = "20260816-ja-drama";
+const TMDB_CACHE_EPOCH = "20260817-es-drama";
 
 const TMDB_IMAGE_CACHE_CONTROL =
   "public, max-age=31536000, s-maxage=31536000, immutable";
@@ -170,6 +170,45 @@ export async function tmdbCacheMiddleware(c: Context, next: () => Promise<void>)
   }
 }
 
+function mergeWithoutGenres(upstream: URL, ids: string[]) {
+	const excluded = new Set(
+		(upstream.searchParams.get("without_genres") ?? "")
+			.split(",")
+			.map((id) => id.trim())
+			.filter(Boolean),
+	);
+	for (const id of ids) excluded.add(id);
+	upstream.searchParams.set("without_genres", [...excluded].join(","));
+}
+
+/** Stale homepage clients still hit the unfiltered ja/es popularity URLs. */
+function applyHomepageDramaDefaults(path: string, upstream: URL) {
+	if (path !== "/3/discover/tv") return;
+	if (upstream.searchParams.get("with_genres") === "16") return;
+
+	const language = upstream.searchParams.get("with_original_language");
+	const sort = upstream.searchParams.get("sort_by");
+
+	if (language === "ja") {
+		mergeWithoutGenres(upstream, ["16", "10762"]);
+		return;
+	}
+
+	if (
+		language === "es" &&
+		sort === "popularity.desc" &&
+		!upstream.searchParams.has("with_genres") &&
+		!upstream.searchParams.has("vote_count.gte")
+	) {
+		upstream.searchParams.set("with_genres", "18");
+		mergeWithoutGenres(upstream, ["16", "10762", "10764"]);
+		upstream.searchParams.set("vote_count.gte", "20");
+		if (!upstream.searchParams.has("first_air_date.gte")) {
+			upstream.searchParams.set("first_air_date.gte", "2018-01-01");
+		}
+	}
+}
+
 async function proxyTmdbDiscover(c: Context, path: string) {
   if (!process.env.TMDB_API_TOKEN) {
     throw new Error("TMDB_API_TOKEN is not set");
@@ -185,23 +224,7 @@ async function proxyTmdbDiscover(c: Context, path: string) {
     upstream.searchParams.append(key, value);
   }
 
-  // Homepage 日剧 used to omit this; stale clients still hit that URL.
-  // Don't rewrite explicit anime discovers (`with_genres=16`).
-  if (
-    path === "/3/discover/tv" &&
-    upstream.searchParams.get("with_original_language") === "ja" &&
-    upstream.searchParams.get("with_genres") !== "16"
-  ) {
-    const excluded = new Set(
-      (upstream.searchParams.get("without_genres") ?? "")
-        .split(",")
-        .map((id) => id.trim())
-        .filter(Boolean),
-    );
-    excluded.add("16");
-    excluded.add("10762");
-    upstream.searchParams.set("without_genres", [...excluded].join(","));
-  }
+  applyHomepageDramaDefaults(path, upstream);
 
   const response = await fetch(upstream, {
     headers: {
