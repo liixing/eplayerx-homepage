@@ -4,6 +4,9 @@ import { tmdb } from "./client.js";
 
 const tmdbApp = new Hono();
 
+/** Bump to drop Cache API entries after discover filter changes. */
+const TMDB_CACHE_EPOCH = "20260816-ja-drama";
+
 const TMDB_IMAGE_CACHE_CONTROL =
   "public, max-age=31536000, s-maxage=31536000, immutable";
 
@@ -145,7 +148,9 @@ export async function tmdbCacheMiddleware(c: Context, next: () => Promise<void>)
   }
 
   const cache = defaultCache();
-  const cacheKey = new Request(c.req.url, { method: "GET" });
+  const cacheKey = new Request(`${c.req.url}#${TMDB_CACHE_EPOCH}`, {
+    method: "GET",
+  });
   if (cache) {
     const hit = await cache.match(cacheKey);
     if (hit) {
@@ -178,6 +183,24 @@ async function proxyTmdbDiscover(c: Context, path: string) {
 
   for (const [key, value] of requestUrl.searchParams.entries()) {
     upstream.searchParams.append(key, value);
+  }
+
+  // Homepage 日剧 used to omit this; stale clients still hit that URL.
+  // Don't rewrite explicit anime discovers (`with_genres=16`).
+  if (
+    path === "/3/discover/tv" &&
+    upstream.searchParams.get("with_original_language") === "ja" &&
+    upstream.searchParams.get("with_genres") !== "16"
+  ) {
+    const excluded = new Set(
+      (upstream.searchParams.get("without_genres") ?? "")
+        .split(",")
+        .map((id) => id.trim())
+        .filter(Boolean),
+    );
+    excluded.add("16");
+    excluded.add("10762");
+    upstream.searchParams.set("without_genres", [...excluded].join(","));
   }
 
   const response = await fetch(upstream, {
