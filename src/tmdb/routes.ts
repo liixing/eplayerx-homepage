@@ -6,7 +6,7 @@ import { tmdb } from "./client.js";
 const tmdbApp = new Hono();
 
 /** Bump to drop Cache API entries after discover filter changes. */
-const TMDB_CACHE_EPOCH = "20260818-list-ratings";
+const TMDB_CACHE_EPOCH = "20260818-videos-all-langs";
 
 const TMDB_IMAGE_CACHE_CONTROL =
   "public, max-age=31536000, s-maxage=31536000, immutable";
@@ -450,14 +450,51 @@ tmdbApp.get("/movie/similar", async (c) => {
   return c.json(result.data);
 });
 
+/** ISO 639-1 only. Regional tags like zh-CN make TMDB drop other languages. */
+const VIDEO_INCLUDE_LANGUAGES =
+  "en,zh,ja,ko,fr,de,es,pt,it,ru,ar,hi,th,id,vi,tr,pl,nl,sv,cs,uk,null";
+const VIDEO_INCLUDE_LANGUAGE_SET = new Set(VIDEO_INCLUDE_LANGUAGES.split(","));
+
+function videoLanguagePrimary(language: string): string {
+  return language.trim().toLowerCase().split(/[-_]/)[0] ?? "";
+}
+
+function includeVideoLanguage(language: string): string {
+  const primary = videoLanguagePrimary(language);
+  if (!primary || VIDEO_INCLUDE_LANGUAGE_SET.has(primary)) {
+    return VIDEO_INCLUDE_LANGUAGES;
+  }
+  return `${primary},${VIDEO_INCLUDE_LANGUAGES}`;
+}
+
+function preferClientLanguageVideos<T extends { iso_639_1?: string }>(
+  results: T[] | undefined,
+  language: string,
+): T[] {
+  if (!results?.length) return results ?? [];
+  const primary = videoLanguagePrimary(language);
+  if (!primary) return results;
+  const matched: T[] = [];
+  const rest: T[] = [];
+  for (const video of results) {
+    if ((video.iso_639_1 ?? "").toLowerCase() === primary) {
+      matched.push(video);
+    } else {
+      rest.push(video);
+    }
+  }
+  return matched.length === 0 ? results : [...matched, ...rest];
+}
+
 tmdbApp.get("/movie/videos", async (c) => {
   const id = c.req.query("id") || "";
   const language = c.req.query("language") || "en";
   const result = await tmdb.GET(`/3/movie/${Number(id)}/videos`, {
     params: {
+      // Movie OpenAPI omits include_video_language; TMDB accepts it.
       query: {
-        language,
-      },
+        include_video_language: includeVideoLanguage(language),
+      } as { language?: string },
       path: {
         movie_id: Number(id),
       },
@@ -466,7 +503,11 @@ tmdbApp.get("/movie/videos", async (c) => {
   if (result.response.status !== 200) {
     return c.json({ error: result.error }, 500);
   }
-  return c.json(result.data);
+  const data = result.data;
+  return c.json({
+    ...data,
+    results: preferClientLanguageVideos(data?.results, language),
+  });
 });
 
 tmdbApp.get("/movie/popular", async (c) => {
@@ -686,7 +727,7 @@ tmdbApp.get("/tv/videos", async (c) => {
   const result = await tmdb.GET(`/3/tv/${Number(id)}/videos`, {
     params: {
       query: {
-        language,
+        include_video_language: includeVideoLanguage(language),
       },
       path: {
         series_id: Number(id),
@@ -696,7 +737,11 @@ tmdbApp.get("/tv/videos", async (c) => {
   if (result.response.status !== 200) {
     return c.json({ error: result.error }, 500);
   }
-  return c.json(result.data);
+  const data = result.data;
+  return c.json({
+    ...data,
+    results: preferClientLanguageVideos(data?.results, language),
+  });
 });
 
 tmdbApp.get("/tv/popular", async (c) => {
