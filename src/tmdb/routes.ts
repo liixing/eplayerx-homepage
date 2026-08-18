@@ -5,7 +5,7 @@ import { tmdb } from "./client.js";
 const tmdbApp = new Hono();
 
 /** Bump to drop Cache API entries after discover filter changes. */
-const TMDB_CACHE_EPOCH = "20260817-es-drama";
+const TMDB_CACHE_EPOCH = "20260818-certification";
 
 const TMDB_IMAGE_CACHE_CONTROL =
   "public, max-age=31536000, s-maxage=31536000, immutable";
@@ -316,6 +316,7 @@ tmdbApp.get("/movie/details", async (c) => {
     params: {
       query: {
         language,
+        append_to_response: "release_dates",
       },
       path: {
         movie_id: Number(id),
@@ -552,6 +553,7 @@ tmdbApp.get("/tv/details", async (c) => {
     params: {
       query: {
         language,
+        append_to_response: "content_ratings",
       },
       path: {
         series_id: Number(id),
