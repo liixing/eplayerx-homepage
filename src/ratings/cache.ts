@@ -51,7 +51,7 @@ export function cachedRatings(
 
 let cachePromise: Promise<RatingsCache> | null = null;
 
-/** Lazy R2 load for publish/crawler — not used on GET request paths. */
+/** Lazy R2 load; shared by publish, crawler, and live TMDB list enrich. */
 export function getRatingsCache(): Promise<RatingsCache> {
 	if (!cachePromise) {
 		cachePromise = loadRatingsCache().catch((error) => {

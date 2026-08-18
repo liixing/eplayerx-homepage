@@ -1,11 +1,12 @@
 import { Hono, type Context } from "hono";
 import { pickPreferredLogo } from "../crawler/tmdb-enrich.js";
+import { cachedRatings, getRatingsCache } from "../ratings/cache.js";
 import { tmdb } from "./client.js";
 
 const tmdbApp = new Hono();
 
 /** Bump to drop Cache API entries after discover filter changes. */
-const TMDB_CACHE_EPOCH = "20260818-certification";
+const TMDB_CACHE_EPOCH = "20260818-list-ratings";
 
 const TMDB_IMAGE_CACHE_CONTROL =
   "public, max-age=31536000, s-maxage=31536000, immutable";
@@ -236,6 +237,22 @@ async function proxyTmdbDiscover(c: Context, path: string) {
 
   if (!response.ok) {
     return c.json({ error: data }, 500);
+  }
+
+  const page = Number.parseInt(requestUrl.searchParams.get("page") || "1", 10);
+  const mediaType = path.endsWith("/movie") ? "movie" : "tv";
+  if (
+    page === 1 &&
+    data &&
+    typeof data === "object" &&
+    Array.isArray((data as { results?: unknown }).results) &&
+    (data as { results: unknown[] }).results.length > 0
+  ) {
+    const results = (data as { results: Record<string, unknown>[] }).results;
+    const top = results.slice(0, 20);
+    const rest = results.slice(20);
+    const rated = await attachListRatings(top, mediaType);
+    return c.json({ ...(data as object), results: [...rated, ...rest] });
   }
 
   return c.json(data);
@@ -762,6 +779,26 @@ function bestByVote<T extends { vote_average?: number }>(items: T[]) {
     : undefined;
 }
 
+function withCachedRatings(
+  item: Record<string, unknown>,
+  mediaType: "movie" | "tv",
+  cache: Awaited<ReturnType<typeof getRatingsCache>>,
+): Record<string, unknown> {
+  const id = Number(item.id);
+  if (!Number.isFinite(id) || id <= 0) return item;
+  const ratings = cachedRatings(cache, mediaType, id);
+  return ratings ? { ...item, ratings } : item;
+}
+
+/** Ratings only — used by discover lists that skip artwork enrich. */
+async function attachListRatings(
+  items: Record<string, unknown>[],
+  mediaType: "movie" | "tv",
+): Promise<Record<string, unknown>[]> {
+  const cache = await getRatingsCache();
+  return items.map((item) => withCachedRatings(item, mediaType, cache));
+}
+
 async function enrichWithImages(
   items: Record<string, unknown>[],
   language: string,
@@ -770,22 +807,30 @@ async function enrichWithImages(
   const [languageCode] = language.split("-");
   const preferredRegion =
     languageCode === "zh" ? (language.includes("TW") ? "TW" : "CN") : undefined;
+  const ratingsCache = getRatingsCache();
 
   const enrichOne = async (item: Record<string, unknown>) => {
-    try {
-      const type = mediaType ?? (item.media_type as string);
-      if (type !== "movie" && type !== "tv") return item;
+    const type = mediaType ?? (item.media_type as string);
+    if (type !== "movie" && type !== "tv") return item;
 
-      const id = item.id as number;
-      const imagesResult =
-        type === "tv"
-          ? await tmdb.GET(`/3/tv/${id}/images`, {
-              params: { path: { series_id: id } },
-            })
-          : await tmdb.GET(`/3/movie/${id}/images`, {
-              params: { path: { movie_id: id } },
-            });
-      if (imagesResult.response.status !== 200) return item;
+    const id = item.id as number;
+    const imagesPromise =
+      type === "tv"
+        ? tmdb.GET(`/3/tv/${id}/images`, {
+            params: { path: { series_id: id } },
+          })
+        : tmdb.GET(`/3/movie/${id}/images`, {
+            params: { path: { movie_id: id } },
+          });
+
+    try {
+      const [imagesResult, cache] = await Promise.all([
+        imagesPromise,
+        ratingsCache,
+      ]);
+
+      const withRatings = withCachedRatings(item, type, cache);
+      if (imagesResult.response.status !== 200) return withRatings;
 
       const images = imagesResult.data;
 
@@ -805,9 +850,13 @@ async function enrichWithImages(
         (item.backdrop_path as string | undefined) ||
         (item.poster_path as string | undefined);
 
-      return { ...item, logo, noLogoPoster, thumb };
+      return { ...withRatings, logo, noLogoPoster, thumb };
     } catch {
-      return item;
+      try {
+        return withCachedRatings(item, type, await ratingsCache);
+      } catch {
+        return item;
+      }
     }
   };
 
