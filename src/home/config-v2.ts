@@ -480,6 +480,10 @@ function createV2BlockTemplates(language: string, timezone: string): V2Section[]
 				path: "/tmdb/discover/tv",
 				query: {
 					with_original_language: "ko",
+					with_genres: 18,
+					without_genres: "16,10762,10764",
+					"first_air_date.gte": "2018-01-01",
+					"vote_count.gte": 15,
 					sort_by: "popularity.desc",
 					language,
 					page: 1,

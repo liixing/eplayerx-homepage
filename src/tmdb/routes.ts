@@ -6,7 +6,7 @@ import { tmdb } from "./client.js";
 const tmdbApp = new Hono();
 
 /** Bump to drop Cache API entries after discover filter changes. */
-const TMDB_CACHE_EPOCH = "20260818-videos-all-langs";
+const TMDB_CACHE_EPOCH = "20260819-ko-drama-filter";
 
 const TMDB_IMAGE_CACHE_CONTROL =
   "public, max-age=31536000, s-maxage=31536000, immutable";
@@ -182,7 +182,7 @@ function mergeWithoutGenres(upstream: URL, ids: string[]) {
 	upstream.searchParams.set("without_genres", [...excluded].join(","));
 }
 
-/** Stale homepage clients still hit the unfiltered ja/es popularity URLs. */
+/** Stale homepage clients still hit the unfiltered ja/ko/es popularity URLs. */
 function applyHomepageDramaDefaults(path: string, upstream: URL) {
 	if (path !== "/3/discover/tv") return;
 	if (upstream.searchParams.get("with_genres") === "16") return;
@@ -192,6 +192,11 @@ function applyHomepageDramaDefaults(path: string, upstream: URL) {
 
 	if (language === "ja") {
 		mergeWithoutGenres(upstream, ["16", "10762"]);
+		return;
+	}
+
+	if (language === "ko") {
+		mergeWithoutGenres(upstream, ["16", "10762", "10764"]);
 		return;
 	}
 
