@@ -5,8 +5,8 @@ import { tmdb } from "./client.js";
 
 const tmdbApp = new Hono();
 
-/** Bump to drop Cache API entries after discover filter changes. */
-const TMDB_CACHE_EPOCH = "20260819-ko-drama-filter";
+/** Bump to drop Cache API entries after discover filter / artwork changes. */
+const TMDB_CACHE_EPOCH = "20260822-discover-artwork";
 
 const TMDB_IMAGE_CACHE_CONTROL =
   "public, max-age=31536000, s-maxage=31536000, immutable";
@@ -245,6 +245,7 @@ async function proxyTmdbDiscover(c: Context, path: string) {
   }
 
   const page = Number.parseInt(requestUrl.searchParams.get("page") || "1", 10);
+  const language = requestUrl.searchParams.get("language") || "en";
   const mediaType = path.endsWith("/movie") ? "movie" : "tv";
   if (
     page === 1 &&
@@ -256,8 +257,8 @@ async function proxyTmdbDiscover(c: Context, path: string) {
     const results = (data as { results: Record<string, unknown>[] }).results;
     const top = results.slice(0, 20);
     const rest = results.slice(20);
-    const rated = await attachListRatings(top, mediaType);
-    return c.json({ ...(data as object), results: [...rated, ...rest] });
+    const enriched = await enrichWithImages(top, language, mediaType);
+    return c.json({ ...(data as object), results: [...enriched, ...rest] });
   }
 
   return c.json(data);
@@ -838,15 +839,6 @@ function withCachedRatings(
   if (!Number.isFinite(id) || id <= 0) return item;
   const ratings = cachedRatings(cache, mediaType, id);
   return ratings ? { ...item, ratings } : item;
-}
-
-/** Ratings only — used by discover lists that skip artwork enrich. */
-async function attachListRatings(
-  items: Record<string, unknown>[],
-  mediaType: "movie" | "tv",
-): Promise<Record<string, unknown>[]> {
-  const cache = await getRatingsCache();
-  return items.map((item) => withCachedRatings(item, mediaType, cache));
 }
 
 async function enrichWithImages(
