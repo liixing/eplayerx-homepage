@@ -6,6 +6,7 @@ import crawlerApp from "./crawler/index.js";
 import homeApp from "./home/index.js";
 import ratingsApp, { ratingsCacheMiddleware } from "./ratings/index.js";
 import tmdbApp, { tmdbCacheMiddleware } from "./tmdb/index.js";
+import tvdbApp, { tvdbCacheMiddleware } from "./tvdb/index.js";
 
 const app = new Hono();
 
@@ -25,6 +26,8 @@ const publicCors = cors({
 
 app.use("/tmdb/*", publicCors);
 app.use("/tmdb/*", tmdbCacheMiddleware);
+app.use("/tvdb/*", publicCors);
+app.use("/tvdb/*", tvdbCacheMiddleware);
 app.use("/ratings", publicCors);
 app.use("/ratings", ratingsCacheMiddleware);
 app.use("/home/*", publicCors);
@@ -46,6 +49,9 @@ app.get("/", (c) => {
 
 // Mount TMDB routes
 app.route("/tmdb", tmdbApp);
+
+// Mount TVDB seasons / episodes
+app.route("/tvdb", tvdbApp);
 
 // Mount multi-source ratings (MDBList)
 app.route("/ratings", ratingsApp);

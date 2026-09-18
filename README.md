@@ -79,6 +79,7 @@ bun run dev:cf
 | 变量名                  | 必需 | 说明                                            |
 | ----------------------- | ---- | ----------------------------------------------- |
 | `TMDB_API_TOKEN`        | ✅   | TMDB API 读取令牌                               |
+| `TVDB_API_KEY`          | ❌   | TheTVDB v4 项目 Key，用于 `/tvdb` 季/集代理   |
 | `MDBLIST_API_KEY`       | ❌   | MDBList API key，多个用逗号分隔会轮询        |
 | `R2_ACCESS_KEY_ID`      | ❌   | Cloudflare R2 访问密钥                          |
 | `R2_SECRET_ACCESS_KEY`  | ❌   | Cloudflare R2 秘密密钥                          |

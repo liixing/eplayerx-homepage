@@ -31,6 +31,7 @@ A media content API service built with [Hono](https://hono.dev/) framework, prov
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `TMDB_API_TOKEN` | ✅ | TMDB API Read Access Token |
+| `TVDB_API_KEY` | ❌ | TheTVDB v4 project key for `/tvdb` seasons and episodes |
 | `MDBLIST_API_KEY` | ❌ | MDBList API key(s) for `GET /ratings` (comma-separated, round-robin) |
 | `R2_ACCESS_KEY_ID` | ❌ | Cloudflare R2 Access Key |
 | `R2_SECRET_ACCESS_KEY` | ❌ | Cloudflare R2 Secret Key |
