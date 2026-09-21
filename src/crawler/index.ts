@@ -169,7 +169,7 @@ async function staticJsonCacheMiddleware(
 app.use("/popular/*", staticJsonCacheMiddleware);
 app.use("/discover/*", staticJsonCacheMiddleware);
 
-type Locale = "en" | "zh" | "zh-Hant" | "ja" | "es" | "ar";
+type Locale = "en" | "zh" | "zh-Hant" | "ja" | "es" | "fr" | "de" | "ar";
 
 interface TmdbListRoute {
   type: "tmdb-list";
@@ -274,6 +274,8 @@ const LANGUAGE_NAME_TRANSLATIONS: Record<string, Record<Locale, string>> = {
     "zh-Hant": "英語",
     ja: "英語",
     es: "Inglés",
+    fr: "Anglais",
+    de: "Englisch",
     ar: "الإنجليزية",
   },
   zh: {
@@ -282,6 +284,8 @@ const LANGUAGE_NAME_TRANSLATIONS: Record<string, Record<Locale, string>> = {
     "zh-Hant": "中文",
     ja: "中国語",
     es: "Chino",
+    fr: "Chinois",
+    de: "Chinesisch",
     ar: "الصينية",
   },
   ja: {
@@ -290,6 +294,8 @@ const LANGUAGE_NAME_TRANSLATIONS: Record<string, Record<Locale, string>> = {
     "zh-Hant": "日語",
     ja: "日本語",
     es: "Japonés",
+    fr: "Japonais",
+    de: "Japanisch",
     ar: "اليابانية",
   },
   ko: {
@@ -298,6 +304,8 @@ const LANGUAGE_NAME_TRANSLATIONS: Record<string, Record<Locale, string>> = {
     "zh-Hant": "韓語",
     ja: "韓国語",
     es: "Coreano",
+    fr: "Coréen",
+    de: "Koreanisch",
     ar: "الكورية",
   },
   es: {
@@ -306,6 +314,8 @@ const LANGUAGE_NAME_TRANSLATIONS: Record<string, Record<Locale, string>> = {
     "zh-Hant": "西班牙語",
     ja: "スペイン語",
     es: "Español",
+    fr: "Espagnol",
+    de: "Spanisch",
     ar: "الإسبانية",
   },
   th: {
@@ -314,6 +324,8 @@ const LANGUAGE_NAME_TRANSLATIONS: Record<string, Record<Locale, string>> = {
     "zh-Hant": "泰語",
     ja: "タイ語",
     es: "Tailandés",
+    fr: "Thaï",
+    de: "Thailändisch",
     ar: "التايلاندية",
   },
   hi: {
@@ -322,6 +334,8 @@ const LANGUAGE_NAME_TRANSLATIONS: Record<string, Record<Locale, string>> = {
     "zh-Hant": "印度語",
     ja: "ヒンディー語",
     es: "Hindi",
+    fr: "Hindi",
+    de: "Hindi",
     ar: "الهندية",
   },
   tr: {
@@ -330,6 +344,8 @@ const LANGUAGE_NAME_TRANSLATIONS: Record<string, Record<Locale, string>> = {
     "zh-Hant": "土耳其語",
     ja: "トルコ語",
     es: "Turco",
+    fr: "Turc",
+    de: "Türkisch",
     ar: "التركية",
   },
   ar: {
@@ -338,6 +354,8 @@ const LANGUAGE_NAME_TRANSLATIONS: Record<string, Record<Locale, string>> = {
     "zh-Hant": "阿拉伯語",
     ja: "アラビア語",
     es: "Árabe",
+    fr: "Arabe",
+    de: "Arabisch",
     ar: "العربية",
   },
   fr: {
@@ -346,6 +364,8 @@ const LANGUAGE_NAME_TRANSLATIONS: Record<string, Record<Locale, string>> = {
     "zh-Hant": "法語",
     ja: "フランス語",
     es: "Francés",
+    fr: "Français",
+    de: "Französisch",
     ar: "الفرنسية",
   },
   it: {
@@ -354,6 +374,8 @@ const LANGUAGE_NAME_TRANSLATIONS: Record<string, Record<Locale, string>> = {
     "zh-Hant": "義大利語",
     ja: "イタリア語",
     es: "Italiano",
+    fr: "Italien",
+    de: "Italienisch",
     ar: "الإيطالية",
   },
   de: {
@@ -362,6 +384,8 @@ const LANGUAGE_NAME_TRANSLATIONS: Record<string, Record<Locale, string>> = {
     "zh-Hant": "德語",
     ja: "ドイツ語",
     es: "Alemán",
+    fr: "Allemand",
+    de: "Deutsch",
     ar: "الألمانية",
   },
   nl: {
@@ -370,6 +394,8 @@ const LANGUAGE_NAME_TRANSLATIONS: Record<string, Record<Locale, string>> = {
     "zh-Hant": "荷蘭語",
     ja: "オランダ語",
     es: "Neerlandés",
+    fr: "Néerlandais",
+    de: "Niederländisch",
     ar: "الهولندية",
   },
   ru: {
@@ -378,6 +404,8 @@ const LANGUAGE_NAME_TRANSLATIONS: Record<string, Record<Locale, string>> = {
     "zh-Hant": "俄語",
     ja: "ロシア語",
     es: "Ruso",
+    fr: "Russe",
+    de: "Russisch",
     ar: "الروسية",
   },
   pt: {
@@ -386,6 +414,8 @@ const LANGUAGE_NAME_TRANSLATIONS: Record<string, Record<Locale, string>> = {
     "zh-Hant": "葡萄牙語",
     ja: "ポルトガル語",
     es: "Portugués",
+    fr: "Portugais",
+    de: "Portugiesisch",
     ar: "البرتغالية",
   },
   vi: {
@@ -394,6 +424,8 @@ const LANGUAGE_NAME_TRANSLATIONS: Record<string, Record<Locale, string>> = {
     "zh-Hant": "越南語",
     ja: "ベトナム語",
     es: "Vietnamita",
+    fr: "Vietnamien",
+    de: "Vietnamesisch",
     ar: "الفيتنامية",
   },
   id: {
@@ -402,6 +434,8 @@ const LANGUAGE_NAME_TRANSLATIONS: Record<string, Record<Locale, string>> = {
     "zh-Hant": "印尼語",
     ja: "インドネシア語",
     es: "Indonesio",
+    fr: "Indonésien",
+    de: "Indonesisch",
     ar: "الإندونيسية",
   },
 };
@@ -413,6 +447,8 @@ const GENRE_TRANSLATIONS: Record<GenreKey, Record<Locale, string>> = {
     "zh-Hant": "劇情",
     ja: "ドラマ",
     es: "Drama",
+    fr: "Drame",
+    de: "Drama",
     ar: "دراما",
   },
   comedy: {
@@ -421,6 +457,8 @@ const GENRE_TRANSLATIONS: Record<GenreKey, Record<Locale, string>> = {
     "zh-Hant": "喜劇",
     ja: "コメディ",
     es: "Comedia",
+    fr: "Comédie",
+    de: "Komödie",
     ar: "كوميديا",
   },
   thriller: {
@@ -429,6 +467,8 @@ const GENRE_TRANSLATIONS: Record<GenreKey, Record<Locale, string>> = {
     "zh-Hant": "懸疑驚悚",
     ja: "スリラー＆ミステリー",
     es: "Thriller y Misterio",
+    fr: "Thriller et mystère",
+    de: "Thriller & Mystery",
     ar: "إثارة وغموض",
   },
   action: {
@@ -437,6 +477,8 @@ const GENRE_TRANSLATIONS: Record<GenreKey, Record<Locale, string>> = {
     "zh-Hant": "動作",
     ja: "アクション",
     es: "Acción",
+    fr: "Action",
+    de: "Action",
     ar: "أكشن",
   },
   animation: {
@@ -445,6 +487,8 @@ const GENRE_TRANSLATIONS: Record<GenreKey, Record<Locale, string>> = {
     "zh-Hant": "動畫",
     ja: "アニメーション",
     es: "Animación",
+    fr: "Animation",
+    de: "Animation",
     ar: "أنميشن",
   },
   crime: {
@@ -453,6 +497,8 @@ const GENRE_TRANSLATIONS: Record<GenreKey, Record<Locale, string>> = {
     "zh-Hant": "犯罪",
     ja: "犯罪",
     es: "Crimen",
+    fr: "Crime",
+    de: "Krimi",
     ar: "جريمة",
   },
   documentary: {
@@ -461,6 +507,8 @@ const GENRE_TRANSLATIONS: Record<GenreKey, Record<Locale, string>> = {
     "zh-Hant": "紀錄片",
     ja: "ドキュメンタリー",
     es: "Documental",
+    fr: "Documentaire",
+    de: "Dokumentarfilm",
     ar: "وثائقي",
   },
   kids: {
@@ -469,6 +517,8 @@ const GENRE_TRANSLATIONS: Record<GenreKey, Record<Locale, string>> = {
     "zh-Hant": "闔家歡",
     ja: "キッズ＆ファミリー",
     es: "Niños y Familia",
+    fr: "Enfants et famille",
+    de: "Kinder & Familie",
     ar: "أطفال وعائلة",
   },
   scifi: {
@@ -477,6 +527,8 @@ const GENRE_TRANSLATIONS: Record<GenreKey, Record<Locale, string>> = {
     "zh-Hant": "科幻",
     ja: "SF",
     es: "Ciencia Ficción",
+    fr: "Science-fiction",
+    de: "Science-Fiction",
     ar: "خيال علمي",
   },
   romance: {
@@ -485,6 +537,8 @@ const GENRE_TRANSLATIONS: Record<GenreKey, Record<Locale, string>> = {
     "zh-Hant": "愛情",
     ja: "ロマンス",
     es: "Romance",
+    fr: "Romance",
+    de: "Romance",
     ar: "رومانسية",
   },
   war: {
@@ -493,6 +547,8 @@ const GENRE_TRANSLATIONS: Record<GenreKey, Record<Locale, string>> = {
     "zh-Hant": "戰爭",
     ja: "戦争",
     es: "Bélico",
+    fr: "Guerre",
+    de: "Krieg",
     ar: "حرب",
   },
 };
@@ -554,6 +610,8 @@ function resolveLocale(language: string): Locale {
   if (normalized.startsWith("zh")) return "zh";
   if (normalized.startsWith("ja")) return "ja";
   if (normalized.startsWith("es")) return "es";
+  if (normalized.startsWith("fr")) return "fr";
+  if (normalized.startsWith("de")) return "de";
   if (normalized.startsWith("ar")) return "ar";
   return "en";
 }

@@ -1,6 +1,6 @@
 import type { TmdbListRoute } from "../blocks/types.js";
 
-type Locale = "en" | "zh" | "zh-Hant" | "ja" | "es" | "ar";
+type Locale = "en" | "zh" | "zh-Hant" | "ja" | "es" | "fr" | "de" | "ar";
 
 type HomeTitleKey =
   | "home.continue_watching"
@@ -81,6 +81,8 @@ const TITLE_TRANSLATIONS: Record<HomeTitleKey, Record<Locale, string>> = {
     "zh-Hant": "繼續觀看",
     ja: "続きを視聴",
     es: "Continuar Viendo",
+    fr: "Continuer à regarder",
+    de: "Weiterschauen",
     ar: "متابعة المشاهدة",
   },
   "home.tmdb_popular_tv_shows": {
@@ -89,6 +91,8 @@ const TITLE_TRANSLATIONS: Record<HomeTitleKey, Record<Locale, string>> = {
     "zh-Hant": "今日熱門電視劇",
     ja: "今日の人気テレビ番組",
     es: "Series de TV Populares de Hoy",
+    fr: "Séries TV populaires du jour",
+    de: "Beliebte TV-Serien von heute",
     ar: "مسلسلات شائعة",
   },
   "home.tmdb_popular_movies": {
@@ -97,6 +101,8 @@ const TITLE_TRANSLATIONS: Record<HomeTitleKey, Record<Locale, string>> = {
     "zh-Hant": "今日熱門電影",
     ja: "今日の人気映画",
     es: "Películas Populares de Hoy",
+    fr: "Films populaires du jour",
+    de: "Beliebte Filme von heute",
     ar: "أفلام شائعة",
   },
   "home.popular_domestic_anime": {
@@ -105,6 +111,8 @@ const TITLE_TRANSLATIONS: Record<HomeTitleKey, Record<Locale, string>> = {
     "zh-Hant": "熱門國產動漫",
     ja: "人気の国内アニメ",
     es: "Anime Doméstico Popular",
+    fr: "Anime chinois populaire",
+    de: "Beliebtes chinesisches Anime",
     ar: "أنمي محلي",
   },
   "home.bangumi_popular_anime": {
@@ -113,6 +121,8 @@ const TITLE_TRANSLATIONS: Record<HomeTitleKey, Record<Locale, string>> = {
     "zh-Hant": "今日熱門番劇",
     ja: "今日の人気番組",
     es: "Bangumi Populares de Hoy",
+    fr: "Bangumi populaires du jour",
+    de: "Beliebte Bangumi von heute",
     ar: "بانغومي شائع",
   },
   "home.tmdb_on_the_air_tv_shows": {
@@ -121,6 +131,8 @@ const TITLE_TRANSLATIONS: Record<HomeTitleKey, Record<Locale, string>> = {
     "zh-Hant": "正在熱播",
     ja: "放送中",
     es: "En Emisión",
+    fr: "En cours de diffusion",
+    de: "Aktuell im TV",
     ar: "يعرض الآن",
   },
   "home.popular_tv_shows": {
@@ -129,6 +141,8 @@ const TITLE_TRANSLATIONS: Record<HomeTitleKey, Record<Locale, string>> = {
     "zh-Hant": "時下最熱門的國產劇",
     ja: "話題の中国ドラマ",
     es: "Dramas Chinos en Tendencia",
+    fr: "Drames chinois tendance",
+    de: "Trendige chinesische Dramen",
     ar: "دراما صينية رائجة",
   },
   "home.popular_movies": {
@@ -137,6 +151,8 @@ const TITLE_TRANSLATIONS: Record<HomeTitleKey, Record<Locale, string>> = {
     "zh-Hant": "實時熱門電影",
     ja: "リアルタイム人気映画",
     es: "Películas en Tendencia",
+    fr: "Films tendance",
+    de: "Trendfilme",
     ar: "أفلام رائجة",
   },
   "home.popular_variety_shows": {
@@ -145,6 +161,8 @@ const TITLE_TRANSLATIONS: Record<HomeTitleKey, Record<Locale, string>> = {
     "zh-Hant": "實時熱門綜藝",
     ja: "今日の人気バラエティ",
     es: "Programas de Variedades Populares de Hoy",
+    fr: "Émissions de divertissement populaires",
+    de: "Beliebte Unterhaltungsshows",
     ar: "برامج منوعة",
   },
   "home.popular_korean_tv_shows": {
@@ -153,6 +171,8 @@ const TITLE_TRANSLATIONS: Record<HomeTitleKey, Record<Locale, string>> = {
     "zh-Hant": "備受歡迎的韓劇推薦",
     ja: "人気の韓国ドラマ",
     es: "Dramas Coreanos Populares",
+    fr: "Drames coréens populaires",
+    de: "Beliebte koreanische Dramen",
     ar: "دراما كورية شائعة",
   },
   "home.popular_japanese_tv_shows": {
@@ -161,6 +181,8 @@ const TITLE_TRANSLATIONS: Record<HomeTitleKey, Record<Locale, string>> = {
     "zh-Hant": "近期最流行日劇榜單",
     ja: "最近人気の日本ドラマ",
     es: "Dramas Japoneses en Tendencia",
+    fr: "Drames japonais tendance",
+    de: "Trendige japanische Dramen",
     ar: "دراما يابانية رائجة",
   },
   "home.popular_spanish_tv_shows": {
@@ -169,6 +191,8 @@ const TITLE_TRANSLATIONS: Record<HomeTitleKey, Record<Locale, string>> = {
     "zh-Hant": "時下流行的西語劇集",
     ja: "話題のスペイン語シリーズ",
     es: "Series en Español en Tendencia",
+    fr: "Séries hispanophones tendance",
+    de: "Trendige spanischsprachige Serien",
     ar: "مسلسلات إسبانية رائجة",
   },
   "home.popular_taiwanese_tv_shows": {
@@ -177,6 +201,8 @@ const TITLE_TRANSLATIONS: Record<HomeTitleKey, Record<Locale, string>> = {
     "zh-Hant": "台劇當然也不能落下",
     ja: "人気の台湾ドラマ",
     es: "Dramas Taiwaneses Populares",
+    fr: "Drames taïwanais populaires",
+    de: "Beliebte taiwanesische Dramen",
     ar: "دراما تايوانية شائعة",
   },
   "home.tmdb_discover_genres": {
@@ -185,6 +211,8 @@ const TITLE_TRANSLATIONS: Record<HomeTitleKey, Record<Locale, string>> = {
     "zh-Hant": "按分類瀏覽",
     ja: "カテゴリで探す",
     es: "Explorar por Categoría",
+    fr: "Parcourir par catégorie",
+    de: "Nach Kategorie stöbern",
     ar: "تصفح حسب الفئة",
   },
   "home.tmdb_discover_languages": {
@@ -193,6 +221,8 @@ const TITLE_TRANSLATIONS: Record<HomeTitleKey, Record<Locale, string>> = {
     "zh-Hant": "按語言瀏覽",
     ja: "言語で探す",
     es: "Explorar por Idioma",
+    fr: "Parcourir par langue",
+    de: "Nach Sprache stöbern",
     ar: "حسب اللغة",
   },
   "home.tmdb_discover_networks": {
@@ -201,6 +231,8 @@ const TITLE_TRANSLATIONS: Record<HomeTitleKey, Record<Locale, string>> = {
     "zh-Hant": "按平台瀏覽",
     ja: "配信サービスで探す",
     es: "Explorar por Plataforma",
+    fr: "Parcourir par plateforme",
+    de: "Nach Plattform stöbern",
     ar: "حسب الشبكة",
   },
   "home.tmdb_top_rated_movies": {
@@ -209,6 +241,8 @@ const TITLE_TRANSLATIONS: Record<HomeTitleKey, Record<Locale, string>> = {
     "zh-Hant": "高分電影",
     ja: "高評価映画",
     es: "Películas Mejor Valoradas",
+    fr: "Films les mieux notés",
+    de: "Bestbewertete Filme",
     ar: "الأعلى تقييماً",
   },
   "home.tmdb_top_rated_tv_shows": {
@@ -217,6 +251,8 @@ const TITLE_TRANSLATIONS: Record<HomeTitleKey, Record<Locale, string>> = {
     "zh-Hant": "高分電視劇",
     ja: "高評価テレビ番組",
     es: "Series Mejor Valoradas",
+    fr: "Séries les mieux notées",
+    de: "Bestbewertete Serien",
     ar: "المسلسلات الأعلى تقييماً",
   },
 };
@@ -257,6 +293,8 @@ function resolveLocale(language: string): Locale {
   if (normalized.startsWith("zh")) return "zh";
   if (normalized.startsWith("ja")) return "ja";
   if (normalized.startsWith("es")) return "es";
+  if (normalized.startsWith("fr")) return "fr";
+  if (normalized.startsWith("de")) return "de";
   if (normalized.startsWith("ar")) return "ar";
   return "en";
 }
