@@ -3,8 +3,8 @@
  * Results already carry TMDB ids, so publishing skips title search.
  */
 
-import type { MediaType } from "../../../src/blocks/types.js";
 import type { PublishItem } from "../../../src/blocks/publish.js";
+import type { MediaType } from "../../../src/blocks/types.js";
 
 interface DiscoverResult {
 	id: number;
@@ -25,6 +25,22 @@ export interface DiscoverFilter {
 	/** Comma-joined keyword ids (AND). */
 	with_keywords?: string;
 	sortBy?: string;
+	/** Minimum runtime in minutes (movies). Drops one-shots and featurettes. */
+	runtimeGte?: number;
+	/** Comma-joined genre ids to exclude. */
+	withoutGenres?: string;
+	voteCountGte?: number;
+	voteAverageGte?: number;
+	withOriginalLanguage?: string;
+	firstAirDateGte?: string;
+	firstAirDateLte?: string;
+	/** US-style certs such as `TV-PG|TV-14|TV-MA`. */
+	certificationCountry?: string;
+	certification?: string;
+	watchRegion?: string;
+	/** Pipe-joined provider ids for `watchRegion`. */
+	withWatchProviders?: string;
+	withWatchMonetizationTypes?: string;
 }
 
 /** Popular titles from TMDB discover, one page by default (20 items). */
@@ -53,6 +69,23 @@ export async function fetchTmdbDiscoverItems(
 		}
 		if (filter.with_keywords) {
 			params.set("with_keywords", filter.with_keywords);
+		}
+		const extra: Record<string, string | number | undefined> = {
+			"with_runtime.gte": filter.runtimeGte,
+			without_genres: filter.withoutGenres,
+			"vote_count.gte": filter.voteCountGte,
+			"vote_average.gte": filter.voteAverageGte,
+			with_original_language: filter.withOriginalLanguage,
+			"first_air_date.gte": filter.firstAirDateGte,
+			"first_air_date.lte": filter.firstAirDateLte,
+			certification_country: filter.certificationCountry,
+			certification: filter.certification,
+			watch_region: filter.watchRegion,
+			with_watch_providers: filter.withWatchProviders,
+			with_watch_monetization_types: filter.withWatchMonetizationTypes,
+		};
+		for (const [key, value] of Object.entries(extra)) {
+			if (value != null && value !== "") params.set(key, String(value));
 		}
 
 		const url = `https://api.themoviedb.org/3/discover/${mediaType}?${params}`;
