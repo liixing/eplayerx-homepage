@@ -4,6 +4,7 @@ import adminApp from "./blocks/admin.js";
 import blocksApp, { importLandingApp } from "./blocks/index.js";
 import crawlerApp from "./crawler/index.js";
 import homeApp from "./home/index.js";
+import baiduOAuthApp from "./oauth/baidu.js";
 import ratingsApp, { ratingsCacheMiddleware } from "./ratings/index.js";
 import tmdbApp, { tmdbCacheMiddleware } from "./tmdb/index.js";
 import tvdbApp, { tvdbCacheMiddleware } from "./tvdb/index.js";
@@ -41,6 +42,8 @@ const welcomeStrings = [
 	"Hello Hono!",
 	"To learn more about Hono on Vercel, visit https://vercel.com/docs/frameworks/backend/hono",
 ];
+
+app.route("/oauth/baidu", baiduOAuthApp);
 
 // Root route
 app.get("/", (c) => {
