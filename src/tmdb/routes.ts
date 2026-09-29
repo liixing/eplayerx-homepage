@@ -162,7 +162,7 @@ export async function tmdbCacheMiddleware(c: Context, next: () => Promise<void>)
     const hit = await cache.match(cacheKey);
     if (hit) {
       const headers = new Headers(hit.headers);
-      headers.set("Cache-Control", cacheControl);
+      headers.set("Cache-Control", hit.headers.get("Cache-Control") ?? cacheControl);
       return new Response(c.req.method === "HEAD" ? null : hit.body, {
         status: hit.status,
         headers,
@@ -171,7 +171,7 @@ export async function tmdbCacheMiddleware(c: Context, next: () => Promise<void>)
   }
 
   await next();
-  c.header("Cache-Control", cacheControl);
+  c.header("Cache-Control", c.res.ok ? (c.res.headers.get("Cache-Control") ?? cacheControl) : "no-store");
   if (cache && c.req.method === "GET" && c.res.ok) {
     c.executionCtx.waitUntil(cache.put(cacheKey, c.res.clone()));
   }
@@ -269,6 +269,48 @@ async function proxyTmdbDiscover(c: Context, path: string) {
 
   return c.json(data);
 }
+
+// Isolate-local coalescing; successful responses are also cached at the edge.
+const scrapeSearches = new Map<string, Promise<Response>>();
+
+tmdbApp.get("/search/scrape", async (c) => {
+  const query = (c.req.query("query") ?? "").trim().replace(/\s+/g, " ");
+  const language = c.req.query("language") || "en-US";
+  const type = c.req.query("type") || "all";
+  if (!query || query.length > 200 || !["movie", "tv", "all"].includes(type) || !/^[a-zA-Z]{2,3}(?:-[a-zA-Z0-9]{2,8})*$/.test(language)) {
+    return c.json({ error: "Invalid query, language or type" }, 400);
+  }
+  const key = JSON.stringify([query, language, type]);
+  let pending = scrapeSearches.get(key);
+  if (!pending) {
+    pending = (async () => {
+      const types = type === "all" ? ["movie", "tv"] as const : [type as "movie" | "tv"];
+      const responses = await Promise.all(types.map(async (mediaType) => {
+        const result = await tmdb.GET(mediaType === "movie" ? "/3/search/movie" : "/3/search/tv", {
+          params: { query: { query, language, page: 1, include_adult: false } },
+        });
+        return { mediaType, result };
+      }));
+      const failure = responses.find(({ result }) => !result.response.ok);
+      if (failure) {
+        const status = failure.result.response.status === 429 ? 429 : 502;
+        const headers: Record<string, string> = { "Cache-Control": "no-store" };
+        const retry = failure.result.response.headers.get("Retry-After");
+        if (retry) headers["Retry-After"] = retry;
+        return Response.json({ error: "TMDB search unavailable" }, { status, headers });
+      }
+      const results = responses.flatMap(({ mediaType, result }) =>
+        (result.data?.results ?? []).map(item => ({ ...item, media_type: mediaType }))
+      ).sort((a, b) => (b.popularity ?? 0) - (a.popularity ?? 0));
+      return Response.json(results, { headers: {
+        "Cache-Control": results.length ? CACHE.search : cacheHeader(300, 0),
+      } });
+    })().catch(() => Response.json({ error: "TMDB search unavailable" }, { status: 502, headers: { "Cache-Control": "no-store" } }));
+    scrapeSearches.set(key, pending);
+    void pending.finally(() => { if (scrapeSearches.get(key) === pending) scrapeSearches.delete(key); });
+  }
+  return (await pending).clone();
+});
 
 tmdbApp.get("/search/keyword", async (c) => {
   const query = c.req.query("query") || "";
