@@ -850,7 +850,7 @@ function sanitizeSharedBlock(raw: unknown): ImportableEntry | null {
 }
 
 /** Community block row -> importable payload with an absolute data URL. */
-function importableFromCommunity(row: CommunityBlockRow): ImportableBlock {
+function importableFromCommunity(row: CommunityBlockRow): ImportableEntry | null {
 	const block = JSON.parse(row.block_json) as HomeBlock | CollectionBlock;
 	// Collection children already carry absolute URLs — pass through as-is.
 	if (block.preset === COLLECTION_PRESET) {
@@ -860,7 +860,7 @@ function importableFromCommunity(row: CommunityBlockRow): ImportableBlock {
 			author: row.author,
 			itemCount: row.item_count,
 			language: row.language,
-		} as unknown as ImportableBlock;
+		};
 	}
 	const hb = block as HomeBlock;
 	if (!hb.source?.path) return null;
@@ -943,14 +943,15 @@ async function resolveImportableBlocks(
 	db: D1Database,
 	blockIds: string[],
 	language: string,
-): Promise<ImportableBlock[]> {
+): Promise<ImportableEntry[]> {
 	const community = await getCommunityBlocksByIds(db, blockIds);
 	const official = officialHomeBlocksById(language);
-	const blocks: ImportableBlock[] = [];
+	const blocks: ImportableEntry[] = [];
 	for (const id of blockIds) {
 		const row = community.get(id);
 		if (row) {
-			blocks.push(importableFromCommunity(row));
+			const importable = importableFromCommunity(row);
+			if (importable) blocks.push(importable);
 			continue;
 		}
 		const officialBlock = official.get(id);

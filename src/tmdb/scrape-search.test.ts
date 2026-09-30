@@ -152,3 +152,25 @@ test('localized search misses fall back without saving English metadata or hidin
     assert.equal(calls.length, 1, 'an upstream error must not trigger a language retry');
   } finally { globalThis.fetch = originalFetch; }
 });
+
+test('matching keeps Swift-compatible case folding and all exact same-year candidates', async () => {
+  const originalFetch = globalThis.fetch;
+  let title = 'Straße';
+  let calls = 0;
+  globalThis.fetch = async input => {
+    const url = new URL(input instanceof Request ? input.url : String(input)); calls++;
+    assert.equal(url.pathname, '/3/search/movie', 'exact title matches need no details');
+    return Response.json({ results: [1, 2].map(id => ({ id, title, original_title: title, overview: '中文简介',
+      original_language: 'de', release_date: '2020-01-01' })) });
+  };
+  const app = new Hono(); app.route('/tmdb', routes);
+  try {
+    for (const [stored, query] of [['Straße', 'STRASSE'], ['ΟΣ', 'οσ'], ['ΟΣ', 'ος']]) {
+      title = stored; calls = 0;
+      const response = await app.request('/tmdb/search/scrape?' + new URLSearchParams({ query, language: 'zh-CN', type: 'movie', year: '2020', match: '1' }));
+      assert.equal(response.status, 200);
+      assert.deepEqual((await response.json() as any[]).map(row => row.id), [1, 2], 'ambiguity must reach the client');
+      assert.equal(calls, 1);
+    }
+  } finally { globalThis.fetch = originalFetch; }
+});

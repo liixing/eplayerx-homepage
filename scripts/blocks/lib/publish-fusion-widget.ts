@@ -51,7 +51,7 @@ async function fetchStreamingPlatformItems(
 			source.itemType,
 		);
 		const mediaType = source.itemType === "movies" ? "movie" : "tv";
-		out.push(...rows.map((row) => ({ ...row, mediaType })));
+		out.push(...rows.map<PublishItem>((row) => ({ ...row, mediaType })));
 	}
 	return out;
 }

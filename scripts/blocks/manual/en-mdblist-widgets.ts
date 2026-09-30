@@ -12,6 +12,7 @@
  *   TARGET=directors REGISTER_ONLY=1 bun run …        # skip publish
  */
 
+import { spawnSync } from "node:child_process";
 import type { CollectionStyle } from "../../../src/blocks/types.js";
 import {
 	fetchFusionAddonWidgetItems,
@@ -139,9 +140,9 @@ async function approveSubmission(
 	itemCount: number,
 ): Promise<void> {
 	const reviewedAt = new Date().toISOString();
-	const proc = Bun.spawnSync(
+	const proc = spawnSync(
+		"bunx",
 		[
-			"bunx",
 			"wrangler",
 			"d1",
 			"execute",
@@ -150,9 +151,9 @@ async function approveSubmission(
 			"--command",
 			`UPDATE submissions SET status='approved', block_id='${blockId}', item_count=${itemCount}, reviewed_at='${reviewedAt}' WHERE id='${submissionId}'`,
 		],
-		{ cwd: process.cwd(), stdout: "inherit", stderr: "inherit" },
+		{ cwd: process.cwd(), stdio: ["ignore", "inherit", "inherit"] },
 	);
-	if (proc.exitCode !== 0) {
+	if (proc.status !== 0) {
 		throw new Error(`Failed to approve submission ${submissionId}`);
 	}
 	console.log(`✓ submission ${submissionId} approved → ${blockId}`);

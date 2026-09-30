@@ -13,7 +13,7 @@
  */
 
 import { type PublishItem, publishBlock } from "../../../src/blocks/publish.js";
-import DATA from "./tspdt-1000-data.json";
+import DATA from "./tspdt-1000-data.json" with { type: "json" };
 
 await publishBlock({
 	submissionId: "979448cdbe48",

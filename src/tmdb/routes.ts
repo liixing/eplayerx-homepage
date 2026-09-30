@@ -154,7 +154,7 @@ export async function tmdbCacheMiddleware(c: Context, next: () => Promise<void>)
   const cache = defaultCache();
   const path = tmdbApiPath(c.req.path);
   const epoch = path === "/search/scrape"
-    ? "20260930-scrape-localized-matching"
+    ? "20260930-scrape-localized-matching-v2"
     : path === "/tv/season/details" ? "20260826-season-aggregate-credits" : TMDB_CACHE_EPOCH;
   const cacheKey = new Request(`${c.req.url}#${epoch}`, {
     method: "GET",
@@ -311,7 +311,8 @@ tmdbApp.get("/search/scrape", async (c) => {
           (result.data?.results ?? []).map(item => ({ ...item, media_type: mediaType }))
         ).sort((a, b) => (b.popularity ?? 0) - (a.popularity ?? 0));
         if (matching) {
-          const normalized = (title: string) => title.normalize("NFKD").toLowerCase().replace(/\p{M}/gu, "").replace(/[^\p{L}\p{N}]/gu, "");
+          // Match Swift's case-insensitive folding for sharp S and final sigma too.
+          const normalized = (title: string) => title.normalize("NFKD").toLowerCase().replace(/ß/g, "ss").replace(/ς/g, "σ").replace(/\p{M}/gu, "").replace(/[^\p{L}\p{N}]/gu, "");
           const wanted = normalized(query);
           const names = (item: Record<string, any>) => [item.title, item.name, item.original_title, item.original_name].filter((name): name is string => typeof name === "string");
           const eligible = results.filter(item => item.media_type === "tv" || !year || item.release_date?.startsWith(year));

@@ -7,6 +7,7 @@
  *   bun run scripts/blocks/manual/register-ar-anime-genre-collections.ts
  */
 
+import { spawnSync } from "node:child_process";
 import {
 	ANIME_GENRE_BLOCK_PREFIX,
 	ANIME_GENRE_SOURCE_URL,
@@ -57,9 +58,9 @@ console.log(`✓ collection ${blockId} (${itemCount} items)`);
 await warmCollectionPreviewR2(blockId);
 
 const reviewedAt = new Date().toISOString();
-const proc = Bun.spawnSync(
+const proc = spawnSync(
+	"bunx",
 	[
-		"bunx",
 		"wrangler",
 		"d1",
 		"execute",
@@ -68,7 +69,7 @@ const proc = Bun.spawnSync(
 		"--command",
 		`UPDATE submissions SET status='approved', block_id='${blockId}', item_count=${itemCount}, reviewed_at='${reviewedAt}' WHERE id='${SUBMISSION_ID}'`,
 	],
-	{ cwd: process.cwd(), stdout: "inherit", stderr: "inherit" },
+	{ cwd: process.cwd(), stdio: ["ignore", "inherit", "inherit"] },
 );
-if (proc.exitCode !== 0) process.exit(1);
+if (proc.status !== 0) process.exit(1);
 console.log(`✓ submission ${SUBMISSION_ID} approved`);
