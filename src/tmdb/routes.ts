@@ -152,9 +152,10 @@ export async function tmdbCacheMiddleware(c: Context, next: () => Promise<void>)
   }
 
   const cache = defaultCache();
-  const epoch = tmdbApiPath(c.req.path) === "/tv/season/details"
-    ? "20260826-season-aggregate-credits"
-    : TMDB_CACHE_EPOCH;
+  const path = tmdbApiPath(c.req.path);
+  const epoch = path === "/search/scrape"
+    ? "20260930-scrape-localized-matching"
+    : path === "/tv/season/details" ? "20260826-season-aggregate-credits" : TMDB_CACHE_EPOCH;
   const cacheKey = new Request(`${c.req.url}#${epoch}`, {
     method: "GET",
   });
@@ -277,34 +278,79 @@ tmdbApp.get("/search/scrape", async (c) => {
   const query = (c.req.query("query") ?? "").trim().replace(/\s+/g, " ");
   const language = c.req.query("language") || "en-US";
   const type = c.req.query("type") || "all";
+  const matching = c.req.query("match") === "1";
+  const year = c.req.query("year");
+  if (year && !/^(19|20)\d{2}$/.test(year)) return c.json({ error: "Invalid year" }, 400);
   if (!query || query.length > 200 || !["movie", "tv", "all"].includes(type) || !/^[a-zA-Z]{2,3}(?:-[a-zA-Z0-9]{2,8})*$/.test(language)) {
     return c.json({ error: "Invalid query, language or type" }, 400);
   }
-  const key = JSON.stringify([query, language, type]);
+  const key = JSON.stringify([query, language, type, matching, year]);
   let pending = scrapeSearches.get(key);
   if (!pending) {
     pending = (async () => {
       const types = type === "all" ? ["movie", "tv"] as const : [type as "movie" | "tv"];
-      const responses = await Promise.all(types.map(async (mediaType) => {
-        const result = await tmdb.GET(mediaType === "movie" ? "/3/search/movie" : "/3/search/tv", {
-          params: { query: { query, language, page: 1, include_adult: false } },
-        });
-        return { mediaType, result };
-      }));
-      const failure = responses.find(({ result }) => !result.response.ok);
-      if (failure) {
-        const status = failure.result.response.status === 429 ? 429 : 502;
-        const headers: Record<string, string> = { "Cache-Control": "no-store" };
-        const retry = failure.result.response.headers.get("Retry-After");
-        if (retry) headers["Retry-After"] = retry;
-        return Response.json({ error: "TMDB search unavailable" }, { status, headers });
+      // Only retry an unmatched localized search; fallback results still need localized details.
+      const searchLanguages = matching && language !== "en-US" ? [language, "en-US"] : [language];
+      const localizedDetails = new Map<string, ReturnType<typeof withMatchTitles>>();
+      for (const searchLanguage of searchLanguages) {
+        const responses = await Promise.all(types.map(async (mediaType) => {
+          const result = await tmdb.GET(mediaType === "movie" ? "/3/search/movie" : "/3/search/tv", {
+            params: { query: { query, language: searchLanguage, page: 1, include_adult: false, ...(mediaType === "movie" && year ? { year } : {}) } },
+          });
+          return { mediaType, result };
+        }));
+        const failure = responses.find(({ result }) => !result.response.ok);
+        if (failure) {
+          const status = failure.result.response.status === 429 ? 429 : 502;
+          const headers: Record<string, string> = { "Cache-Control": "no-store" };
+          const retry = failure.result.response.headers.get("Retry-After");
+          if (retry) headers["Retry-After"] = retry;
+          return Response.json({ error: "TMDB search unavailable" }, { status, headers });
+        }
+        let results: Record<string, any>[] = responses.flatMap(({ mediaType, result }) =>
+          (result.data?.results ?? []).map(item => ({ ...item, media_type: mediaType }))
+        ).sort((a, b) => (b.popularity ?? 0) - (a.popularity ?? 0));
+        if (matching) {
+          const normalized = (title: string) => title.normalize("NFKD").toLowerCase().replace(/\p{M}/gu, "").replace(/[^\p{L}\p{N}]/gu, "");
+          const wanted = normalized(query);
+          const names = (item: Record<string, any>) => [item.title, item.name, item.original_title, item.original_name].filter((name): name is string => typeof name === "string");
+          const eligible = results.filter(item => item.media_type === "tv" || !year || item.release_date?.startsWith(year));
+          const exact = eligible.filter(item => names(item).some(title => normalized(title) === wanted));
+          const localizedMatch = searchLanguage === language && exact.length > 0;
+          const candidates = localizedMatch ? [] : exact.length ? exact : eligible;
+          results = localizedMatch ? exact.map(item => ({ ...item, match_titles: names(item) })) : [];
+          // Bound upstream fanout; unrelated fuzzy results never become automatic matches.
+          for (let offset = 0; offset < candidates.length; offset += 5) {
+            const batch = await Promise.all(candidates.slice(offset, offset + 5).map(async item => {
+              const type = item.media_type as "movie" | "tv";
+              const detailKey = `${type}/${item.id}`;
+              let details = localizedDetails.get(detailKey);
+              if (!details) {
+                const result = type === "movie"
+                  ? await tmdb.GET(`/3/movie/${Number(item.id)}`, { params: { path: { movie_id: Number(item.id) }, query: { language, append_to_response: "alternative_titles,translations" } } })
+                  : await tmdb.GET(`/3/tv/${Number(item.id)}`, { params: { path: { series_id: Number(item.id) }, query: { language, append_to_response: "alternative_titles,translations" } } });
+                if (!result.response.ok) return { failure: result.response };
+                details = withMatchTitles(result.data);
+                localizedDetails.set(detailKey, details);
+              }
+              const matchTitles = [...new Set([...names(item), ...details.match_titles])];
+              return { item: matchTitles.some(title => normalized(title) === wanted)
+                ? { ...details, media_type: type, match_titles: matchTitles } : null };
+            }));
+            const failure = batch.find(result => result.failure)?.failure;
+            if (failure) {
+              const headers: Record<string, string> = { "Cache-Control": "no-store" };
+              const retry = failure.headers.get("Retry-After"); if (retry) headers["Retry-After"] = retry;
+              return Response.json({ error: "TMDB metadata unavailable" }, { status: failure.status === 429 ? 429 : 502, headers });
+            }
+            results.push(...batch.flatMap(result => result.item ? [result.item] : []));
+          }
+        }
+        if (results.length || !matching) return Response.json(results, { headers: {
+          "Cache-Control": results.length ? CACHE.search : cacheHeader(300, 0),
+        } });
       }
-      const results = responses.flatMap(({ mediaType, result }) =>
-        (result.data?.results ?? []).map(item => ({ ...item, media_type: mediaType }))
-      ).sort((a, b) => (b.popularity ?? 0) - (a.popularity ?? 0));
-      return Response.json(results, { headers: {
-        "Cache-Control": results.length ? CACHE.search : cacheHeader(300, 0),
-      } });
+      return Response.json([], { headers: { "Cache-Control": cacheHeader(300, 0) } });
     })().catch(() => Response.json({ error: "TMDB search unavailable" }, { status: 502, headers: { "Cache-Control": "no-store" } }));
     scrapeSearches.set(key, pending);
     void pending.finally(() => { if (scrapeSearches.get(key) === pending) scrapeSearches.delete(key); });
@@ -379,6 +425,19 @@ tmdbApp.get("/genre/movie/list", async (c) => {
   }
   return c.json(result.data?.genres || []);
 });
+
+/** Return only alias names, not every translation's synopsis/artwork. */
+function withMatchTitles(data: unknown) {
+  const { translations, alternative_titles, ...details } = data as Record<string, unknown> & {
+    translations?: { translations?: { data?: { title?: string; name?: string } }[] };
+    alternative_titles?: { titles?: { title?: string }[]; results?: { title?: string }[] };
+  };
+  const titles = [details.title, details.name, details.original_title, details.original_name,
+    ...(translations?.translations ?? []).flatMap(row => [row.data?.title, row.data?.name]),
+    ...(alternative_titles?.titles ?? alternative_titles?.results ?? []).map(row => row.title),
+  ].filter((title): title is string => typeof title === "string" && title.trim().length > 0);
+  return { ...details, match_titles: [...new Set(titles.map(title => title.trim()))] };
+}
 
 tmdbApp.get("/movie/details", async (c) => {
   const id = c.req.query("id") || "";
