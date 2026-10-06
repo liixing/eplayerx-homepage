@@ -345,7 +345,6 @@ function createV2BlockTemplates(language: string, timezone: string): V2Section[]
 					mediaType: "tv",
 					titleKey: "home.popular_tv_shows",
 					preset: "poster-list",
-					showRank: true,
 					source: {
 						path: "/crawler/popular/douban/tv",
 						query: {
@@ -359,7 +358,6 @@ function createV2BlockTemplates(language: string, timezone: string): V2Section[]
 					mediaType: "movie",
 					titleKey: "home.popular_movies",
 					preset: "poster-list",
-					showRank: true,
 					source: {
 						path: "/crawler/popular/douban/movies",
 						itemEnvelope: "data",
@@ -374,7 +372,6 @@ function createV2BlockTemplates(language: string, timezone: string): V2Section[]
 					mediaType: "tv",
 					titleKey: "home.popular_domestic_anime",
 					preset: "poster-list",
-					showRank: true,
 					source: {
 						path: "/crawler/popular/douban/animation",
 						query: {
@@ -389,7 +386,6 @@ function createV2BlockTemplates(language: string, timezone: string): V2Section[]
 					mediaType: "tv",
 					titleKey: "home.bangumi_popular_anime",
 					preset: "poster-list",
-					showRank: true,
 					source: {
 						path: "/crawler/popular/bangumi/animation",
 						query: {
@@ -408,7 +404,6 @@ function createV2BlockTemplates(language: string, timezone: string): V2Section[]
 					mediaType: "tv",
 					titleKey: "home.popular_variety_shows",
 					preset: "poster-list",
-					showRank: true,
 					source: {
 						path: "/crawler/popular/douban/hot-variety-shows",
 						itemEnvelope: "data",
@@ -423,7 +418,6 @@ function createV2BlockTemplates(language: string, timezone: string): V2Section[]
 			mediaType: "tv",
 			titleKey: "home.tmdb_popular_tv_shows",
 			preset: "poster-list",
-			showRank: true,
 			source: {
 				path: "/tmdb/trending/tv",
 				query: {
@@ -443,7 +437,6 @@ function createV2BlockTemplates(language: string, timezone: string): V2Section[]
 			mediaType: "movie",
 			titleKey: "home.tmdb_popular_movies",
 			preset: "poster-list",
-			showRank: true,
 			source: {
 				path: "/tmdb/trending/movie",
 				query: {
@@ -513,7 +506,6 @@ function createV2BlockTemplates(language: string, timezone: string): V2Section[]
 			mediaType: "tv",
 			titleKey: "home.popular_korean_tv_shows",
 			preset: "poster-list",
-			showRank: true,
 			source: {
 				path: "/tmdb/discover/tv",
 				query: {
@@ -538,7 +530,6 @@ function createV2BlockTemplates(language: string, timezone: string): V2Section[]
 			mediaType: "tv",
 			titleKey: "home.popular_japanese_tv_shows",
 			preset: "poster-list",
-			showRank: true,
 			source: {
 				path: "/tmdb/discover/tv",
 				query: {
@@ -564,7 +555,6 @@ function createV2BlockTemplates(language: string, timezone: string): V2Section[]
 			mediaType: "tv",
 			titleKey: "home.popular_spanish_tv_shows",
 			preset: "poster-list",
-			showRank: true,
 			source: {
 				path: "/tmdb/discover/tv",
 				query: {
@@ -589,7 +579,6 @@ function createV2BlockTemplates(language: string, timezone: string): V2Section[]
 			mediaType: "tv",
 			titleKey: "home.popular_taiwanese_tv_shows",
 			preset: "poster-list",
-			showRank: true,
 			source: {
 				path: "/tmdb/discover/tv",
 				query: {
