@@ -22,6 +22,7 @@ await publishBlock({
 	blockId: "community-letterboxd-top100-japanese",
 	mediaType: "movie",
 	language: "zh-CN",
+	requireOriginCountries: ["JP"],
 	fetchItems: async () =>
 		(await fetchDoulistItems("140851169")).map((item) => ({
 			...item,

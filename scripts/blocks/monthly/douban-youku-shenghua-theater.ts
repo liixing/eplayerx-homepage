@@ -15,6 +15,7 @@ await publishBlock({
 	blockId: "community-youku-shenghua-theater",
 	mediaType: "tv",
 	language: "zh-CN",
+	requireOriginCountries: ["CN"],
 	useTmdbTitle: true,
 	fetchItems: () => fetchDoulistItems("159054707", { types: ["tv"] }),
 });

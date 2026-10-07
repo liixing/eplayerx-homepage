@@ -13,5 +13,6 @@ await publishBlock({
 	blockId: "community-douban-domestic-top250-movies",
 	mediaType: "movie",
 	language: "zh-CN",
+	requireOriginCountries: ["CN", "HK", "TW", "MO"],
 	fetchItems: () => fetchDoulistItems("157864682", { max: 250 }),
 });

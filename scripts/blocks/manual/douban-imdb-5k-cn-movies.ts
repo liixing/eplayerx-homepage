@@ -13,5 +13,6 @@ await publishBlock({
 	blockId: "community-douban-imdb-5k-cn-movies",
 	mediaType: "movie",
 	language: "zh-CN",
+	requireOriginCountries: ["CN", "HK", "TW", "MO"],
 	fetchItems: () => fetchDoulistItems("108560843", { types: ["movie"], max: 200 }),
 });

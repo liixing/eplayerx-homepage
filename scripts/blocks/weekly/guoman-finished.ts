@@ -16,6 +16,7 @@ await publishBlock({
 	blockId: "community-guoman-finished",
 	mediaType: "tv",
 	language: "zh-CN",
+	requireOriginCountries: ["CN"],
 	useTmdbTitle: true,
 	requireTvGenreIds: [TMDB_TV_GENRE_ANIMATION],
 	fetchItems: () => fetchGuomanWeekday("完结"),

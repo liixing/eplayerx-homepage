@@ -20,6 +20,7 @@ await publishBlock({
 	blockId: "community-tencent-x-theater",
 	mediaType: "tv",
 	language: "zh-CN",
+	requireOriginCountries: ["CN"],
 	useTmdbTitle: true,
 	fetchItems: async () =>
 		(await fetchDoulistItems("155026800", { types: ["tv"] })).map((item) => ({

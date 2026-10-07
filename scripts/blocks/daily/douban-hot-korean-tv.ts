@@ -15,6 +15,7 @@ await publishBlock({
 	blockId: "community-douban-hot-korean-tv",
 	mediaType: "tv",
 	language: "zh-CN",
+	requireOriginCountries: ["KR"],
 	useTmdbTitle: true,
 	fetchItems: async () =>
 		(await fetchSubjectCollectionItems("tv_korean")).filter(

@@ -19,6 +19,7 @@ await publishBlock({
 	blockId: "community-youku-baiye-theater",
 	mediaType: "tv",
 	language: "zh-CN",
+	requireOriginCountries: ["CN"],
 	useTmdbTitle: true,
 	fetchItems: async () =>
 		(await fetchDoulistItems("159320021", { types: ["tv"] })).map((item) => ({

@@ -16,6 +16,7 @@ await publishBlock({
 	blockId: "community-douban-classic-tw-drama",
 	mediaType: "tv",
 	language: "zh-CN",
+	requireOriginCountries: ["TW"],
 	useTmdbTitle: true,
 	fetchItems: () => fetchSubjectCollectionItems("ECBI5EL6A"),
 });

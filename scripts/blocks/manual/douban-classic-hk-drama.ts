@@ -21,6 +21,7 @@ await publishBlock({
 	blockId: "community-douban-classic-hk-drama",
 	mediaType: "tv",
 	language: "zh-CN",
+	requireOriginCountries: ["HK"],
 	useTmdbTitle: true,
 	fetchItems: async () =>
 		(await fetchSubjectCollectionItems("ECVM47WUA")).map((item) => ({

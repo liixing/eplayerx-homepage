@@ -13,6 +13,7 @@ await publishBlock({
 	blockId: "community-douban-popular-cn-drama",
 	mediaType: "tv",
 	language: "zh-CN",
+	requireOriginCountries: ["CN"],
 	useTmdbTitle: true,
 	fetchItems: () =>
 		fetchDoulistItems("36929192", { types: ["tv"], max: 300 }),

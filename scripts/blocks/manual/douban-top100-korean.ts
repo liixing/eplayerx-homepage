@@ -27,6 +27,7 @@ await publishBlock({
 	blockId: "community-letterboxd-top100-korean",
 	mediaType: "movie",
 	language: "zh-CN",
+	requireOriginCountries: ["KR"],
 	fetchItems: async () =>
 		(await fetchDoulistItems("138515831")).map((item) => ({
 			...item,

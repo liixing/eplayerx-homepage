@@ -13,6 +13,7 @@ await publishBlock({
 	blockId: "community-douban-domestic-top250-tv",
 	mediaType: "tv",
 	language: "zh-CN",
+	requireOriginCountries: ["CN"],
 	useTmdbTitle: true,
 	fetchItems: () =>
 		fetchDoulistItems("154192614", { types: ["tv"], max: 250 }),

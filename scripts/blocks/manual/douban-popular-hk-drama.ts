@@ -13,6 +13,7 @@ await publishBlock({
 	blockId: "community-douban-popular-hk-drama",
 	mediaType: "tv",
 	language: "zh-CN",
+	requireOriginCountries: ["HK"],
 	useTmdbTitle: true,
 	fetchItems: () => fetchDoulistItems("36864746", { types: ["tv"] }),
 });

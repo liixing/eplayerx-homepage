@@ -25,6 +25,7 @@ await publishBlock({
 	blockId: "community-iqiyi-xiaodou-theater",
 	mediaType: "tv",
 	language: "zh-CN",
+	requireOriginCountries: ["CN"],
 	useTmdbTitle: true,
 	fetchItems: async () =>
 		(await fetchDoulistItems("153511631", { types: ["tv"] }))

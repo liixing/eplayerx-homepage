@@ -22,6 +22,7 @@ await publishBlock({
 	blockId: "community-douban-classic-jp-drama",
 	mediaType: "tv",
 	language: "zh-CN",
+	requireOriginCountries: ["JP"],
 	useTmdbTitle: true,
 	fetchItems: async () =>
 		(await fetchSubjectCollectionItems("ECBQCUATA")).map((item) => ({

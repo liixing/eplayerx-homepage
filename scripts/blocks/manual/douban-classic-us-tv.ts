@@ -16,6 +16,7 @@ await publishBlock({
 	blockId: "community-douban-classic-us-tv",
 	mediaType: "tv",
 	language: "zh-CN",
+	requireOriginCountries: ["US"],
 	useTmdbTitle: true,
 	fetchItems: () => fetchSubjectCollectionItems("ECVACWVGI"),
 });

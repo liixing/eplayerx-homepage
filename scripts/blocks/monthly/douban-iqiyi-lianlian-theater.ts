@@ -15,6 +15,7 @@ await publishBlock({
 	blockId: "community-iqiyi-lianlian-theater",
 	mediaType: "tv",
 	language: "zh-CN",
+	requireOriginCountries: ["CN"],
 	useTmdbTitle: true,
 	fetchItems: () => fetchDoulistItems("153511620", { types: ["tv"] }),
 });

@@ -75,6 +75,7 @@ await publishBlock({
 	blockId: BLOCK_ID,
 	mediaType: "movie",
 	language: "ar-SA",
+	requireOriginCountries: ["KR"],
 	useTmdbTitle: true,
 	fetchItems,
 });

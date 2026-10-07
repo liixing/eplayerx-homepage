@@ -21,6 +21,8 @@ export interface SearchTmdbOptions {
 	 * TV search: use first result that includes all of these genre ids (e.g. Animation only).
 	 */
 	requireTvGenreIds?: number[];
+	/** Match at least one ISO 3166-1 origin country; missing country data is rejected. */
+	requireOriginCountries?: string[];
 	/**
 	 * Movie search: require a release year within ±1 of this (disambiguates
 	 * remakes while tolerating premiere/wide-release year offsets).
@@ -305,29 +307,34 @@ export async function searchTMDB(
 		if (type === "movie" && options.year) {
 			const want = options.year;
 			results = results.filter((item) => {
-				const year = Number.parseInt(
-					(item.release_date ?? "").slice(0, 4),
-					10,
-				);
+				const year = Number.parseInt((item.release_date ?? "").slice(0, 4), 10);
 				return Number.isFinite(year) && Math.abs(year - want) <= 1;
 			});
 		}
-		if (results.length === 0) {
-			return null;
-		}
-
 		if (type === "tv" && options.requireTvGenreIds?.length) {
 			const need = options.requireTvGenreIds;
-			for (const r of results) {
-				const gids = r.genre_ids ?? [];
-				if (need.every((id) => gids.includes(id))) {
-					return r;
-				}
-			}
-			return null;
+			results = results.filter((r) =>
+				need.every((id) => r.genre_ids?.includes(id)),
+			);
 		}
 
-		return results[0];
+		const countries = options.requireOriginCountries;
+		if (!countries?.length) return results[0] ?? null;
+		for (const candidate of results) {
+			let origins = candidate.origin_country;
+			// Movie search omits origin_country; check details before selecting a hit.
+			if (type === "movie" && candidate.id && !origins?.length) {
+				const details = await client.GET(`/3/movie/${candidate.id}`, {
+					params: { path: { movie_id: candidate.id }, query: { language } },
+				});
+				origins = (details.data as TmdbSearchResult | undefined)
+					?.origin_country;
+			}
+			if (countries.some((country) => origins?.includes(country))) {
+				return candidate;
+			}
+		}
+		return null;
 	} catch (error) {
 		console.error(`TMDB search error for "${title}":`, error);
 		return null;
@@ -431,13 +438,12 @@ export async function fetchDetailsWithEnrichment(
 			include_image_language?: string;
 		} = {
 			language: lang,
-			append_to_response:
-				mediaType === "tv" ? "external_ids,images" : "images",
+			append_to_response: mediaType === "tv" ? "external_ids,images" : "images",
 		};
 		if (origin) {
-			query.include_image_language = [...new Set([langCode, origin, "null"])].join(
-				",",
-			);
+			query.include_image_language = [
+				...new Set([langCode, origin, "null"]),
+			].join(",");
 		}
 		const result =
 			mediaType === "movie"

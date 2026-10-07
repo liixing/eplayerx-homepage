@@ -28,6 +28,7 @@ await publishBlock({
 	// blockId: "community-xxxx", // set to overwrite an existing snapshot
 	mediaType: "movie",
 	// language: "zh-CN",
+	// requireOriginCountries: ["CN"], // restrict origin for country-specific lists
 	// requireTvGenreIds: [TMDB_TV_GENRE_ANIMATION], // tv-only: restrict genre
 	fetchItems,
 });

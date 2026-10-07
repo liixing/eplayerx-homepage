@@ -13,6 +13,7 @@ await publishBlock({
 	blockId: "community-douban-popular-kr-drama",
 	mediaType: "tv",
 	language: "zh-CN",
+	requireOriginCountries: ["KR"],
 	useTmdbTitle: true,
 	fetchItems: () =>
 		fetchDoulistItems("36731518", { types: ["tv"], max: 300 }),

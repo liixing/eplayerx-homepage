@@ -13,6 +13,7 @@ await publishBlock({
 	blockId: "community-douban-hot-japanese-tv",
 	mediaType: "tv",
 	language: "zh-CN",
+	requireOriginCountries: ["JP"],
 	useTmdbTitle: true,
 	fetchItems: () => fetchSubjectCollectionItems("tv_japanese"),
 });

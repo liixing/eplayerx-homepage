@@ -21,6 +21,7 @@ await publishBlock({
 	blockId: "community-douban-chinese-best-variety",
 	mediaType: "tv",
 	language: "zh-CN",
+	requireOriginCountries: ["CN", "HK", "TW", "MO"],
 	useTmdbTitle: true,
 	fetchItems: async () => {
 		const items = await fetchSubjectCollectionItems("show_chinese_best_weekly");

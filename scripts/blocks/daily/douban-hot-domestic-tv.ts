@@ -15,6 +15,7 @@ await publishBlock({
 	blockId: "community-douban-hot-domestic-tv",
 	mediaType: "tv",
 	language: "zh-CN",
+	requireOriginCountries: ["CN"],
 	useTmdbTitle: true,
 	fetchItems: async () =>
 		(await fetchSubjectCollectionItems("tv_domestic")).filter(

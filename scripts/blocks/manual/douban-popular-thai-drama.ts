@@ -13,6 +13,7 @@ await publishBlock({
 	blockId: "community-douban-popular-thai-drama",
 	mediaType: "tv",
 	language: "zh-CN",
+	requireOriginCountries: ["TH"],
 	useTmdbTitle: true,
 	fetchItems: () => fetchDoulistItems("116204055", { types: ["tv"] }),
 });

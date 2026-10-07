@@ -19,6 +19,7 @@ await publishBlock({
 	blockId: "community-iqiyi-mist-theater",
 	mediaType: "tv",
 	language: "zh-CN",
+	requireOriginCountries: ["CN"],
 	useTmdbTitle: true,
 	fetchItems: async () =>
 		(await fetchDoulistItems("128396349", { types: ["tv"] })).map((item) => ({

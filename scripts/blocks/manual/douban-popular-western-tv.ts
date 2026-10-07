@@ -13,6 +13,7 @@ await publishBlock({
 	blockId: "community-douban-popular-western-tv",
 	mediaType: "tv",
 	language: "zh-CN",
+	requireOriginCountries: ["US", "GB"],
 	useTmdbTitle: true,
 	fetchItems: () =>
 		fetchDoulistItems("37523091", { types: ["tv"], max: 300 }),

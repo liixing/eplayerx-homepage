@@ -13,5 +13,6 @@ await publishBlock({
 	blockId: "community-douban-100k-raters-domestic",
 	mediaType: "movie",
 	language: "zh-CN",
+	requireOriginCountries: ["CN", "HK", "TW", "MO"],
 	fetchItems: () => fetchDoulistItems("1817142", { max: 300 }),
 });

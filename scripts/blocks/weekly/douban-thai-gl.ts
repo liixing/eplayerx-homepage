@@ -45,6 +45,7 @@ await publishBlock({
 	blockId: "community-douban-thai-gl",
 	mediaType: "tv",
 	language: "zh-CN",
+	requireOriginCountries: ["TH"],
 	useTmdbTitle: true,
 	fetchItems: async () => {
 		const items = await fetchDoulistItems("162796973", { types: ["tv"] });

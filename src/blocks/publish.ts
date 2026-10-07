@@ -57,6 +57,8 @@ export interface PublishBlockOptions {
 	language?: string;
 	/** e.g. [TMDB_TV_GENRE_ANIMATION] to only match animation on TV search. */
 	requireTvGenreIds?: number[];
+	/** Match at least one ISO 3166-1 origin country; pinned ids may lack country metadata. */
+	requireOriginCountries?: string[];
 	/** Store TMDB's localized title (per `language`) instead of the scraped one. */
 	useTmdbTitle?: boolean;
 	/** Per-submission scraper: returns titles in ranked order. */
@@ -255,6 +257,15 @@ async function resolveItem(
 	if (!enriched) return null;
 
 	const { tmdbData, externalIds, imageMeta } = enriched;
+	if (
+		searchOptions.requireOriginCountries?.length &&
+		(!item.tmdbId || tmdbData.origin_country?.length) &&
+		!searchOptions.requireOriginCountries.some((country) =>
+			tmdbData.origin_country?.includes(country),
+		)
+	) {
+		return null;
+	}
 	const title = useTmdbTitle
 		? tmdbData.name || tmdbData.title || item.title
 		: item.title;
@@ -294,6 +305,7 @@ export async function publishBlock(
 	const searchOptions: SearchTmdbOptions = {
 		language: options.language,
 		requireTvGenreIds: options.requireTvGenreIds,
+		requireOriginCountries: options.requireOriginCountries,
 	};
 
 	const scraped = await options.fetchItems();

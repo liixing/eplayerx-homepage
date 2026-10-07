@@ -14,6 +14,7 @@ await publishBlock({
 	blockId: "community-guduo-network-drama",
 	mediaType: "tv",
 	language: "zh-CN",
+	requireOriginCountries: ["CN"],
 	useTmdbTitle: true,
 	fetchItems: () => fetchGuduoBillboardItems("NETWORK_DRAMA"),
 });

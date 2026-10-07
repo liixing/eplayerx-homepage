@@ -13,5 +13,6 @@ await publishBlock({
 	blockId: "community-douban-90s-chinese-classic-movies",
 	mediaType: "movie",
 	language: "zh-CN",
+	requireOriginCountries: ["CN", "HK", "TW", "MO"],
 	fetchItems: () => fetchSubjectCollectionItems("3957"),
 });

@@ -28,6 +28,7 @@ for (const { file, blockId } of GUOMAN_DAYS) {
 			blockId,
 			mediaType: "tv",
 			language: "zh-CN",
+			requireOriginCountries: ["CN"],
 			useTmdbTitle: true,
 			requireTvGenreIds: [TMDB_TV_GENRE_ANIMATION],
 			fetchItems: () => fetchGuomanWeekday(file),

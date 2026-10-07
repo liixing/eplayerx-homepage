@@ -13,6 +13,7 @@ await publishBlock({
 	blockId: "community-douban-zhengyang-suns-tv",
 	mediaType: "tv",
 	language: "zh-CN",
+	requireOriginCountries: ["CN"],
 	useTmdbTitle: true,
 	fetchItems: () => fetchDoulistItems("112220076", { types: ["tv"] }),
 });

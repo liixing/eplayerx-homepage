@@ -20,6 +20,7 @@ await publishBlock({
 	blockId: "community-douban-cn-animation-movies",
 	mediaType: "movie",
 	language: "zh-CN",
+	requireOriginCountries: ["CN", "HK", "TW", "MO"],
 	fetchItems: async () =>
 		(await fetchDoulistItems("149670450")).map((item) => ({
 			...item,
