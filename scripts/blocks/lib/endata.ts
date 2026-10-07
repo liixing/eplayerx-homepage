@@ -158,7 +158,9 @@ export async function fetchEndataDayItems(
 			rows = await fetchEndataDayRaw(tvType, date, limit);
 		} catch (error) {
 			lastError = error;
-			console.warn(`endata tvType=${tvType} date=${date} failed: ${String(error)}`);
+			console.warn(
+				`endata tvType=${tvType} date=${date} failed: ${String(error)}`,
+			);
 			continue;
 		}
 		const ranked = rows.filter(
