@@ -15,6 +15,14 @@ export const TMDB_TV_GENRE_ANIMATION = 16;
  */
 export type TmdbClient = ReturnType<typeof createTmdbClient>;
 
+function checkTmdbResponse(response: Response): void {
+	if (!response.ok && response.status !== 404) {
+		throw new Error(
+			`TMDB HTTP ${response.status}; aborting to preserve the existing snapshot.`,
+		);
+	}
+}
+
 export interface SearchTmdbOptions {
 	language?: string;
 	/**
@@ -297,6 +305,7 @@ export async function searchTMDB(
 			},
 		});
 
+		checkTmdbResponse(result.response);
 		const rawResults = (result.data?.results ?? []) as TmdbSearchResult[];
 		let results =
 			type === "tv"
@@ -327,6 +336,7 @@ export async function searchTMDB(
 				const details = await client.GET(`/3/movie/${candidate.id}`, {
 					params: { path: { movie_id: candidate.id }, query: { language } },
 				});
+				checkTmdbResponse(details.response);
 				origins = (details.data as TmdbSearchResult | undefined)
 					?.origin_country;
 			}
@@ -337,7 +347,7 @@ export async function searchTMDB(
 		return null;
 	} catch (error) {
 		console.error(`TMDB search error for "${title}":`, error);
-		return null;
+		throw error;
 	}
 }
 
@@ -453,6 +463,7 @@ export async function fetchDetailsWithEnrichment(
 				: await client.GET(`/3/tv/${tmdbId}`, {
 						params: { path: { series_id: tmdbId }, query },
 					});
+		checkTmdbResponse(result.response);
 		const data = result.data as TmdbDetailsPayload | undefined;
 		if (!data?.id) return null;
 
@@ -476,6 +487,6 @@ export async function fetchDetailsWithEnrichment(
 		};
 	} catch (error) {
 		console.error(`TMDB details error for ${mediaType}/${tmdbId}:`, error);
-		return null;
+		throw error;
 	}
 }

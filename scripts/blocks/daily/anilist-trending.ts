@@ -5,11 +5,9 @@
  * Run: bun run scripts/blocks/daily/anilist-trending.ts
  */
 
-import {
-	type PublishItem,
-	publishBlock,
-} from "../../../src/blocks/publish.js";
+import { type PublishItem, publishBlock } from "../../../src/blocks/publish.js";
 import { TMDB_TV_GENRE_ANIMATION } from "../../../src/crawler/tmdb-enrich.js";
+import { fetchWithRetry } from "../lib/http.js";
 
 const GRAPHQL_URL = "https://graphql.anilist.co";
 const MAX_ITEMS = 50;
@@ -30,11 +28,12 @@ interface AniListMedia {
 }
 
 interface AniListResponse {
+	errors?: { message?: string }[];
 	data?: { Page?: { media?: AniListMedia[] } };
 }
 
 async function fetchItems(): Promise<PublishItem[]> {
-	const res = await fetch(GRAPHQL_URL, {
+	const res = await fetchWithRetry(GRAPHQL_URL, {
 		method: "POST",
 		headers: { "Content-Type": "application/json", Accept: "application/json" },
 		// Over-fetch: movie/OVA formats get filtered out below.
@@ -43,7 +42,17 @@ async function fetchItems(): Promise<PublishItem[]> {
 	if (!res.ok) {
 		throw new Error(`AniList GraphQL error: ${res.status}`);
 	}
-	const media = ((await res.json()) as AniListResponse).data?.Page?.media ?? [];
+	const data = (await res.json()) as AniListResponse;
+	if (data.errors?.length) {
+		throw new Error(
+			`AniList GraphQL: ${data.errors.map((error) => error.message).join("; ")}`,
+		);
+	}
+	const media = data.data?.Page?.media;
+	if (!media?.length)
+		throw new Error(
+			"AniList returned no media; keeping the existing snapshot.",
+		);
 
 	const items: PublishItem[] = [];
 	for (const m of media) {

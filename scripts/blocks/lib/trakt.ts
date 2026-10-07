@@ -7,6 +7,7 @@
  */
 
 import type { PublishItem } from "../../../src/blocks/publish.js";
+import { fetchWithRetry } from "./http.js";
 
 const API_BASE = "https://api.trakt.tv";
 // Public web-app client id from the app.trakt.tv bundle (not a secret).
@@ -27,10 +28,27 @@ export async function fetchTraktListItems(
 	listSlug: string,
 	itemType: "movies" | "shows",
 ): Promise<PublishItem[]> {
+	return fetchTraktItems(
+		`/users/${user}/lists/${listSlug}/items/${itemType}`,
+		itemType,
+	);
+}
+
+/** Official trending feed; does not depend on a user's public mirror list. */
+export async function fetchTraktTrendingItems(
+	itemType: "movies" | "shows",
+): Promise<PublishItem[]> {
+	return fetchTraktItems(`/${itemType}/trending`, itemType);
+}
+
+async function fetchTraktItems(
+	path: string,
+	itemType: "movies" | "shows",
+): Promise<PublishItem[]> {
 	const items: PublishItem[] = [];
 	for (let page = 1; page <= MAX_PAGES; page++) {
-		const url = `${API_BASE}/users/${user}/lists/${listSlug}/items/${itemType}?page=${page}&limit=${PAGE_LIMIT}`;
-		const res = await fetch(url, {
+		const url = `${API_BASE}${path}?page=${page}&limit=${PAGE_LIMIT}`;
+		const res = await fetchWithRetry(url, {
 			headers: {
 				"Content-Type": "application/json",
 				"trakt-api-version": "2",
@@ -38,7 +56,9 @@ export async function fetchTraktListItems(
 			},
 		});
 		if (!res.ok) {
-			throw new Error(`Trakt API error: ${res.status}`);
+			throw new Error(
+				`Trakt ${path}: HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`,
+			);
 		}
 		const rows = (await res.json()) as TraktListItem[];
 		for (const row of rows) {

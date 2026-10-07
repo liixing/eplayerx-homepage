@@ -5,6 +5,7 @@
 
 import type { PublishItem } from "../../../src/blocks/publish.js";
 import type { MediaType } from "../../../src/blocks/types.js";
+import { createTmdbFetch } from "../../../src/tmdb/client.js";
 
 interface DiscoverResult {
 	id: number;
@@ -51,6 +52,7 @@ export async function fetchTmdbDiscoverItems(
 	language: string,
 	maxPages = 1,
 ): Promise<PublishItem[]> {
+	const fetchTmdb = createTmdbFetch(token, process.env.TMDB_API_TOKEN);
 	const items: PublishItem[] = [];
 	for (let page = 1; page <= maxPages; page++) {
 		const params = new URLSearchParams({
@@ -89,7 +91,7 @@ export async function fetchTmdbDiscoverItems(
 		}
 
 		const url = `https://api.themoviedb.org/3/discover/${mediaType}?${params}`;
-		const res = await fetch(url, {
+		const res = await fetchTmdb(url, {
 			headers: { Authorization: `Bearer ${token}` },
 		});
 		if (!res.ok) {

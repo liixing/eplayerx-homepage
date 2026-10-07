@@ -8,6 +8,7 @@
  */
 
 import type { PublishItem } from "../../../src/blocks/publish.js";
+import { fetchWithRetry } from "./http.js";
 
 const HEADERS = {
 	"User-Agent":
@@ -18,13 +19,21 @@ const HEADERS = {
 export async function fetchBahamutQuarterly(
 	day: number,
 ): Promise<PublishItem[]> {
-	const res = await fetch(`https://acg.gamer.com.tw/quarterly.php?d=${day}`, {
-		headers: HEADERS,
-	});
+	const res = await fetchWithRetry(
+		`https://acg.gamer.com.tw/quarterly.php?d=${day}`,
+		{
+			headers: HEADERS,
+		},
+	);
 	if (!res.ok) {
 		throw new Error(`Bahamut page error: ${res.status}`);
 	}
 	const html = await res.text();
+	if (!html.includes("ACG-maintag")) {
+		throw new Error(
+			`Bahamut day ${day}: expected quarterly page, received unexpected HTML`,
+		);
+	}
 
 	// Cover block: <div class="ACG-mainbox2B">...<img alt="繁中,日文,English">.
 	// The English part may itself contain commas, so only split twice.
@@ -38,6 +47,11 @@ export async function fetchBahamutQuarterly(
 		seen.add(zhTw);
 		const candidates = [ja.trim(), zhTw.trim(), en].filter(Boolean);
 		items.push({ title: candidates[0], altTitles: candidates.slice(1) });
+	}
+	if (!items.length && html.includes("ACG-mainbox2")) {
+		throw new Error(
+			`Bahamut day ${day}: entries exist but titles could not be parsed`,
+		);
 	}
 	return items;
 }

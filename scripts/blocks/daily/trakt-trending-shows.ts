@@ -1,12 +1,12 @@
 /**
- * Trakt trending shows via snoak's mirror list (mdblist.com/lists/snoak/trakt-s-trending-shows).
+ * Trakt trending shows via the official /shows/trending feed.
  * Submission: Trakt Trending Shows (zh-CN, tv, poster-list) by @Nacho.
  *
  * Run: bun run scripts/blocks/daily/trakt-trending-shows.ts
  */
 
 import { publishBlock } from "../../../src/blocks/publish.js";
-import { fetchTraktListItems } from "../lib/trakt.js";
+import { fetchTraktTrendingItems } from "../lib/trakt.js";
 
 await publishBlock({
 	submissionId: "86d1cb5e27ca",
@@ -14,6 +14,5 @@ await publishBlock({
 	mediaType: "tv",
 	language: "zh-CN",
 	useTmdbTitle: true,
-	fetchItems: () =>
-		fetchTraktListItems("snoak", "trakt-s-trending-shows", "shows"),
+	fetchItems: () => fetchTraktTrendingItems("shows"),
 });

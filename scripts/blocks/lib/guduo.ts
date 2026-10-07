@@ -4,6 +4,7 @@
  */
 
 import type { PublishItem } from "../../../src/blocks/publish.js";
+import { fetchWithRetry } from "./http.js";
 
 const BILLBOARD_URL = "https://d2.guduomedia.com/m/v3/billboard/list";
 const HEADERS = {
@@ -48,7 +49,7 @@ export async function fetchGuduoBillboardItems(
 			orderTitle: "gdi",
 			platformId: "0",
 		});
-		const res = await fetch(`${BILLBOARD_URL}?${params.toString()}`, {
+		const res = await fetchWithRetry(`${BILLBOARD_URL}?${params.toString()}`, {
 			headers: HEADERS,
 		});
 		if (!res.ok) continue;

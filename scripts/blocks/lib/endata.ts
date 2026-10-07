@@ -5,6 +5,7 @@
 
 import { createDecipheriv } from "node:crypto";
 import type { PublishItem } from "../../../src/blocks/publish.js";
+import { fetchWithRetry } from "./http.js";
 
 const API_URL = "https://app.endata.com.cn/API/DataBox/Eovt/GetDayList";
 const PAGE_URL = "https://app.endata.com.cn/DataBox/Video/Home/Index";
@@ -41,7 +42,7 @@ export function decryptEndata(cipher: string): EndataResponse {
 	const raw = cipher.trim();
 	if (raw.length < 16) throw new Error("endata cipher too short");
 
-	let cut = Number.parseInt(raw.at(-1) ?? "0", 16) + 9;
+	const cut = Number.parseInt(raw.at(-1) ?? "0", 16) + 9;
 	const keyOffset = Number.parseInt(raw[cut] ?? "0", 16);
 	let payload = stripAt(raw, cut, 1);
 	const key = payload.slice(keyOffset, keyOffset + 8);
@@ -79,9 +80,7 @@ function searchHints(title: string): { title: string; altTitles?: string[] } {
 		)
 		.trim();
 	if (noSeason && noSeason !== noParen) alts.add(noSeason);
-	return alts.size
-		? { title, altTitles: [...alts] }
-		: { title };
+	return alts.size ? { title, altTitles: [...alts] } : { title };
 }
 
 interface EndataRowWithIndex extends EndataRow {
@@ -121,7 +120,7 @@ async function fetchEndataDayRaw(
 		r: String(Math.random()),
 	});
 
-	const res = await fetch(API_URL, {
+	const res = await fetchWithRetry(API_URL, {
 		method: "POST",
 		headers: {
 			"User-Agent":
@@ -152,8 +151,16 @@ export async function fetchEndataDayItems(
 		? [opts.date]
 		: [0, -1, -2, -3].map((d) => utc8Ymd(d));
 
+	let lastError: unknown;
 	for (const date of dates) {
-		const rows = await fetchEndataDayRaw(tvType, date, limit);
+		let rows: EndataRowWithIndex[];
+		try {
+			rows = await fetchEndataDayRaw(tvType, date, limit);
+		} catch (error) {
+			lastError = error;
+			console.warn(`endata tvType=${tvType} date=${date} failed: ${String(error)}`);
+			continue;
+		}
 		const ranked = rows.filter(
 			(row) => row.TvName?.trim() && row.PlayCountIndex != null,
 		);
@@ -174,5 +181,6 @@ export async function fetchEndataDayItems(
 	}
 	throw new Error(
 		`endata empty/unranked list for tvType=${tvType} dates=${dates.join(",")}`,
+		{ cause: lastError },
 	);
 }

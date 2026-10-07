@@ -67,7 +67,8 @@ async function findTvIdByImdbId(imdbId: string): Promise<number | null> {
 		`https://api.themoviedb.org/3/find/${imdbId}?external_source=imdb_id`,
 		{ headers: { Authorization: `Bearer ${token}` } },
 	);
-	if (!res.ok) return null;
+	if (res.status === 404) return null;
+	if (!res.ok) throw new Error(`TMDB /find ${imdbId}: HTTP ${res.status}`);
 	const data = (await res.json()) as { tv_results?: { id: number }[] };
 	return data.tv_results?.[0]?.id ?? null;
 }

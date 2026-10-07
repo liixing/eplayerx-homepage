@@ -6,8 +6,8 @@
  * TMDB search + artwork enrichment, uploads the snapshot to R2, and prints
  * the public data URL + blockId to paste into the /admin review form.
  *
- * TMDB requests run with the *submitter's* token so traffic spreads across
- * tokens instead of hammering the admin's own. The token never lives in the
+ * TMDB requests start with the *submitter's* token and fall back to the
+ * admin's TMDB_API_TOKEN on 401. The token never lives in the
  * repo: scripts reference a submissionId, and the token is fetched at runtime
  * from the worker (GET /admin/api/token/:id, backed by D1).
  *
@@ -299,7 +299,10 @@ async function resolveItem(
 export async function publishBlock(
 	options: PublishBlockOptions,
 ): Promise<PublishBlockResult> {
-	const client = createTmdbClient(await resolveToken(options));
+	const client = createTmdbClient(
+		await resolveToken(options),
+		process.env.TMDB_API_TOKEN,
+	);
 
 	const blockId = options.blockId || `community-${shortId()}`;
 	const searchOptions: SearchTmdbOptions = {

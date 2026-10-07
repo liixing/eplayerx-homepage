@@ -42,6 +42,13 @@ const DAYS = [
 let failed = false;
 for (const { day, submissionId, blockId } of DAYS) {
 	try {
+		const items = await fetchBahamutQuarterly(day);
+		if (!items.length) {
+			console.log(
+				`⏭ Bahamut day ${day} has no scheduled titles; keeping ${blockId} unchanged.`,
+			);
+			continue;
+		}
 		await publishBlock({
 			submissionId,
 			blockId,
@@ -49,7 +56,7 @@ for (const { day, submissionId, blockId } of DAYS) {
 			language: "zh-CN",
 			useTmdbTitle: true,
 			requireTvGenreIds: [TMDB_TV_GENRE_ANIMATION],
-			fetchItems: () => fetchBahamutQuarterly(day),
+			fetchItems: async () => items,
 		});
 	} catch (error) {
 		failed = true;
