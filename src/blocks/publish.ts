@@ -313,6 +313,9 @@ export async function publishBlock(
 
 	const scraped = await options.fetchItems();
 	console.log(`📥 ${scraped.length} titles for ${blockId}`);
+	if (scraped.length === 0) {
+		throw new Error("Source returned no titles; existing snapshot preserved.");
+	}
 
 	const resolved: SnapshotItem[] = [];
 	for (const entry of scraped) {

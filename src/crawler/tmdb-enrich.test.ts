@@ -160,6 +160,11 @@ test("country constraints reject same-title imports and survive publish fallback
 				{ title: "同名 第二季", altTitles: ["Alias"], year: 2026 },
 			],
 		};
+		await assert.rejects(
+			publishBlock({ ...options, fetchItems: async () => [] }),
+			/Source returned no titles/,
+		);
+		assert.equal(calls.length, 0, "empty sources must not trigger TMDB search");
 		await assert.rejects(publishBlock(options), /No items resolved/);
 		assert.deepEqual(
 			calls.map((url) => url.searchParams.get("query")),
