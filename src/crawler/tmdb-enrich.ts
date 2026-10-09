@@ -1,3 +1,4 @@
+import { trailerCandidates, resolveTrailerCandidates, videoLanguages, type Video } from "../tmdb/trailer-candidates.js";
 /**
  * Shared TMDB enrichment helpers: title search + artwork meta
  * (thumb / logo / clean poster). Used by the scheduled crawlers and
@@ -39,6 +40,7 @@ export interface SearchTmdbOptions {
 }
 
 export interface TmdbSearchResult {
+	trailer?: ReturnType<typeof trailerCandidates>;
 	id?: number;
 	title?: string;
 	name?: string;
@@ -71,6 +73,7 @@ interface TmdbImagesPayload {
 }
 
 interface TmdbDetailsPayload extends TmdbSearchResult {
+	videos?: { results?: Video[] };
 	genres?: { id: number }[];
 	imdb_id?: unknown;
 	tvdb_id?: unknown;
@@ -420,7 +423,7 @@ export async function fetchExternalIds(
 }
 
 /**
- * One TMDB details call with appended images (+ external_ids for TV).
+ * One TMDB details call with appended images, trailer metadata and external IDs.
  * Replaces a separate /images request during publish/crawl.
  */
 export async function fetchDetailsWithEnrichment(
@@ -446,9 +449,11 @@ export async function fetchDetailsWithEnrichment(
 			language: string;
 			append_to_response: string;
 			include_image_language?: string;
+			include_video_language: string;
 		} = {
 			language: lang,
-			append_to_response: mediaType === "tv" ? "external_ids,images" : "images",
+			append_to_response: "external_ids,images,videos",
+			include_video_language: videoLanguages(lang, originalLanguage),
 		};
 		if (origin) {
 			query.include_image_language = [
@@ -470,6 +475,7 @@ export async function fetchDetailsWithEnrichment(
 		return {
 			tmdbData: {
 				...data,
+				...(data.videos ? { trailer: await resolveTrailerCandidates(data, lang, mediaType, query.include_video_language, client).catch(() => undefined) } : {}),
 				genre_ids: data.genres?.map((g) => g.id) ?? data.genre_ids ?? [],
 			},
 			externalIds: externalIdsFromPayload(mediaType, data),

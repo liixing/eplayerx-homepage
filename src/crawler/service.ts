@@ -1,3 +1,4 @@
+import type { trailerCandidates } from "../tmdb/trailer-candidates.js";
 /**
  * JSON storage service using Cloudflare R2
  */
@@ -51,6 +52,7 @@ const r2Client = new S3Client({
 
 /** Localized overlay fields stored under ContentItem.translations. */
 export interface ContentItemTranslation {
+  trailer?: ReturnType<typeof trailerCandidates>;
   title: string;
   overview?: string | null;
   thumb?: string | null;
@@ -61,6 +63,7 @@ export interface ContentItemTranslation {
 }
 
 export interface ContentItem {
+	trailer?: ReturnType<typeof trailerCandidates>;
   title: string;
   tmdbId: number;
   imdbId?: string | null;

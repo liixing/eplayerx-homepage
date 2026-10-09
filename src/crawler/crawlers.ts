@@ -79,6 +79,7 @@ function translationFromEnrichment(
 		logo: enriched.imageMeta.logo,
 		noLogoPoster: enriched.imageMeta.noLogoPoster,
 		poster_path: data.poster_path ?? null,
+		...(data.trailer ? { trailer: data.trailer } : {}),
 		backdrop_path: data.backdrop_path ?? null,
 	};
 }
@@ -138,6 +139,7 @@ async function buildContentItem(
 		imdbId: externalIds.imdbId,
 		tvdbId: externalIds.tvdbId,
 		vote_average: data.vote_average ?? null,
+		...(data.trailer ? { trailer: data.trailer } : {}),
 		...(ratings ? { ratings } : {}),
 		poster_path: data.poster_path,
 		backdrop_path: data.backdrop_path,

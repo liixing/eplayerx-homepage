@@ -6,10 +6,16 @@ import {
 import { cachedRatings, getRatingsCache } from "../ratings/cache.js";
 import { tmdb } from "./client.js";
 
+import { resolveTrailerCandidates, videoLanguages, type Details as TrailerDetails } from "./trailer-candidates.js";
+import trailerRoutes from "./trailers.js";
+import trailerPlayback from "./trailer-playback.js";
+
 const tmdbApp = new Hono();
+tmdbApp.route("/", trailerRoutes);
+tmdbApp.route("/", trailerPlayback);
 
 /** Bump to drop Cache API entries after cached response-shape changes. */
-const TMDB_CACHE_EPOCH = "20260824-logo-origin-language";
+const TMDB_CACHE_EPOCH = "20261009-youtube-language-v2";
 
 const TMDB_IMAGE_CACHE_CONTROL =
   "public, max-age=31536000, s-maxage=31536000, immutable";
@@ -965,14 +971,15 @@ async function enrichWithImages(
     if (type !== "movie" && type !== "tv") return item;
 
     const id = item.id as number;
-    const imagesPromise =
-      type === "tv"
-        ? tmdb.GET(`/3/tv/${id}/images`, {
-            params: { path: { series_id: id } },
-          })
-        : tmdb.GET(`/3/movie/${id}/images`, {
-            params: { path: { movie_id: id } },
-          });
+    // Appended metadata replaces the old images call; it does not add an upstream request.
+    const query = { language, append_to_response: "images,videos",
+      include_image_language: [...new Set([languageCode, originLanguage(
+        item.original_language as string | undefined, item.origin_country as string[] | undefined,
+      ) ?? "en", "en", "null"])].join(","),
+      include_video_language: videoLanguages(language, item.original_language as string | undefined) };
+    const imagesPromise = type === "tv"
+      ? tmdb.GET(`/3/tv/${id}`, { params: { path: { series_id: id }, query } })
+      : tmdb.GET(`/3/movie/${id}`, { params: { path: { movie_id: id }, query } });
 
     try {
       const [imagesResult, cache] = await Promise.all([
@@ -983,7 +990,8 @@ async function enrichWithImages(
       const withRatings = withCachedRatings(item, type, cache);
       if (imagesResult.response.status !== 200) return withRatings;
 
-      const images = imagesResult.data;
+      const details = imagesResult.data as (TrailerDetails & { images?: { logos?: ImageEntry[]; posters?: ImageEntry[]; backdrops?: ImageEntry[] } }) | undefined;
+      const images = details?.images;
 
       const logos = (images?.logos ?? []) as ImageEntry[];
       const logo = pickPreferredLogo(
@@ -1008,7 +1016,8 @@ async function enrichWithImages(
         (item.backdrop_path as string | undefined) ||
         (item.poster_path as string | undefined);
 
-      return { ...withRatings, logo, noLogoPoster, thumb };
+      const trailer = details?.videos ? await resolveTrailerCandidates(details, language, type, query.include_video_language).catch(() => undefined) : undefined;
+      return { ...withRatings, logo, noLogoPoster, thumb, ...(trailer ? { trailer } : {}) };
     } catch {
       try {
         return withCachedRatings(item, type, await ratingsCache);

@@ -270,3 +270,24 @@ test("country constraints reject same-title imports and survive publish fallback
 		else process.env.BLOCKS_ADMIN_PASSWORD = originalPassword;
 	}
 });
+
+test("enrichment embeds trailer identities in the existing details request", async () => {
+    const { fetchDetailsWithEnrichment } = await import("./tmdb-enrich.js");
+    const originalFetch = globalThis.fetch;
+    const calls: URL[] = [];
+    globalThis.fetch = async input => {
+        const url = new URL(input instanceof Request ? input.url : String(input));
+        calls.push(url);
+        assert.equal(url.pathname, "/3/movie/693134");
+        assert.equal(url.searchParams.get("append_to_response"), "external_ids,images,videos");
+        assert.equal(url.searchParams.get("include_video_language"), "zh");
+        return Response.json({ id: 693134, original_language: "ja", images: { logos: [] }, videos: {
+            results: [{ key: "_YUzQa_1RCE", site: "YouTube", type: "Trailer", official: true, size: 1080, iso_639_1: "zh" }]
+        }});
+    };
+    try {
+        const result = await fetchDetailsWithEnrichment(693134, "movie", "zh-CN", createTmdbClient("test-token"));
+        assert.deepEqual(result?.tmdbData.trailer, { youtube: ["_YUzQa_1RCE"], language: "zh" });
+        assert.equal(calls.length, 1);
+    } finally { globalThis.fetch = originalFetch; }
+});

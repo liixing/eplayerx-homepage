@@ -656,6 +656,7 @@ function localizeContentItem(item: ContentItem, locale: Locale): ContentItem {
     thumb: translation.thumb ?? rest.thumb,
     logo: translation.logo ?? rest.logo,
     noLogoPoster: translation.noLogoPoster ?? rest.noLogoPoster,
+    trailer: translation.trailer ?? rest.trailer,
     poster_path: translation.poster_path ?? rest.poster_path,
     backdrop_path: translation.backdrop_path ?? rest.backdrop_path,
   };

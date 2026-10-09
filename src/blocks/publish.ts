@@ -281,6 +281,7 @@ async function resolveItem(
 		imdbId: externalIds.imdbId,
 		tvdbId: externalIds.tvdbId,
 		vote_average: tmdbData.vote_average ?? null,
+		...(tmdbData.trailer ? { trailer: tmdbData.trailer } : {}),
 		...(ratings ? { ratings } : {}),
 		poster_path: tmdbData.poster_path ?? null,
 		backdrop_path: tmdbData.backdrop_path ?? null,
