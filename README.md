@@ -44,6 +44,27 @@ docker compose up -d
 npm run deploy:cf
 ```
 
+## tvOS DeepSeek 字幕翻译
+
+`POST https://api.eplayerx.com/subtitles/deepseek/v1/chat/completions` 接收 EPlayerX / KSPlayer 的单句或批量字幕翻译请求。
+tvOS 默认选择「内置」，不需要用户填写地址或 Key；选择「DeepSeek」仍可填写自己的 Key 直连官方接口。
+翻译开关由用户控制，已有自定义服务配置保留。用户字幕会经本服务发送给 DeepSeek。
+
+Cloudflare Workers 上配置服务端密钥后部署（不把 Key 写入代码或客户端）：
+
+```bash
+npx wrangler secret put DEEPSEEK_API_KEY
+npm run deploy:cf
+```
+
+接口需要 `wrangler.toml` 中的 `SUBTITLE_RATE_LIMITER` 绑定；Key 或绑定缺失时返回 503，不调用上游。
+每个 IP 每分钟最多 60 次（Cloudflare 按节点近似计数，同一出口共享额度，并非全局费用上限）。
+请求最多 64 KiB / 30 行字幕；固定 `deepseek-flash`、非流式、关闭思考、最多 4096 输出 token，18 秒超时，不自动重试。
+客户端指令和工具参数不会直接透传；错误响应隐藏上游详情，字幕和密钥不写入应用日志或缓存。
+该接口依赖 Workers 的限流绑定，普通 Bun/Docker 入口不启用此功能。
+
+验证：`node --import tsx --test src/subtitles/deepseek.test.ts` 和 `npm run test:ts`。
+
 ## 🔑 获取 TMDB API Token
 
 1. 访问 [TMDB 官网](https://www.themoviedb.org/) 并注册账号
@@ -135,3 +156,5 @@ wrangler secret put BLOCKS_ADMIN_PASSWORD
 ## 📄 许可证
 
 MIT License
+
+首页 TMDB 热门电影和电视剧的前 20 项评分由 Cloudflare Cron 每日 UTC 06:17 更新（需要 `MDBLIST_API_KEY` 和 R2 凭证），每天约 40 次 MDBList 查询。已有评分也会刷新，查询失败保留旧值；服务每小时重载评分缓存。静态社区榜单仍使用手动补全脚本。

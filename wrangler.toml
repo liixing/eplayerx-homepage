@@ -21,6 +21,13 @@ mode = "smart"
 [observability]
 enabled = true
 
+# Public tvOS subtitle translation. Store DEEPSEEK_API_KEY with wrangler secret put.
+# shortcut: per-IP limits are approximate per Cloudflare location, not a global spending cap.
+[[ratelimits]]
+name = "SUBTITLE_RATE_LIMITER"
+namespace_id = "20261011"
+simple = { limit = 60, period = 60 }
+
 # D1 database for EplayerX Blocks (community submissions + approved blocks).
 # Create once: `wrangler d1 create eplayerx-blocks`, then paste the returned
 # database_id below. Apply schema: `wrangler d1 migrations apply eplayerx-blocks`.
@@ -36,6 +43,6 @@ migrations_dir = "migrations"
 binding = "ASSETS"
 bucket_name = "crawler"
 
-# Uncomment to enable cron trigger (e.g. daily crawl at 08:00 UTC)
-# [triggers]
-# crons = ["0 8 * * *"]
+# Refresh ratings for the current Home trending movie/TV lists daily.
+[triggers]
+crons = ["17 6 * * *"]

@@ -159,7 +159,9 @@ export async function tmdbCacheMiddleware(c: Context, next: () => Promise<void>)
 
   const cache = defaultCache();
   const path = tmdbApiPath(c.req.path);
-  const epoch = path === "/search/scrape"
+  const epoch = path === "/trending/tv" || path === "/trending/movie"
+    ? `${TMDB_CACHE_EPOCH}-ratings-v2`
+    : path === "/search/scrape"
     ? "20260930-scrape-localized-matching-v2"
     : path === "/tv/season/details" ? "20260826-season-aggregate-credits" : TMDB_CACHE_EPOCH;
   const cacheKey = new Request(`${c.req.url}#${epoch}`, {

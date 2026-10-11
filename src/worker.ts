@@ -5,6 +5,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
 import app from "./index.js";
+import { refreshTrendingRatings } from "./ratings/refresh.js";
 
 type Env = Record<string, unknown>;
 
@@ -22,8 +23,12 @@ export default {
 		return app.fetch(request, env, ctx);
 	},
 
-	async scheduled(_event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
+	async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
 		syncEnv(env);
+		if (event.cron === "17 6 * * *") {
+			ctx.waitUntil(refreshTrendingRatings());
+			return;
+		}
 		const url = "http://localhost/crawler/cron/crawl-all";
 		ctx.waitUntil(Promise.resolve(app.fetch(new Request(url), env, ctx)));
 	},

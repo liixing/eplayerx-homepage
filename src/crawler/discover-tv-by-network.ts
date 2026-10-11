@@ -77,6 +77,15 @@ const NETWORKS: NetworkSpec[] = [
   { id: 885, name: "JTBC", logo_path: "/44I4aVlasm8Blb8WPGXTkMYuZJF.png" },
   { id: 3897, name: "TVING", logo_path: "/cfMtt9sNl2bDyHuoPSZouEqDB9N.png" },
   { id: 3357, name: "wavve", logo_path: "/13a2E9fbpRtQrQgfb9UCNWZcM2O.png" },
+  { id: 3626, name: "Shahid", logo_path: "/fPku7XI2slnF3LDaL5Tmiajjmke.png" },
+  {
+    id: 6972,
+    name: "TOD",
+    logo_path: "/a97LDSIw6uH6e9f3q27pzjvqAJS.png",
+    // The TOD network catalog is Turkish; use its Arab-region streaming catalog.
+    watchProvider: "1750",
+    watchRegion: "SA",
+  },
 ];
 
 /**

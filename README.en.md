@@ -10,6 +10,24 @@ A media content API service built with [Hono](https://hono.dev/) framework, prov
 
 > ⚠️ **Important**: During deployment, Vercel will prompt you to enter the `TMDB_API_TOKEN` environment variable. This is required. Please obtain your Token first by following the instructions below.
 
+## tvOS DeepSeek subtitle translation
+
+`POST https://api.eplayerx.com/subtitles/deepseek/v1/chat/completions` accepts EPlayerX / KSPlayer single-line and batch subtitle requests.
+tvOS defaults to the built-in service without client credentials. Selecting **DeepSeek** instead allows users to enter their own key for the official API. Existing custom configurations are preserved; the translation toggle remains user-controlled. Subtitle text is sent through this service to DeepSeek.
+
+Configure the server secret and deploy to Cloudflare Workers:
+
+```bash
+npx wrangler secret put DEEPSEEK_API_KEY
+npm run deploy:cf
+```
+
+Both the secret and the `SUBTITLE_RATE_LIMITER` binding in `wrangler.toml` are required; missing configuration returns 503 without contacting DeepSeek. Limits: 60 requests/minute/IP, 64 KiB request body, 30 subtitles, 4096 output tokens, 18-second upstream timeout, no automatic retries. Cloudflare limits are approximate per location and shared by users behind the same IP; they are not a global spending cap.
+
+The server fixes the model to `deepseek-flash`, disables thinking and streaming, and rebuilds the translation prompt. Caller instructions/tools are not forwarded. Upstream error details are hidden; application code does not log or cache subtitles or keys. The plain Bun/Docker server does not enable this endpoint because it requires Workers bindings.
+
+Validate with `node --import tsx --test src/subtitles/deepseek.test.ts` and `npm run test:ts`.
+
 ## 🔑 Get TMDB API Token
 
 1. Visit [TMDB](https://www.themoviedb.org/) and create an account
@@ -43,3 +61,5 @@ A media content API service built with [Hono](https://hono.dev/) framework, prov
 
 MIT License
 
+
+Cloudflare Cron refreshes ratings for the first 20 trending movies and TV shows daily at 06:17 UTC (requires `MDBLIST_API_KEY` and R2 credentials), using about 40 MDBList lookups per day. Existing scores are refreshed, failures preserve previous values, and servers reload the ratings cache hourly. Static community lists still use the manual backfill script.

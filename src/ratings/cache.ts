@@ -50,17 +50,30 @@ export function cachedRatings(
 }
 
 let cachePromise: Promise<RatingsCache> | null = null;
+let lastCache: RatingsCache = new Map();
+let reloadAt = 0;
 
-/** Lazy R2 load; shared by publish, crawler, and live TMDB list enrich. */
+/** Reload R2 hourly; retain good scores and retry soon after a storage failure. */
 export function getRatingsCache(): Promise<RatingsCache> {
 	if (!cachePromise) {
-		cachePromise = loadRatingsCache().catch((error) => {
-			console.warn(
-				"ratings cache unavailable, continuing without it:",
-				error instanceof Error ? error.message : error,
-			);
-			return new Map();
-		});
+		if (Date.now() < reloadAt) return Promise.resolve(lastCache);
+		cachePromise = loadRatingsCache()
+			.then((cache) => {
+				lastCache = cache;
+				reloadAt = Date.now() + 60 * 60 * 1000;
+				return cache;
+			})
+			.catch((error) => {
+				console.warn(
+					"ratings cache unavailable, retaining previous scores:",
+					error instanceof Error ? error.message : error,
+				);
+				reloadAt = Date.now() + 60 * 1000;
+				return lastCache;
+			})
+			.finally(() => {
+				cachePromise = null;
+			});
 	}
 	return cachePromise;
 }

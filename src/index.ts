@@ -6,6 +6,7 @@ import crawlerApp from "./crawler/index.js";
 import homeApp from "./home/index.js";
 import baiduOAuthApp from "./oauth/baidu.js";
 import ratingsApp, { ratingsCacheMiddleware } from "./ratings/index.js";
+import deepSeekApp from "./subtitles/deepseek.js";
 import tmdbApp, { tmdbCacheMiddleware } from "./tmdb/index.js";
 import tvdbApp, { tvdbCacheMiddleware } from "./tvdb/index.js";
 
@@ -44,6 +45,7 @@ const welcomeStrings = [
 ];
 
 app.route("/oauth/baidu", baiduOAuthApp);
+app.route("/subtitles/deepseek", deepSeekApp);
 
 // Root route
 app.get("/", (c) => {
