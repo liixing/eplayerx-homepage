@@ -5,7 +5,16 @@
  * (localStorage + navigator.languages) — never via Accept-Language SSR.
  */
 
-export type UiLocale = "zh-CN" | "zh-TW" | "en" | "ja" | "es" | "fr" | "de" | "ar";
+export type UiLocale =
+	| "zh-CN"
+	| "zh-TW"
+	| "en"
+	| "ja"
+	| "es"
+	| "fr"
+	| "de"
+	| "ar"
+	| "vi";
 
 export const UI_STORAGE_KEY = "blocks_ui_lang";
 export const CONTENT_STORAGE_KEY = "blocks_content_lang";
@@ -19,6 +28,7 @@ export const UI_LOCALES: { code: UiLocale; label: string }[] = [
 	{ code: "fr", label: "Français" },
 	{ code: "de", label: "Deutsch" },
 	{ code: "ar", label: "العربية" },
+	{ code: "vi", label: "Tiếng Việt" },
 ];
 
 const UI_SET = new Set<string>(UI_LOCALES.map((l) => l.code));
@@ -34,6 +44,7 @@ export function contentLangToUiLocale(code: string): UiLocale | null {
 	if (c.startsWith("fr")) return "fr";
 	if (c.startsWith("de")) return "de";
 	if (c.startsWith("ar")) return "ar";
+	if (c.startsWith("vi")) return "vi";
 	if (c.startsWith("en")) return "en";
 	return null;
 }
@@ -1059,6 +1070,163 @@ const de: Dict = {
 	"import.download": "EplayerX holen",
 };
 
+const vi: Dict = {
+	"nav.explore": "Thư viện cộng đồng",
+	"nav.submit": "+ Đóng góp",
+	"nav.submit_short": "Đóng góp",
+	"nav.ui_lang": "Ngôn ngữ giao diện",
+	"explore.title": "Blocks cộng đồng",
+	"explore.sub":
+		"Chọn các khối mặc định và danh sách do cộng đồng đóng góp để thêm vào trang chủ của ứng dụng.",
+	"explore.search_ph": "Tìm tiêu đề / tác giả",
+	"explore.all_langs": "Tất cả ngôn ngữ",
+	"explore.cat.all": "Tất cả",
+	"explore.cat.movie": "Phim điện ảnh",
+	"explore.cat.tv": "Phim truyền hình",
+	"explore.cat.anime": "Anime",
+	"explore.cat.collection": "Bộ sưu tập",
+	"explore.cat.homepage": "Trang chủ",
+	"explore.make_group": "Tạo bộ sưu tập",
+	"explore.make_home": "Tạo trang chủ",
+	"explore.cancel": "Hủy",
+	"explore.done": "Xong",
+	"explore.pick_hint": "Chọn khối · Nhấn để thêm, có thể chọn trên nhiều trang",
+	"explore.pick_hint_n":
+		"Đã chọn {n} · Giữ lựa chọn khi chuyển trang · Nhấn Xong để chỉnh sửa",
+	"explore.step_pick": "1. Chọn",
+	"explore.step_edit": "2. Chỉnh sửa",
+	"explore.step_preview": "3. Xem trước",
+	"explore.selected": "Đã chọn",
+	"explore.empty_cat": "Danh mục này chưa có khối nào. Hãy đóng góp một khối!",
+	"explore.empty_home":
+		"Chưa có trang chủ nào được đăng. Chọn vài khối rồi nhấn “Tạo trang chủ”.",
+	"explore.prev": "Trang trước",
+	"explore.next": "Trang sau",
+	"explore.page_n": "Trang {n}",
+	"explore.pager": "Phân trang",
+	"tag.collection": "Bộ sưu tập",
+	"tag.homepage": "Trang chủ",
+	"block.meta_charts": "{n} danh sách · {installs} lượt cài đặt",
+	"block.meta_items": "{n} mục · {installs} lượt cài đặt",
+	"block.meta_home": "{n} khối · {installs} lượt cài đặt",
+	"block.install": "Cài đặt",
+	"sel.selected_n": "Đã chọn {n}",
+	"sel.selected_cross": "Đã chọn {n} (trên nhiều trang)",
+	"sel.publish_group": "Đăng bộ sưu tập",
+	"group.title_ph": "Tên bộ sưu tập, ví dụ: Anime hằng ngày",
+	"group.mode_custom": "Tùy chỉnh",
+	"group.mode_weekday": "Theo ngày trong tuần",
+	"group.style_label": "Kiểu bộ sưu tập",
+	"group.style_capsule": "Viên nang",
+	"group.style_rank": "Xếp hạng",
+	"group.style_banner": "Biểu ngữ",
+	"group.style_image": "Hình ảnh",
+	"group.style_landscape": "Ảnh ngang",
+	"group.style_portrait": "Ảnh dọc",
+	"group.create": "Tạo và đăng",
+	"group.admin_hint":
+		"Quản trị viên: đăng bộ sưu tập vào thư viện cộng đồng, hiển thị trên trang chủ dưới dạng một hàng thẻ viên nang.",
+	"pack.back_pick": "Chọn tiếp",
+	"pack.edit_title": "Chỉnh sửa trang chủ",
+	"pack.edit_sub": "⋮⋮ Kéo để sắp xếp · Đổi kiểu hiển thị bên dưới",
+	"pack.preview": "Xem trước",
+	"pack.preview_title": "Xem trước trang chủ",
+	"pack.preview_sub": "Giống trang chi tiết sau khi đăng · Xác nhận để đăng",
+	"pack.label_title": "Tiêu đề",
+	"pack.title_ph": "Ví dụ: Phim hay cuối tuần",
+	"pack.label_author": "Tác giả",
+	"pack.optional_ph": "Không bắt buộc",
+	"pack.label_desc": "Mô tả",
+	"pack.preview_home": "Xem trước trang chủ",
+	"pack.back_edit": "Quay lại chỉnh sửa",
+	"pack.confirm": "Xác nhận đăng",
+	"pack.copy_link": "Sao chép liên kết",
+	"pack.view_home": "Xem trang chủ",
+	"pack.publish_home": "Đăng trang chủ",
+	"style.thumb": "Ảnh ngang",
+	"style.poster": "Áp phích",
+	"style.hero": "Ảnh lớn",
+	"style.show": "Hiển thị",
+	"style.rank_num": "Số thứ hạng",
+	"style.overview": "Tóm tắt",
+	"style.drag": "Kéo để sắp xếp",
+	"chip.other_page": " · trang khác",
+	"wd.1": "Thứ 2",
+	"wd.2": "Thứ 3",
+	"wd.3": "Thứ 4",
+	"wd.4": "Thứ 5",
+	"wd.5": "Thứ 6",
+	"wd.6": "Thứ 7",
+	"wd.7": "Chủ nhật",
+	"msg.need_one_block": "Chọn ít nhất một khối",
+	"msg.pick_blocks_first": "Hãy chọn khối trước",
+	"msg.need_group_title": "Nhập tên bộ sưu tập",
+	"msg.group_min2": "Bộ sưu tập cần ít nhất 2 danh sách",
+	"msg.group_max7": "Chế độ theo ngày cho phép tối đa 7 danh sách",
+	"msg.need_labels": "Nhập nhãn cho từng danh sách",
+	"msg.publishing": "Đang đăng…",
+	"msg.publish_fail": "Đăng thất bại",
+	"msg.network": "Lỗi mạng",
+	"msg.group_published": "Đã đăng · {id} (tải lại trang để xem)",
+	"msg.need_home_title": "Nhập tiêu đề trang chủ",
+	"msg.loading_preview": "Đang tải bản xem trước trang chủ…",
+	"msg.preview_fail": "Không tải được bản xem trước",
+	"msg.untitled_home": "Trang chủ chưa có tiêu đề",
+	"msg.home_meta_confirm": "{n} khối · Kiểm tra rồi xác nhận đăng",
+	"msg.home_published":
+		"Đã đăng trang chủ. Xem trong mục Trang chủ hoặc mở liên kết trên iPhone để nhập vào ứng dụng.",
+	"msg.copied_import": "Đã sao chép liên kết nhập",
+	"msg.preview_unavailable": "Bản xem trước chưa khả dụng",
+	"msg.preview_in_app": "Khối này sẽ hiển thị trong ứng dụng",
+	"msg.collection_nested": " (không thể lồng bộ sưu tập — đã bỏ qua)",
+	"group.label_ph": "Nhãn",
+	"hp.sub":
+		"{n} khối · {installs} lượt cài đặt. Cài đặt trên iPhone để thêm một trang chủ mới vào ứng dụng.",
+	"hp.install": "Cài vào ứng dụng",
+	"hp.copy": "Sao chép liên kết",
+	"submit.title": "Đóng góp một Block",
+	"submit.sub":
+		"Thêm nguồn dữ liệu và thông tin hiển thị. Quản trị viên sẽ thu thập và duyệt trước khi đưa vào thư viện cộng đồng.",
+	"submit.token":
+		"TMDB API Token (bắt buộc — quản trị viên dùng để thu thập dữ liệu)",
+	"submit.token_ph": "Read Access Token bắt đầu bằng eyJ",
+	"submit.token_hint_before": "Token sẽ được kiểm tra khi gửi. Lấy token tại",
+	"submit.token_hint_link": "TMDB",
+	"submit.token_hint_after": ".",
+	"submit.category": "Danh mục",
+	"submit.name": "Tên",
+	"submit.name_ph": "Ví dụ: Phim bí ẩn được đánh giá cao",
+	"submit.language": "Ngôn ngữ (tiêu đề và tóm tắt từ TMDB)",
+	"submit.source": "URL danh sách / dữ liệu",
+	"submit.source_ph":
+		'Nhập URL API danh sách, ví dụ: /tmdb/trending/movie hoặc URL đầy đủ\nhoặc dán JSON, ví dụ: [{"id":603,"title":"Ma trận"}, ...]',
+	"submit.source_hint":
+		"Cung cấp URL để lấy danh sách hoặc dán toàn bộ JSON. Quản trị viên sẽ thu thập và xử lý dữ liệu.",
+	"submit.preset": "Kiểu hiển thị",
+	"submit.preset_thumb": "Ảnh thu nhỏ",
+	"submit.preset_poster": "Áp phích",
+	"submit.preset_hero": "Ảnh lớn",
+	"submit.ov_note":
+		"Tóm tắt chỉ hiển thị ở kiểu ảnh thu nhỏ, không hiển thị ở kiểu áp phích hoặc ảnh lớn.",
+	"submit.show_rank": "Hiển thị số thứ hạng",
+	"submit.show_overview": "Hiển thị tóm tắt",
+	"submit.author": "Tên tác giả (không bắt buộc)",
+	"submit.author_ph": "Biệt danh, có thể để trống",
+	"submit.btn": "Gửi để duyệt",
+	"submit.submitting": "Đang gửi…",
+	"submit.submitted": "Đã gửi",
+	"submit.ok":
+		"Đã gửi để duyệt! Nội dung sẽ xuất hiện trong thư viện cộng đồng sau khi được duyệt. Cảm ơn bạn!",
+	"submit.err_token": "Nhập TMDB Token",
+	"submit.err_title": "Nhập tên",
+	"submit.err_source": "Nhập URL danh sách hoặc dán dữ liệu",
+	"submit.err_fail": "Gửi thất bại",
+	"import.sub":
+		"{n} khối · Mở trang này trên iPhone để nhập vào EplayerX và tạo trang chủ mới.",
+	"import.open": "Nhập vào ứng dụng",
+	"import.download": "Tải EplayerX",
+};
+
 export const MESSAGES: Record<UiLocale, Dict> = {
 	"zh-CN": zhCN,
 	"zh-TW": zhTW,
@@ -1068,6 +1236,7 @@ export const MESSAGES: Record<UiLocale, Dict> = {
 	fr,
 	de,
 	ar,
+	vi,
 };
 
 export function t(
@@ -1148,6 +1317,7 @@ function contentToUi(code){
   if(c.indexOf('fr')===0)return 'fr';
   if(c.indexOf('de')===0)return 'de';
   if(c.indexOf('ar')===0)return 'ar';
+  if(c.indexOf('vi')===0)return 'vi';
   if(c.indexOf('en')===0)return 'en';
   return null;
 }

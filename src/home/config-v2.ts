@@ -14,7 +14,7 @@ import {
 	type TmdbListRoute,
 } from "../blocks/types.js";
 
-type Locale = "en" | "zh" | "zh-Hant" | "ja" | "es" | "fr" | "de" | "ar";
+type Locale = "en" | "zh" | "zh-Hant" | "ja" | "es" | "fr" | "de" | "ar" | "vi";
 
 type HomeTitleKey =
 	| "home.tmdb_popular_tv_shows"
@@ -105,6 +105,7 @@ const TITLE_TRANSLATIONS: Record<HomeTitleKey, Record<Locale, string>> = {
 		fr: "Séries TV populaires du jour",
 		de: "Beliebte TV-Serien von heute",
 		ar: "مسلسلات شائعة",
+		vi: "Phim truyền hình nổi bật hôm nay",
 	},
 	"home.tmdb_popular_movies": {
 		en: "Today's Popular Movies",
@@ -115,6 +116,7 @@ const TITLE_TRANSLATIONS: Record<HomeTitleKey, Record<Locale, string>> = {
 		fr: "Films populaires du jour",
 		de: "Beliebte Filme von heute",
 		ar: "أفلام شائعة",
+		vi: "Phim điện ảnh nổi bật hôm nay",
 	},
 	"home.popular_tv_shows": {
 		en: "Popular Domestic Dramas",
@@ -125,6 +127,7 @@ const TITLE_TRANSLATIONS: Record<HomeTitleKey, Record<Locale, string>> = {
 		fr: "Drames chinois populaires",
 		de: "Beliebte chinesische Dramen",
 		ar: "دراما صينية شائعة",
+		vi: "Phim truyền hình Trung Quốc nổi bật",
 	},
 	"home.popular_movies": {
 		en: "Trending Movies",
@@ -135,6 +138,7 @@ const TITLE_TRANSLATIONS: Record<HomeTitleKey, Record<Locale, string>> = {
 		fr: "Films tendance",
 		de: "Trendfilme",
 		ar: "أفلام رائجة",
+		vi: "Phim điện ảnh thịnh hành",
 	},
 	"home.tmdb_discover_genres": {
 		en: "Browse By Category",
@@ -145,6 +149,7 @@ const TITLE_TRANSLATIONS: Record<HomeTitleKey, Record<Locale, string>> = {
 		fr: "Parcourir par catégorie",
 		de: "Nach Kategorie stöbern",
 		ar: "تصفح حسب الفئة",
+		vi: "Khám phá theo thể loại",
 	},
 	"home.classic_decades": {
 		en: "Classic Decades",
@@ -155,6 +160,7 @@ const TITLE_TRANSLATIONS: Record<HomeTitleKey, Record<Locale, string>> = {
 		fr: "Classiques par décennie",
 		de: "Klassiker nach Jahrzehnt",
 		ar: "كلاسيكيات العقود",
+		vi: "Phim kinh điển theo thập niên",
 	},
 	"home.tmdb_discover_networks": {
 		en: "Browse By Network",
@@ -165,6 +171,7 @@ const TITLE_TRANSLATIONS: Record<HomeTitleKey, Record<Locale, string>> = {
 		fr: "Parcourir par plateforme",
 		de: "Nach Plattform stöbern",
 		ar: "حسب الشبكة",
+		vi: "Khám phá theo nền tảng",
 	},
 	"home.tmdb_discover_languages": {
 		en: "Browse By Language",
@@ -175,6 +182,7 @@ const TITLE_TRANSLATIONS: Record<HomeTitleKey, Record<Locale, string>> = {
 		fr: "Parcourir par langue",
 		de: "Nach Sprache stöbern",
 		ar: "حسب اللغة",
+		vi: "Khám phá theo ngôn ngữ",
 	},
 	"home.tmdb_on_the_air_tv_shows": {
 		en: "On The Air TV Shows",
@@ -185,6 +193,7 @@ const TITLE_TRANSLATIONS: Record<HomeTitleKey, Record<Locale, string>> = {
 		fr: "En cours de diffusion",
 		de: "Aktuell im TV",
 		ar: "يعرض الآن",
+		vi: "Phim truyền hình đang phát sóng",
 	},
 	"home.popular_domestic_anime": {
 		en: "Popular Domestic Anime",
@@ -195,6 +204,7 @@ const TITLE_TRANSLATIONS: Record<HomeTitleKey, Record<Locale, string>> = {
 		fr: "Anime chinois populaire",
 		de: "Beliebtes chinesisches Anime",
 		ar: "أنمي محلي",
+		vi: "Hoạt hình Trung Quốc nổi bật",
 	},
 	"home.bangumi_popular_anime": {
 		en: "Today's Popular Bangumi",
@@ -205,6 +215,7 @@ const TITLE_TRANSLATIONS: Record<HomeTitleKey, Record<Locale, string>> = {
 		fr: "Bangumi populaires du jour",
 		de: "Beliebte Bangumi von heute",
 		ar: "بانغومي شائع",
+		vi: "Anime nổi bật hôm nay",
 	},
 	"home.popular_korean_tv_shows": {
 		en: "Popular Korean Dramas",
@@ -215,6 +226,7 @@ const TITLE_TRANSLATIONS: Record<HomeTitleKey, Record<Locale, string>> = {
 		fr: "Drames coréens populaires",
 		de: "Beliebte koreanische Dramen",
 		ar: "دراما كورية شائعة",
+		vi: "Phim truyền hình Hàn Quốc nổi bật",
 	},
 	"home.popular_japanese_tv_shows": {
 		en: "Popular Japanese Dramas",
@@ -225,6 +237,7 @@ const TITLE_TRANSLATIONS: Record<HomeTitleKey, Record<Locale, string>> = {
 		fr: "Drames japonais populaires",
 		de: "Beliebte japanische Dramen",
 		ar: "دراما يابانية شائعة",
+		vi: "Phim truyền hình Nhật Bản nổi bật",
 	},
 	"home.popular_spanish_tv_shows": {
 		en: "Popular Spanish-Language Series",
@@ -235,6 +248,7 @@ const TITLE_TRANSLATIONS: Record<HomeTitleKey, Record<Locale, string>> = {
 		fr: "Séries hispanophones populaires",
 		de: "Beliebte spanischsprachige Serien",
 		ar: "مسلسلات إسبانية شائعة",
+		vi: "Phim truyền hình tiếng Tây Ban Nha nổi bật",
 	},
 	"home.popular_taiwanese_tv_shows": {
 		en: "Popular Taiwanese Dramas",
@@ -245,6 +259,7 @@ const TITLE_TRANSLATIONS: Record<HomeTitleKey, Record<Locale, string>> = {
 		fr: "Drames taïwanais populaires",
 		de: "Beliebte taiwanesische Dramen",
 		ar: "دراما تايوانية شائعة",
+		vi: "Phim truyền hình Đài Loan nổi bật",
 	},
 	"home.popular_variety_shows": {
 		en: "Today's Popular Variety Shows",
@@ -255,6 +270,7 @@ const TITLE_TRANSLATIONS: Record<HomeTitleKey, Record<Locale, string>> = {
 		fr: "Émissions de divertissement populaires",
 		de: "Beliebte Unterhaltungsshows",
 		ar: "برامج منوعة",
+		vi: "Chương trình giải trí thịnh hành",
 	},
 	"home.tmdb_top_rated_movies": {
 		en: "Top Rated Movies",
@@ -265,6 +281,7 @@ const TITLE_TRANSLATIONS: Record<HomeTitleKey, Record<Locale, string>> = {
 		fr: "Films les mieux notés",
 		de: "Bestbewertete Filme",
 		ar: "الأعلى تقييماً",
+		vi: "Phim điện ảnh được đánh giá cao",
 	},
 	"home.tmdb_top_rated_tv_shows": {
 		en: "Top Rated TV Shows",
@@ -275,6 +292,7 @@ const TITLE_TRANSLATIONS: Record<HomeTitleKey, Record<Locale, string>> = {
 		fr: "Séries les mieux notées",
 		de: "Bestbewertete Serien",
 		ar: "المسلسلات الأعلى تقييماً",
+		vi: "Phim truyền hình được đánh giá cao",
 	},
 };
 
@@ -307,6 +325,7 @@ function resolveLocale(language: string): Locale {
 	if (normalized.startsWith("fr")) return "fr";
 	if (normalized.startsWith("de")) return "de";
 	if (normalized.startsWith("ar")) return "ar";
+	if (normalized.startsWith("vi")) return "vi";
 	return "en";
 }
 

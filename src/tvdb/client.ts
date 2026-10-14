@@ -25,6 +25,7 @@ export function tvdbLanguage(raw: string | undefined): string {
 	if (language.startsWith("fr")) return "fra";
 	if (language.startsWith("de")) return "deu";
 	if (language.startsWith("ar")) return "ara";
+	if (language.startsWith("vi")) return "vie";
 	return "eng";
 }
 
