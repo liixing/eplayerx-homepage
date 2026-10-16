@@ -9,10 +9,12 @@ import { tmdb } from "./client.js";
 import { resolveTrailerCandidates, videoLanguages, type Details as TrailerDetails } from "./trailer-candidates.js";
 import trailerRoutes from "./trailers.js";
 import trailerPlayback from "./trailer-playback.js";
+import episodeGroups from "./episode-groups.js";
 
 const tmdbApp = new Hono();
 tmdbApp.route("/", trailerRoutes);
 tmdbApp.route("/", trailerPlayback);
+tmdbApp.route("/", episodeGroups);
 
 /** Bump to drop Cache API entries after cached response-shape changes. */
 const TMDB_CACHE_EPOCH = "20261009-youtube-language-v2";
@@ -20,6 +22,7 @@ const TMDB_CACHE_EPOCH = "20261009-youtube-language-v2";
 const TMDB_IMAGE_CACHE_CONTROL =
   "public, max-age=31536000, s-maxage=31536000, immutable";
 
+// SWR applies to downstream caches; Cache API misses are coalesced below.
 function cacheHeader(maxAgeSeconds: number, swrSeconds: number): string {
   return `public, max-age=${maxAgeSeconds}, s-maxage=${maxAgeSeconds}, stale-while-revalidate=${swrSeconds}`;
 }
@@ -111,7 +114,7 @@ function cacheControlForRequest(c: Context): string | null {
     return CACHE.videos;
   }
 
-  if (path === "/tv/season/details") {
+  if (path === "/tv/season/details" || path === "/tv/episode_groups" || path === "/tv/episode_group") {
     return CACHE.season;
   }
 
@@ -147,6 +150,8 @@ function cacheControlForRequest(c: Context): string | null {
   return null;
 }
 
+const pendingResponses = new Map<string, Promise<Response>>();
+
 export async function tmdbCacheMiddleware(c: Context, next: () => Promise<void>) {
   if (c.req.method !== "GET" && c.req.method !== "HEAD") {
     return next();
@@ -164,7 +169,10 @@ export async function tmdbCacheMiddleware(c: Context, next: () => Promise<void>)
     : path === "/search/scrape"
     ? "20260930-scrape-localized-matching-v2"
     : path === "/tv/season/details" ? "20260826-season-aggregate-credits" : TMDB_CACHE_EPOCH;
-  const cacheKey = new Request(`${c.req.url}#${epoch}`, {
+  const cacheUrl = new URL(c.req.url);
+  cacheUrl.searchParams.set("_cache_version", epoch);
+  cacheUrl.searchParams.sort();
+  const cacheKey = new Request(cacheUrl, {
     method: "GET",
   });
   if (cache) {
@@ -179,10 +187,31 @@ export async function tmdbCacheMiddleware(c: Context, next: () => Promise<void>)
     }
   }
 
-  await next();
-  c.header("Cache-Control", c.res.ok ? (c.res.headers.get("Cache-Control") ?? cacheControl) : "no-store");
-  if (cache && c.req.method === "GET" && c.res.ok) {
-    c.executionCtx.waitUntil(cache.put(cacheKey, c.res.clone()));
+  if (c.req.method === "HEAD") {
+    await next();
+    c.header("Cache-Control", c.res.ok ? (c.res.headers.get("Cache-Control") ?? cacheControl) : "no-store");
+    return;
+  }
+  let job = pendingResponses.get(cacheKey.url);
+  if (!job) {
+    if (pendingResponses.size >= 64) {
+      return c.json({ error: "Busy" }, 503, { "Cache-Control": "no-store", "Retry-After": "5" });
+    }
+    job = (async () => {
+      await next();
+      c.header("Cache-Control", c.res.ok ? (c.res.headers.get("Cache-Control") ?? cacheControl) : "no-store");
+      if (cache && c.res.ok) {
+        // Keep the shared response until the cache fill finishes, closing the miss window.
+        try { await cache.put(cacheKey, c.res.clone()); } catch { /* Return usable metadata when cache storage fails. */ }
+      }
+      return c.res;
+    })();
+    pendingResponses.set(cacheKey.url, job);
+  }
+  try {
+    return (await job).clone();
+  } finally {
+    if (pendingResponses.get(cacheKey.url) === job) pendingResponses.delete(cacheKey.url);
   }
 }
 

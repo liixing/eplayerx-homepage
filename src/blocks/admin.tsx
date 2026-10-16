@@ -96,7 +96,7 @@ function pickBool(value: unknown, fallback: boolean): boolean {
 }
 
 /** Bearer auth for script/CI endpoints (cookie auth is browser-only). */
-function isAdminBearer(c: Context): boolean {
+export function isAdminBearer(c: Context): boolean {
 	const pw = adminPassword();
 	const header = c.req.header("Authorization") || "";
 	return !!pw && header === `Bearer ${pw}`;

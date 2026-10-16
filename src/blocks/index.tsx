@@ -157,7 +157,9 @@ async function publicCachedGet(
 	if (isAdmin(c) || c.req.method !== "GET" || !cache) {
 		return render();
 	}
-	const cacheKey = new Request(c.req.url, { method: "GET" });
+	const cacheUrl = new URL(c.req.url);
+	cacheUrl.searchParams.set("_cache_version", "20261014-preview-escaping");
+	const cacheKey = new Request(cacheUrl, { method: "GET" });
 	const cached = await cache.match(cacheKey);
 	if (cached) return cached;
 	const response = await render();

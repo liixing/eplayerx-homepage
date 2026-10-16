@@ -6,7 +6,16 @@ import {
 	parseMdblistApiKeys,
 } from "./mdblist.js";
 
-const ratingsApp = new Hono();
+type RatingsBindings = {
+	RATINGS_RATE_LIMITER?: {
+		limit(options: { key: string }): Promise<{ success: boolean }>;
+	};
+	DB?: D1Database;
+	ASSETS?: R2Bucket;
+};
+
+const ratingsApp = new Hono<{ Bindings: RatingsBindings }>();
+const pendingResponses = new Map<string, Promise<Response>>();
 
 /** Ratings drift slowly; 1d cache, 6h stale-while-revalidate. */
 const CACHE_CONTROL =
@@ -25,8 +34,16 @@ export async function ratingsCacheMiddleware(
 		return next();
 	}
 
+	const type = parseType(c.req.query("type"));
+	const tmdbId = parseTmdbId(c.req.query("id"));
+	const imdbId = parseImdbId(c.req.query("imdb"));
+	if (!type || (!tmdbId && !imdbId)) return next();
 	const cache = defaultCache();
-	const cacheKey = new Request(c.req.url, { method: "GET" });
+	const cacheUrl = new URL("https://api.eplayerx.com/ratings");
+	cacheUrl.searchParams.set("type", type);
+	cacheUrl.searchParams.set(tmdbId ? "id" : "imdb", String(tmdbId ?? imdbId));
+	cacheUrl.searchParams.set("_cache_version", "20261014-ratings-v2");
+	const cacheKey = new Request(cacheUrl, { method: "GET" });
 	if (cache) {
 		const hit = await cache.match(cacheKey);
 		if (hit) {
@@ -39,11 +56,31 @@ export async function ratingsCacheMiddleware(
 		}
 	}
 
-	await next();
-	if (!c.res.ok) return;
-	c.header("Cache-Control", CACHE_CONTROL);
-	if (cache && c.req.method === "GET") {
-		c.executionCtx.waitUntil(cache.put(cacheKey, c.res.clone()));
+	if (c.req.method === "HEAD") {
+		await next();
+		c.header("Cache-Control", c.res.ok ? CACHE_CONTROL : "no-store");
+		return;
+	}
+	let job = pendingResponses.get(cacheKey.url);
+	if (!job) {
+		if (pendingResponses.size >= 64) {
+			return c.json({ error: "Busy" }, 503, { "Cache-Control": "no-store", "Retry-After": "5" });
+		}
+		job = (async () => {
+			await next();
+			c.header("Cache-Control", c.res.ok ? CACHE_CONTROL : "no-store");
+			if (cache && c.res.ok) {
+				// Retain the shared result until the edge entry is ready for the next request.
+				try { await cache.put(cacheKey, c.res.clone()); } catch { /* Return ratings when cache storage fails. */ }
+			}
+			return c.res;
+		})();
+		pendingResponses.set(cacheKey.url, job);
+	}
+	try {
+		return (await job).clone();
+	} finally {
+		if (pendingResponses.get(cacheKey.url) === job) pendingResponses.delete(cacheKey.url);
 	}
 }
 
@@ -56,12 +93,12 @@ function parseTmdbId(raw: string | undefined): number | null {
 	if (!raw) return null;
 	if (!/^\d+$/.test(raw)) return null;
 	const n = Number.parseInt(raw, 10);
-	return n > 0 ? n : null;
+	return Number.isSafeInteger(n) && n > 0 ? n : null;
 }
 
 function parseImdbId(raw: string | undefined): string | null {
 	if (!raw) return null;
-	const id = raw.trim();
+	const id = raw.trim().toLowerCase();
 	return /^tt\d+$/i.test(id) ? id : null;
 }
 
@@ -90,6 +127,24 @@ ratingsApp.get("/", async (c) => {
 	const imdbId = parseImdbId(c.req.query("imdb"));
 	if (!tmdbId && !imdbId) {
 		return c.json({ error: "id (tmdb) or imdb is required" }, 400);
+	}
+
+	// Workers fail closed; standalone Bun/Docker has no rate-limit binding.
+	const limiter = c.env?.RATINGS_RATE_LIMITER;
+	if (limiter) {
+		const ip = c.req.header("CF-Connecting-IP");
+		if (!ip) return c.json({ error: "Missing client address" }, 403);
+		try {
+			if (!(await limiter.limit({ key: `ratings:${ip}` })).success) {
+				return c.json({ error: "Ratings rate limit reached" }, 429, {
+					"Cache-Control": "no-store", "Retry-After": "60",
+				});
+			}
+		} catch {
+			return c.json({ error: "Ratings temporarily unavailable" }, 503);
+		}
+	} else if (defaultCache() || c.env?.ASSETS || c.env?.DB) {
+		return c.json({ error: "Ratings rate limiter is not configured" }, 503);
 	}
 
 	try {

@@ -46,6 +46,11 @@ Validate with `node --import tsx --test src/subtitles/deepseek.test.ts` and `npm
 
 ## ⚙️ Environment Variables
 
+Remote `/crawler/crawl/*` and `/crawler/cron/*` endpoints require `Authorization: Bearer <BLOCKS_ADMIN_PASSWORD>`.
+GitHub Actions run local scripts directly; Worker scheduled calls supply this credential.
+Uncached `/ratings` lookups on Workers require `RATINGS_RATE_LIMITER` (60/minute/IP); missing bindings fail closed.
+Rating cache keys use only the effective media type and ID. Per-location limits are not a global spending cap.
+
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `TMDB_API_TOKEN` | ✅ | TMDB API Read Access Token |

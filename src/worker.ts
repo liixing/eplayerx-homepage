@@ -30,6 +30,8 @@ export default {
 			return;
 		}
 		const url = "http://localhost/crawler/cron/crawl-all";
-		ctx.waitUntil(Promise.resolve(app.fetch(new Request(url), env, ctx)));
+		ctx.waitUntil(Promise.resolve(app.fetch(new Request(url, {
+			headers: { Authorization: `Bearer ${process.env.BLOCKS_ADMIN_PASSWORD ?? ""}` },
+		}), env, ctx)));
 	},
 };

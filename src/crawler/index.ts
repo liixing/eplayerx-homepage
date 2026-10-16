@@ -1,5 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 import { type Context, Hono } from "hono";
+import { isAdminBearer } from "../blocks/admin.js";
 import {
   crawlBangumiAnimation,
   crawlDoubanAnimation,
@@ -27,6 +28,14 @@ type CrawlerBindings = {
 type CrawlerContext = Context<{ Bindings: CrawlerBindings }>;
 
 const app = new Hono<{ Bindings: CrawlerBindings }>();
+
+for (const path of ["/crawl/*", "/cron/*"]) {
+  app.use(path, async (c, next) => {
+    c.header("Cache-Control", "no-store");
+    if (!isAdminBearer(c)) return c.json({ error: "unauthorized" }, 401);
+    await next();
+  });
+}
 
 function defaultCache(): Cache | null {
   if (typeof caches === "undefined") return null;
@@ -143,7 +152,9 @@ async function staticJsonCacheMiddleware(
   if (!cache) {
     return next();
   }
-  const cacheKey = new Request(`${c.req.url}#${STATIC_JSON_CACHE_EPOCH}`, {
+  const cacheUrl = new URL(c.req.url);
+  cacheUrl.searchParams.set("_cache_version", STATIC_JSON_CACHE_EPOCH);
+  const cacheKey = new Request(cacheUrl, {
     method: "GET",
   });
   const hit = await cache.match(cacheKey);

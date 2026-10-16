@@ -111,6 +111,11 @@ bun run dev:cf
 
 ## 🧩 EplayerX Blocks（社区自定义首页）
 
+远程 `/crawler/crawl/*` 与 `/crawler/cron/*` 入口需要 `Authorization: Bearer <BLOCKS_ADMIN_PASSWORD>`。
+GitHub Actions 直接运行本地爬虫脚本，不受影响；Worker 内部定时任务会携带管理员凭证。
+Workers 的 `/ratings` 缓存未命中查询使用 `RATINGS_RATE_LIMITER`，每 IP 每分钟最多 60 次；绑定缺失时拒绝付费查询。
+评分缓存按影片类型和有效 ID 统一，无关参数不会增加上游查询。限流按 Cloudflare 节点近似计数，不是全局费用上限。
+
 社区投稿门户与审核后台。用户填一个任意数据源提交投稿；管理员在本地跑发布脚本抓取并上传 R2，再到审核后台填入 blockId（参数可编辑）发布到社区库供客户端拉取。
 
 - `/blocks` 社区库（首页）　`/blocks/submit` 投稿页　`/admin` 审核后台（密码进入，普通用户无入口）

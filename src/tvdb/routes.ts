@@ -19,7 +19,9 @@ export async function tvdbCacheMiddleware(
 		return next();
 	}
 	const cache = defaultCache();
-	const cacheKey = new Request(`${c.req.url}#20260918-tvdb-seasons`, {
+	const cacheUrl = new URL(c.req.url);
+	cacheUrl.searchParams.set("_cache_version", "20260918-tvdb-seasons");
+	const cacheKey = new Request(cacheUrl, {
 		method: "GET",
 	});
 	if (cache) {

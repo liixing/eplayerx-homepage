@@ -1794,12 +1794,12 @@ function esc(s){return String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt
 function img(p,sz){return p?(IMG+'/'+sz+p):'';}
 function yr(it){const d=it.release_date||it.first_air_date||'';return d?String(d).slice(0,4):'';}
 function tt(it){return it.title||it.name||'';}
-function pic(u){return u?'<img loading="lazy" src="'+u+'">':'';}
+function pic(u){return u?'<img loading="lazy" src="'+esc(u)+'">':'';}
 // Deep-link attributes: snapshots carry tmdbId, raw TMDB payloads carry id.
 function attrs(it){
   const id=it.tmdbId||it.id;if(!id)return '';
   const mt=it.media_type==='movie'||it.media_type==='tv'?it.media_type:'';
-  return ' data-tid="'+id+'"'+(mt?' data-mt="'+mt+'"':'');
+  return ' data-tid="'+esc(id)+'"'+(mt?' data-mt="'+mt+'"':'');
 }
 function cap(it,rankHtml){return '<div class="cap">'+(rankHtml||'')+'<div class="txt"><div class="t1">'+esc(tt(it))+'</div><div class="t2">'+esc(yr(it))+'</div></div></div>';}
 function thumb(it,i,rank,ov){
@@ -1858,7 +1858,7 @@ function sameItems(a,b){return !!a&&!!b&&JSON.stringify(a)===JSON.stringify(b);}
 function fillCapsule(c,items){
   const lines=c.querySelector('.rank-lines');
   if(lines){
-    lines.innerHTML=items.slice(0,3).map((it,i)=>'<span>'+((i+1)+'. '+(it.title||'未命名'))+'</span>').join('');
+    lines.innerHTML=items.slice(0,3).map((it,i)=>'<span>'+((i+1)+'. '+esc(it.title||'未命名'))+'</span>').join('');
   }
   const max=c.classList.contains('col-banner')?9:3;
   const basePosters=items.map(it=>img(it.poster_path||it.thumb||it.backdrop_path,'w154')).filter(Boolean);
@@ -1877,7 +1877,7 @@ const LAUREL='<svg class="laurel" viewBox="0 0 28 20" aria-hidden="true"><path d
 const LAUREL_R='<svg class="laurel r" viewBox="0 0 28 20" aria-hidden="true"><path d="M22 17 C14 15 8 10 6 3"/><path d="M15 13 C14 10 16 8 19 8 C19 11 18 13 15 13"/><path d="M11 9 C10 6 12 4 15 4 C15 7 14 9 11 9"/><path d="M8 5 C7 3 8.5 1.5 11 1.5 C11 4 10 5.5 8 5"/></svg>';
 const COL_DECK='<span class="stack"><span class="ph s1"></span><span class="ph s2"></span><span class="ph s3"></span></span>';
 function colAttrs(ch){
-  return ' data-cid="'+esc(ch.id)+'" data-csrc="'+esc(ch.previewSrc||'')+'"'+(ch.weekday?' data-wd="'+ch.weekday+'"':'');
+  return ' data-cid="'+esc(ch.id)+'" data-csrc="'+esc(ch.previewSrc||'')+'"'+(ch.weekday?' data-wd="'+esc(ch.weekday)+'"':'');
 }
 function buildCollectionCapsHtml(children,style){
   return children.map((ch,i)=>{

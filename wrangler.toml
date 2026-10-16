@@ -28,6 +28,13 @@ name = "SUBTITLE_RATE_LIMITER"
 namespace_id = "20261011"
 simple = { limit = 60, period = 60 }
 
+# Limit uncached paid rating lookups per IP, including workers.dev traffic.
+# shortcut: per-location limits reduce abuse, not a global spending cap.
+[[ratelimits]]
+name = "RATINGS_RATE_LIMITER"
+namespace_id = "20261014"
+simple = { limit = 60, period = 60 }
+
 # D1 database for EplayerX Blocks (community submissions + approved blocks).
 # Create once: `wrangler d1 create eplayerx-blocks`, then paste the returned
 # database_id below. Apply schema: `wrangler d1 migrations apply eplayerx-blocks`.
