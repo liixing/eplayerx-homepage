@@ -1,6 +1,7 @@
 import { type Context, Hono } from "hono";
 import type { BlocksBindings } from "../blocks/types.js";
 import { createDefaultHomeConfig } from "./config.js";
+import { configureHomeLanguages } from "../media-languages.js";
 import { createHomeConfigV2 } from "./config-v2.js";
 
 const DEFAULT_IMAGE_BASE_URL = "https://image.tmdb.org/t/p";
@@ -37,16 +38,16 @@ function cacheHomeConfig(c: Context) {
 
 app.get("/config", (c) => {
 	cacheHomeConfig(c);
-	return c.json(createDefaultHomeConfig(resolveConfigRequest(c)));
+	return c.json(configureHomeLanguages(createDefaultHomeConfig(resolveConfigRequest(c)), c));
 });
 
 app.get("/config/v2", async (c) => {
 	cacheHomeConfig(c);
 	return c.json(
-		await createHomeConfigV2({
+		configureHomeLanguages(await createHomeConfigV2({
 			...resolveConfigRequest(c),
 			db: c.env?.DB,
-		}),
+		}), c),
 	);
 });
 

@@ -163,3 +163,9 @@ wrangler secret put BLOCKS_ADMIN_PASSWORD
 MIT License
 
 首页 TMDB 热门电影和电视剧的前 20 项评分由 Cloudflare Cron 每日 UTC 06:17 更新（需要 `MDBLIST_API_KEY` 和 R2 凭证），每天约 40 次 MDBList 查询。已有评分也会刷新，查询失败保留旧值；服务每小时重载评分缓存。静态社区榜单仍使用手动补全脚本。
+
+### 独立语言偏好
+
+`/home/config`、`/home/config/v2` 和媒体列表接口支持可选的 `metadataLanguage`、`posterLanguage`、`logoLanguage`。`language` 保留旧语义和默认行为：用于首页栏目文案；未指定独立偏好时也用于媒体内容。元数据使用 TMDB 语言标签（例如 `zh-CN`），海报和 Logo 还支持 `original`。
+
+例如 `language=en-US&metadataLanguage=zh-CN&posterLanguage=zh-TW&logoLanguage=ja-JP` 返回英文栏目、简中影片内容、繁中海报、日文 Logo。分类和语言浏览入口仍使用 App 语言。响应缓存按完整参数区分；已发布快照和已有刮削数据不会被重写。没有独立偏好的旧请求不增加上游查询，榜单已有中英文译文优先复用。

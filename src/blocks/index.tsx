@@ -1,3 +1,4 @@
+import { hasMediaLanguages, localizeMediaPayload } from "../media-languages.js";
 /** @jsxImportSource hono/jsx */
 /// <reference types="@cloudflare/workers-types" />
 /**
@@ -658,7 +659,7 @@ app.get("/data/:blockId", (c) =>
 			try {
 				const preview = await ensureCollectionPreviewBlob(getDb(c), blockId);
 				if (preview) {
-					return c.json(preview);
+					return c.json(await localizeMediaPayload(preview, c));
 				}
 			} catch {
 				// fall through to 404
@@ -682,7 +683,7 @@ app.get("/data/:blockId", (c) =>
 				: object.response.headers.get("Content-Type") || "application/json";
 		// Without a limit (the iOS client) stream the snapshot through untouched;
 		// the blob carries the block's display title since publish time.
-		if (!Number.isFinite(limit) || limit <= 0) {
+		if ((!Number.isFinite(limit) || limit <= 0) && !hasMediaLanguages(c)) {
 			return new Response(body, {
 				status: 200,
 				headers: { "Content-Type": contentType },
@@ -694,10 +695,10 @@ app.get("/data/:blockId", (c) =>
 				: await object.response.json()
 		) as SnapshotBlob | CollectionPreviewBlob;
 		if (isCollectionPreviewBlob(blob)) {
-			return c.json(blob);
+			return c.json(await localizeMediaPayload(blob, c));
 		}
-		const data = (blob.data ?? []).slice(0, limit);
-		return c.json({ ...blob, count: data.length, data });
+		const data = Number.isFinite(limit) && limit > 0 ? (blob.data ?? []).slice(0, limit) : (blob.data ?? []);
+		return c.json(await localizeMediaPayload({ ...blob, count: data.length, data }, c));
 	}),
 );
 

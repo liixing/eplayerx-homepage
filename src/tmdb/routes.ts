@@ -1,17 +1,23 @@
+import { metadataLanguage, hasMediaLanguages, localizeMediaPayload, enrichWithImages } from "../media-languages.js";
 import { Hono, type Context } from "hono";
-import {
-  originLanguage,
-  pickPreferredLogo,
-} from "../crawler/tmdb-enrich.js";
-import { cachedRatings, getRatingsCache } from "../ratings/cache.js";
 import { tmdb } from "./client.js";
 
-import { resolveTrailerCandidates, videoLanguages, type Details as TrailerDetails } from "./trailer-candidates.js";
 import trailerRoutes from "./trailers.js";
 import trailerPlayback from "./trailer-playback.js";
 import episodeGroups from "./episode-groups.js";
 
 const tmdbApp = new Hono();
+tmdbApp.use("*", async (c, next) => {
+  await next();
+  if (!c.res.ok || !hasMediaLanguages(c)) return;
+  const path = c.req.path;
+  if (path.endsWith("/search/scrape")) return;
+  if (!path.endsWith("/collection/details") && !/\/(popular|top_rated|upcoming|on_the_air|similar|movie_credits|tv_credits)$|\/(trending|discover|search)\//.test(path)) return;
+  const type = path.endsWith("/collection/details") ? "movie" : /\/(movie|movie_credits)(\/|$)/.test(path) ? "movie" : /\/(tv|tv_credits)(\/|$)/.test(path) ? "tv" : undefined;
+  const payload = await c.res.clone().json() as Record<string, unknown>;
+  const localized = await localizeMediaPayload(payload, c, type);
+  c.res = new Response(JSON.stringify(localized), { status: c.res.status, headers: c.res.headers });
+});
 tmdbApp.route("/", trailerRoutes);
 tmdbApp.route("/", trailerPlayback);
 tmdbApp.route("/", episodeGroups);
@@ -271,9 +277,10 @@ async function proxyTmdbDiscover(c: Context, path: string) {
   );
 
   for (const [key, value] of requestUrl.searchParams.entries()) {
-    upstream.searchParams.append(key, value);
+    if (!["metadataLanguage", "posterLanguage", "logoLanguage"].includes(key)) upstream.searchParams.append(key, value);
   }
 
+  if (c.req.query("metadataLanguage")) upstream.searchParams.set("language", metadataLanguage(c));
   applyHomepageDramaDefaults(path, upstream);
 
   const response = await fetch(upstream, {
@@ -301,7 +308,7 @@ async function proxyTmdbDiscover(c: Context, path: string) {
     const results = (data as { results: Record<string, unknown>[] }).results;
     const top = results.slice(0, 20);
     const rest = results.slice(20);
-    const enriched = await enrichWithImages(top, language, mediaType);
+    const enriched = hasMediaLanguages(c) ? top : await enrichWithImages(top, language, mediaType);
     return c.json({ ...(data as object), results: [...enriched, ...rest] });
   }
 
@@ -313,7 +320,7 @@ const scrapeSearches = new Map<string, Promise<Response>>();
 
 tmdbApp.get("/search/scrape", async (c) => {
   const query = (c.req.query("query") ?? "").trim().replace(/\s+/g, " ");
-  const language = c.req.query("language") || "en-US";
+  const language = metadataLanguage(c, "en-US");
   const type = c.req.query("type") || "all";
   const matching = c.req.query("match") === "1";
   const year = c.req.query("year");
@@ -399,7 +406,7 @@ tmdbApp.get("/search/scrape", async (c) => {
 tmdbApp.get("/search/keyword", async (c) => {
   const query = c.req.query("query") || "";
   const page = Number.parseInt(c.req.query("page") || "1");
-  const language = c.req.query("language") || "en-US";
+  const language = metadataLanguage(c, "en-US");
   const result = await tmdb.GET("/3/search/multi", {
     params: {
       query: {
@@ -418,7 +425,7 @@ tmdbApp.get("/search/keyword", async (c) => {
 tmdbApp.get("/search/person", async (c) => {
   const query = c.req.query("query") || "";
   const page = Number.parseInt(c.req.query("page") || "1", 10);
-  const language = c.req.query("language") || "en-US";
+  const language = metadataLanguage(c, "en-US");
   const result = await tmdb.GET("/3/search/person", {
     params: {
       query: {
@@ -435,7 +442,7 @@ tmdbApp.get("/search/person", async (c) => {
 });
 
 tmdbApp.get("/genre/tv/list", async (c) => {
-  const language = c.req.query("language") || "en";
+  const language = metadataLanguage(c, "en");
   const result = await tmdb.GET("/3/genre/tv/list", {
     params: {
       query: {
@@ -450,7 +457,7 @@ tmdbApp.get("/genre/tv/list", async (c) => {
 });
 
 tmdbApp.get("/genre/movie/list", async (c) => {
-  const language = c.req.query("language") || "en";
+  const language = metadataLanguage(c, "en");
   const result = await tmdb.GET("/3/genre/movie/list", {
     params: {
       query: {
@@ -479,7 +486,7 @@ function withMatchTitles(data: unknown) {
 
 tmdbApp.get("/movie/details", async (c) => {
   const id = c.req.query("id") || "";
-  const language = c.req.query("language") || "en";
+  const language = metadataLanguage(c, "en");
   const result = await tmdb.GET(`/3/movie/${Number(id)}`, {
     params: {
       query: {
@@ -565,7 +572,7 @@ tmdbApp.get("/find", async (c) => {
 
 tmdbApp.get("/movie/credits", async (c) => {
   const id = c.req.query("id") || "";
-  const language = c.req.query("language") || "en";
+  const language = metadataLanguage(c, "en");
   const result = await tmdb.GET(`/3/movie/${Number(id)}/credits`, {
     params: {
       query: {
@@ -584,7 +591,7 @@ tmdbApp.get("/movie/credits", async (c) => {
 
 tmdbApp.get("/movie/similar", async (c) => {
   const id = c.req.query("id") || "";
-  const language = c.req.query("language") || "en";
+  const language = metadataLanguage(c, "en");
   const result = await tmdb.GET(`/3/movie/${Number(id)}/recommendations`, {
     params: {
       query: {
@@ -639,7 +646,7 @@ function preferClientLanguageVideos<T extends { iso_639_1?: string }>(
 
 tmdbApp.get("/movie/videos", async (c) => {
   const id = c.req.query("id") || "";
-  const language = c.req.query("language") || "en";
+  const language = metadataLanguage(c, "en");
   const result = await tmdb.GET(`/3/movie/${Number(id)}/videos`, {
     params: {
       // Movie OpenAPI omits include_video_language; TMDB accepts it.
@@ -662,7 +669,7 @@ tmdbApp.get("/movie/videos", async (c) => {
 });
 
 tmdbApp.get("/movie/popular", async (c) => {
-  const language = c.req.query("language") || "en";
+  const language = metadataLanguage(c, "en");
   const page = Number.parseInt(c.req.query("page") || "1");
   const result = await tmdb.GET("/3/movie/popular", {
     params: {
@@ -680,7 +687,7 @@ tmdbApp.get("/movie/popular", async (c) => {
 });
 
 tmdbApp.get("/movie/top_rated", async (c) => {
-  const language = c.req.query("language") || "en";
+  const language = metadataLanguage(c, "en");
   const page = Number.parseInt(c.req.query("page") || "1");
   const result = await tmdb.GET("/3/movie/top_rated", {
     params: {
@@ -697,14 +704,14 @@ tmdbApp.get("/movie/top_rated", async (c) => {
     const results = result.data.results as Record<string, unknown>[];
     const top = results.slice(0, 20);
     const rest = results.slice(20);
-    const enriched = await enrichWithImages(top, language, "movie");
+    const enriched = hasMediaLanguages(c) ? top : await enrichWithImages(top, language, "movie");
     return c.json({ ...result.data, results: [...enriched, ...rest] });
   }
   return c.json(result.data);
 });
 
 tmdbApp.get("/movie/upcoming", async (c) => {
-  const language = c.req.query("language") || "en";
+  const language = metadataLanguage(c, "en");
   const region = c.req.query("region") || "US";
   const result = await tmdb.GET("/3/movie/upcoming", {
     params: {
@@ -723,7 +730,7 @@ tmdbApp.get("/movie/upcoming", async (c) => {
 
 tmdbApp.get("/collection/details", async (c) => {
   const id = c.req.query("id") || "";
-  const language = c.req.query("language") || "en";
+  const language = metadataLanguage(c, "en");
   const result = await tmdb.GET(`/3/collection/${Number(id)}`, {
     params: {
       query: {
@@ -757,7 +764,7 @@ tmdbApp.get("/tv/external_ids", async (c) => {
 
 tmdbApp.get("/tv/details", async (c) => {
   const id = c.req.query("id") || "";
-  const language = c.req.query("language") || "en";
+  const language = metadataLanguage(c, "en");
   const result = await tmdb.GET(`/3/tv/${Number(id)}`, {
     params: {
       query: {
@@ -813,7 +820,7 @@ tmdbApp.get("/tv/season/images", async (c) => {
 tmdbApp.get("/tv/season/details", async (c) => {
   const id = c.req.query("id") || "";
   const seasonNumber = c.req.query("seasonNumber") || "";
-  const language = c.req.query("language") || "en";
+  const language = metadataLanguage(c, "en");
   const result = await tmdb.GET(
     `/3/tv/${Number(id)}/season/${Number(seasonNumber)}`,
     {
@@ -837,7 +844,7 @@ tmdbApp.get("/tv/season/details", async (c) => {
 
 tmdbApp.get("/tv/credits", async (c) => {
   const id = c.req.query("id") || "";
-  const language = c.req.query("language") || "en";
+  const language = metadataLanguage(c, "en");
   const result = await tmdb.GET(`/3/tv/${Number(id)}/credits`, {
     params: {
       query: {
@@ -856,7 +863,7 @@ tmdbApp.get("/tv/credits", async (c) => {
 
 tmdbApp.get("/tv/similar", async (c) => {
   const id = c.req.query("id") || "";
-  const language = c.req.query("language") || "en";
+  const language = metadataLanguage(c, "en");
   const result = await tmdb.GET(`/3/tv/${Number(id)}/recommendations`, {
     params: {
       query: {
@@ -875,7 +882,7 @@ tmdbApp.get("/tv/similar", async (c) => {
 
 tmdbApp.get("/tv/videos", async (c) => {
   const id = c.req.query("id") || "";
-  const language = c.req.query("language") || "en";
+  const language = metadataLanguage(c, "en");
   const result = await tmdb.GET(`/3/tv/${Number(id)}/videos`, {
     params: {
       query: {
@@ -897,7 +904,7 @@ tmdbApp.get("/tv/videos", async (c) => {
 });
 
 tmdbApp.get("/tv/popular", async (c) => {
-  const language = c.req.query("language") || "en";
+  const language = metadataLanguage(c, "en");
   const page = Number.parseInt(c.req.query("page") || "1");
   const result = await tmdb.GET("/3/tv/popular", {
     params: {
@@ -914,7 +921,7 @@ tmdbApp.get("/tv/popular", async (c) => {
 });
 
 tmdbApp.get("/tv/top_rated", async (c) => {
-  const language = c.req.query("language") || "en";
+  const language = metadataLanguage(c, "en");
   const page = Number.parseInt(c.req.query("page") || "1");
   const result = await tmdb.GET("/3/tv/top_rated", {
     params: {
@@ -931,14 +938,14 @@ tmdbApp.get("/tv/top_rated", async (c) => {
     const results = result.data.results as Record<string, unknown>[];
     const top = results.slice(0, 20);
     const rest = results.slice(20);
-    const enriched = await enrichWithImages(top, language, "tv");
+    const enriched = hasMediaLanguages(c) ? top : await enrichWithImages(top, language, "tv");
     return c.json({ ...result.data, results: [...enriched, ...rest] });
   }
   return c.json(result.data);
 });
 
 tmdbApp.get("/tv/on_the_air", async (c) => {
-  const language = c.req.query("language") || "en";
+  const language = metadataLanguage(c, "en");
   const timezone = c.req.query("timezone") || "America/New_York";
   const result = await tmdb.GET("/3/tv/on_the_air", {
     params: {
@@ -954,122 +961,14 @@ tmdbApp.get("/tv/on_the_air", async (c) => {
   if (result.data?.results?.length) {
     const top = (result.data.results as Record<string, unknown>[]).slice(0, 20);
     const rest = (result.data.results as Record<string, unknown>[]).slice(20);
-    const enriched = await enrichWithImages(top, language, "tv");
+    const enriched = hasMediaLanguages(c) ? top : await enrichWithImages(top, language, "tv");
     return c.json({ ...result.data, results: [...enriched, ...rest] });
   }
   return c.json(result.data);
 });
 
-type ImageEntry = {
-  iso_639_1?: string | null;
-  iso_3166_1?: string;
-  file_path?: string;
-  vote_average?: number;
-  aspect_ratio?: number;
-  width?: number;
-  height?: number;
-};
-
-function bestByVote<T extends { vote_average?: number }>(items: T[]) {
-  return items.length
-    ? items.sort((a, b) => (b.vote_average ?? 0) - (a.vote_average ?? 0))[0]
-    : undefined;
-}
-
-function withCachedRatings(
-  item: Record<string, unknown>,
-  mediaType: "movie" | "tv",
-  cache: Awaited<ReturnType<typeof getRatingsCache>>,
-): Record<string, unknown> {
-  const id = Number(item.id);
-  if (!Number.isFinite(id) || id <= 0) return item;
-  const ratings = cachedRatings(cache, mediaType, id);
-  return ratings ? { ...item, ratings } : item;
-}
-
-async function enrichWithImages(
-  items: Record<string, unknown>[],
-  language: string,
-  mediaType?: "movie" | "tv"
-) {
-  const [languageCode] = language.split("-");
-  const preferredRegion =
-    languageCode === "zh" ? (language.includes("TW") ? "TW" : "CN") : undefined;
-  const ratingsCache = getRatingsCache();
-
-  const enrichOne = async (item: Record<string, unknown>) => {
-    const type = mediaType ?? (item.media_type as string);
-    if (type !== "movie" && type !== "tv") return item;
-
-    const id = item.id as number;
-    // Appended metadata replaces the old images call; it does not add an upstream request.
-    const query = { language, append_to_response: "images,videos",
-      include_image_language: [...new Set([languageCode, originLanguage(
-        item.original_language as string | undefined, item.origin_country as string[] | undefined,
-      ) ?? "en", "en", "null"])].join(","),
-      include_video_language: videoLanguages(language, item.original_language as string | undefined) };
-    const imagesPromise = type === "tv"
-      ? tmdb.GET(`/3/tv/${id}`, { params: { path: { series_id: id }, query } })
-      : tmdb.GET(`/3/movie/${id}`, { params: { path: { movie_id: id }, query } });
-
-    try {
-      const [imagesResult, cache] = await Promise.all([
-        imagesPromise,
-        ratingsCache,
-      ]);
-
-      const withRatings = withCachedRatings(item, type, cache);
-      if (imagesResult.response.status !== 200) return withRatings;
-
-      const details = imagesResult.data as (TrailerDetails & { images?: { logos?: ImageEntry[]; posters?: ImageEntry[]; backdrops?: ImageEntry[] } }) | undefined;
-      const images = details?.images;
-
-      const logos = (images?.logos ?? []) as ImageEntry[];
-      const logo = pickPreferredLogo(
-        logos,
-        languageCode,
-        preferredRegion,
-        originLanguage(
-          item.original_language as string | undefined,
-          item.origin_country as string[] | undefined,
-        ),
-      )?.file_path;
-
-      const posters = (images?.posters ?? []) as ImageEntry[];
-      const noLogoPoster = bestByVote(
-        posters.filter((p) => !p.iso_639_1)
-      )?.file_path;
-
-      const backdrops = (images?.backdrops ?? []) as ImageEntry[];
-      const thumb =
-        backdrops.find((b) => b.iso_639_1 === languageCode)?.file_path ||
-        backdrops.find((b) => b.iso_639_1 === "en")?.file_path ||
-        (item.backdrop_path as string | undefined) ||
-        (item.poster_path as string | undefined);
-
-      const trailer = details?.videos ? await resolveTrailerCandidates(details, language, type, query.include_video_language).catch(() => undefined) : undefined;
-      return { ...withRatings, logo, noLogoPoster, thumb, ...(trailer ? { trailer } : {}) };
-    } catch {
-      try {
-        return withCachedRatings(item, type, await ratingsCache);
-      } catch {
-        return item;
-      }
-    }
-  };
-
-  const CONCURRENCY = 5;
-  const results: Record<string, unknown>[] = [];
-  for (let i = 0; i < items.length; i += CONCURRENCY) {
-    const batch = items.slice(i, i + CONCURRENCY);
-    const batchResults = await Promise.all(batch.map(enrichOne));
-    results.push(...batchResults);
-  }
-  return results;
-}
-
 tmdbApp.get("/trending/all", async (c) => {
-  const language = c.req.query("language") || "en";
+  const language = metadataLanguage(c, "en");
   const timeWindow: "day" | "week" =
     (c.req.query("timeWindow") as "day" | "week") || "day";
   const result = await tmdb.GET(`/3/trending/all/${timeWindow}`, {
@@ -1089,7 +988,7 @@ tmdbApp.get("/trending/all", async (c) => {
 });
 
 tmdbApp.get("/trending/movie", async (c) => {
-  const language = c.req.query("language") || "en";
+  const language = metadataLanguage(c, "en");
   const timeWindow: "day" | "week" =
     (c.req.query("timeWindow") as "day" | "week") || "day";
   const page = Number.parseInt(c.req.query("page") || "1");
@@ -1111,14 +1010,14 @@ tmdbApp.get("/trending/movie", async (c) => {
     const results = result.data.results as Record<string, unknown>[];
     const top = results.slice(0, 20);
     const rest = results.slice(20);
-    const enriched = await enrichWithImages(top, language, "movie");
+    const enriched = hasMediaLanguages(c) ? top : await enrichWithImages(top, language, "movie");
     return c.json({ ...result.data, results: [...enriched, ...rest] });
   }
   return c.json(result.data);
 });
 
 tmdbApp.get("/trending/tv", async (c) => {
-  const language = c.req.query("language") || "en";
+  const language = metadataLanguage(c, "en");
   const timeWindow: "day" | "week" =
     (c.req.query("timeWindow") as "day" | "week") || "day";
   const page = Number.parseInt(c.req.query("page") || "1");
@@ -1141,7 +1040,7 @@ tmdbApp.get("/trending/tv", async (c) => {
     const results = result.data.results as Record<string, unknown>[];
     const top = results.slice(0, 20);
     const rest = results.slice(20);
-    const enriched = await enrichWithImages(top, language, "tv");
+    const enriched = hasMediaLanguages(c) ? top : await enrichWithImages(top, language, "tv");
     return c.json({ ...result.data, results: [...enriched, ...rest] });
   }
   return c.json(result.data);
@@ -1157,7 +1056,7 @@ tmdbApp.get("/discover/tv", async (c) => {
 
 tmdbApp.get("/person/details", async (c) => {
   const id = c.req.query("id") || "";
-  const language = c.req.query("language") || "en";
+  const language = metadataLanguage(c, "en");
   const result = await tmdb.GET(`/3/person/${Number(id)}`, {
     params: {
       query: {
@@ -1176,7 +1075,7 @@ tmdbApp.get("/person/details", async (c) => {
 
 tmdbApp.get("/person/movie_credits", async (c) => {
   const id = c.req.query("id") || "";
-  const language = c.req.query("language") || "en";
+  const language = metadataLanguage(c, "en");
   const result = await tmdb.GET(`/3/person/${Number(id)}/movie_credits`, {
     params: {
       query: {
@@ -1195,7 +1094,7 @@ tmdbApp.get("/person/movie_credits", async (c) => {
 
 tmdbApp.get("/person/tv_credits", async (c) => {
   const id = c.req.query("id") || "";
-  const language = c.req.query("language") || "en";
+  const language = metadataLanguage(c, "en");
   const result = await tmdb.GET(`/3/person/${Number(id)}/tv_credits`, {
     params: {
       query: {

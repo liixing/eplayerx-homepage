@@ -1,3 +1,4 @@
+import { languagePreference, localizeMediaPayload } from "../media-languages.js";
 /// <reference types="@cloudflare/workers-types" />
 import { type Context, Hono } from "hono";
 import { isAdminBearer } from "../blocks/admin.js";
@@ -728,7 +729,22 @@ async function servePopularJson(
   const result = await readStaticR2Json(c, key);
   if (!result.ok) return result.response;
   const payload = result.data as PopularBlobPayload;
-  return c.json(localizePopularPayload(payload, locale), 200, {
+  let localized = localizePopularPayload(payload, locale);
+  const selected = languagePreference(c.req.query("metadataLanguage"))?.toLowerCase();
+  // Reuse published translations for common text-only switches; never re-scrape the snapshot.
+  const savedLocale = selected === "zh-cn" || selected === "zh" || selected === "zh-hans" ? "zh"
+    : selected?.startsWith("en") && payload.data?.every(item => item.translations?.en) ? "en"
+    : selected?.startsWith("ar") && payload.data?.every(item => item.translations?.ar) ? "ar" : undefined;
+  if (savedLocale && !c.req.query("posterLanguage") && !c.req.query("logoLanguage")) {
+    const translated = localizePopularPayload(payload, savedLocale);
+    localized.data = localized.data?.map((item, index) => ({ ...item,
+      title: translated.data?.[index]?.title || item.title,
+      overview: translated.data?.[index]?.overview ?? item.overview,
+    }));
+  } else {
+    localized = await localizeMediaPayload(localized, c);
+  }
+  return c.json(localized, 200, {
     "Cache-Control": STATIC_JSON_CACHE_CONTROL,
   });
 }

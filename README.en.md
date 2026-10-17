@@ -68,3 +68,9 @@ MIT License
 
 
 Cloudflare Cron refreshes ratings for the first 20 trending movies and TV shows daily at 06:17 UTC (requires `MDBLIST_API_KEY` and R2 credentials), using about 40 MDBList lookups per day. Existing scores are refreshed, failures preserve previous values, and servers reload the ratings cache hourly. Static community lists still use the manual backfill script.
+
+### Independent language preferences
+
+Home configuration and media-list endpoints accept optional `metadataLanguage`, `posterLanguage`, and `logoLanguage` parameters. Existing `language` behavior is preserved: it selects home headings and supplies the legacy defaults when independent preferences are absent. Metadata uses TMDB language tags such as `zh-CN`; posters and logos also accept `original`.
+
+For example, `language=en-US&metadataLanguage=zh-CN&posterLanguage=zh-TW&logoLanguage=ja-JP` selects English headings, Simplified Chinese media text, Traditional Chinese posters, and Japanese logos. Browse categories retain the App language. Response caches include all preferences; published snapshots and existing scraped data are never rewritten. Legacy requests add no upstream work, and existing chart translations are reused when available.
