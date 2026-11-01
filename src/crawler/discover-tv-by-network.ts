@@ -81,7 +81,8 @@ const NETWORKS: NetworkSpec[] = [
   {
     id: 6972,
     name: "TOD",
-    logo_path: "/a97LDSIw6uH6e9f3q27pzjvqAJS.png",
+    // Keep the background transparent for the client's white logo tint.
+    logo_path: "/guegiRsNWEtfpiUAnV7hSIYYRZ6.png",
     // The TOD network catalog is Turkish; use its Arab-region streaming catalog.
     watchProvider: "1750",
     watchRegion: "SA",
