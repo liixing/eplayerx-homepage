@@ -75,6 +75,7 @@ function translationFromEnrichment(
 	return {
 		title,
 		overview: data.overview ?? null,
+		tagline: data.tagline?.trim() || null,
 		thumb: enriched.imageMeta.thumb,
 		logo: enriched.imageMeta.logo,
 		noLogoPoster: enriched.imageMeta.noLogoPoster,
@@ -148,6 +149,7 @@ async function buildContentItem(
 		release_date: data.release_date || null,
 		first_air_date: data.first_air_date,
 		overview: data.overview,
+		tagline: data.tagline?.trim() || null,
 		thumb: imageMeta.thumb,
 		logo: imageMeta.logo,
 		noLogoPoster: imageMeta.noLogoPoster,

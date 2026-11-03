@@ -55,6 +55,7 @@ export interface ContentItemTranslation {
   trailer?: ReturnType<typeof trailerCandidates>;
   title: string;
   overview?: string | null;
+  tagline?: string | null;
   thumb?: string | null;
   logo?: string | null;
   noLogoPoster?: string | null;
@@ -77,6 +78,7 @@ export interface ContentItem {
   release_date?: string | null;
   first_air_date?: string | null;
   overview?: string | null;
+  tagline?: string | null;
   thumb?: string | null;
   logo?: string | null;
   noLogoPoster?: string | null;

@@ -23,7 +23,7 @@ tmdbApp.route("/", trailerPlayback);
 tmdbApp.route("/", episodeGroups);
 
 /** Bump to drop Cache API entries after cached response-shape changes. */
-const TMDB_CACHE_EPOCH = "20261009-youtube-language-v2";
+const TMDB_CACHE_EPOCH = "20261102-tagline";
 
 const TMDB_IMAGE_CACHE_CONTROL =
   "public, max-age=31536000, s-maxage=31536000, immutable";

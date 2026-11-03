@@ -290,6 +290,7 @@ async function resolveItem(
 		release_date: tmdbData.release_date ?? null,
 		first_air_date: tmdbData.first_air_date ?? null,
 		overview: tmdbData.overview ?? null,
+		tagline: tmdbData.tagline?.trim() || null,
 		thumb: imageMeta.thumb,
 		logo: imageMeta.logo,
 		noLogoPoster: imageMeta.noLogoPoster,

@@ -694,6 +694,7 @@ function localizeContentItem(item: ContentItem, locale: Locale): ContentItem {
     ...rest,
     title: translation.title || rest.title,
     overview: translation.overview ?? rest.overview,
+    tagline: translation.tagline ?? rest.tagline,
     thumb: translation.thumb ?? rest.thumb,
     logo: translation.logo ?? rest.logo,
     noLogoPoster: translation.noLogoPoster ?? rest.noLogoPoster,
@@ -740,6 +741,7 @@ async function servePopularJson(
     localized.data = localized.data?.map((item, index) => ({ ...item,
       title: translated.data?.[index]?.title || item.title,
       overview: translated.data?.[index]?.overview ?? item.overview,
+      tagline: translated.data?.[index]?.tagline ?? item.tagline,
     }));
   } else {
     localized = await localizeMediaPayload(localized, c);

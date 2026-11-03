@@ -174,6 +174,7 @@ export async function enrichWithImages(
 
       const trailer = details?.videos ? await resolveTrailerCandidates(details, language, type, query.include_video_language).catch(() => undefined) : undefined;
       const next: Record<string, unknown> = { ...withRatings, logo, noLogoPoster: noLogoPoster ?? item.noLogoPoster, thumb, ...(trailer ? { trailer } : {}) };
+      next.tagline = (details as { tagline?: string } | undefined)?.tagline?.trim() || undefined;
       const resolve = (value?: string) => value === "original" ? original || artworkLanguage : value || artworkLanguage;
       const region = (tag: string) => /^zh/i.test(tag) ? (/hant|tw|hk|mo/i.test(tag) ? "TW" : "CN") : undefined;
       if (preferences?.metadataLanguage && details) {
