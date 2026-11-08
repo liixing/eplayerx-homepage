@@ -22,6 +22,7 @@ mode = "smart"
 enabled = true
 
 # Public tvOS subtitle translation. Store DEEPSEEK_API_KEY with wrangler secret put.
+# All devices behind the same public IP share this quota.
 # shortcut: per-IP limits are approximate per Cloudflare location, not a global spending cap.
 [[ratelimits]]
 name = "SUBTITLE_RATE_LIMITER"
@@ -34,6 +35,12 @@ simple = { limit = 60, period = 60 }
 name = "RATINGS_RATE_LIMITER"
 namespace_id = "20261014"
 simple = { limit = 60, period = 60 }
+
+# Limit episode timing lookups and submissions.
+[[ratelimits]]
+name = "EPISODE_TIMING_RATE_LIMITER"
+namespace_id = "20261106"
+simple = { limit = 30, period = 60 }
 
 # D1 database for EplayerX Blocks (community submissions + approved blocks).
 # Create once: `wrangler d1 create eplayerx-blocks`, then paste the returned

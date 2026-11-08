@@ -273,6 +273,127 @@ test("single-line translation remains compatible with KSPlayer", async (t) => {
 	});
 });
 
+test("person-name memory shares one translation request and preserves older clients", async (t) => {
+	const names = [{ source: "John", translation: "约翰" }];
+	const subtitles = ["John is here.", "Ann left."];
+	const responseBody = {
+		translations: ["约翰在这里。", "安走了。"],
+		names: [
+			{ source: "Ann", translation: "安", extra: "discard" },
+			{ source: "Nobody", translation: "不存在" },
+			{ source: "John", translation: "并未出现的译名" },
+			{ source: "", translation: "无效" },
+		],
+	};
+	const calls = t.mock.method(
+		globalThis,
+		"fetch",
+		async (_url: Parameters<typeof fetch>[0], init?: RequestInit) => {
+			const upstream = JSON.parse(String(init?.body));
+			const payload = JSON.parse(upstream.messages[1].content);
+			assert.deepEqual(payload.names, names);
+			assert.deepEqual(upstream.response_format, { type: "json_object" });
+			assert.ok(upstream.messages[0].content.includes("reuse them exactly"));
+			assert.ok(
+				upstream.messages[0].content.includes("inferred identities or aliases"),
+			);
+			return completion(JSON.stringify(responseBody));
+		},
+	);
+	const response = await app.request(
+		endpoint,
+		request({
+			...body,
+			messages: [
+				body.messages[0],
+				{
+					role: "user",
+					content: JSON.stringify({ subtitles, previous: [], names }),
+				},
+			],
+		}),
+		env,
+	);
+	assert.equal(response.status, 200);
+	const result = (await response.json()) as {
+		choices: { message: { content: string } }[];
+	};
+	assert.deepEqual(JSON.parse(result.choices[0].message.content), {
+		translations: responseBody.translations,
+		names: [{ source: "Ann", translation: "安" }],
+	});
+	assert.equal(calls.mock.callCount(), 1);
+});
+
+test("optional name learning tolerates legacy arrays and malformed name metadata", async (t) => {
+	const calls = t.mock.method(globalThis, "fetch");
+	for (const output of [
+		'["你好","再见"]',
+		JSON.stringify({ translations: ["你好", "再见"], names: 42 }),
+	]) {
+		calls.mock.mockImplementation(async () => completion(output));
+		const response = await app.request(
+			endpoint,
+			request({
+				...body,
+				messages: [
+					body.messages[0],
+					{
+						role: "user",
+						content: JSON.stringify({
+							subtitles: ["Hello", "Goodbye"],
+							previous: [],
+							names: [],
+						}),
+					},
+				],
+			}),
+			env,
+		);
+		assert.equal(response.status, 200);
+		const result = (await response.json()) as {
+			choices: { message: { content: string } }[];
+		};
+		assert.deepEqual(JSON.parse(result.choices[0].message.content), {
+			translations: ["你好", "再见"],
+			names: [],
+		});
+	}
+});
+
+test("invalid or oversized name glossaries never reach the paid provider", async (t) => {
+	const calls = t.mock.method(globalThis, "fetch", async () => completion());
+	for (const names of [
+		null,
+		{},
+		Array(33).fill({ source: "John", translation: "约翰" }),
+		[{ source: "", translation: "约翰" }],
+		[{ source: "John", translation: "x".repeat(81) }],
+		[{ source: "John\n", translation: "约翰" }],
+	]) {
+		const response = await app.request(
+			endpoint,
+			request({
+				...body,
+				messages: [
+					body.messages[0],
+					{
+						role: "user",
+						content: JSON.stringify({
+							subtitles: ["Hello", "Goodbye"],
+							previous: [],
+							names,
+						}),
+					},
+				],
+			}),
+			env,
+		);
+		assert.equal(response.status, 400);
+	}
+	assert.equal(calls.mock.callCount(), 0);
+});
+
 test("upstream errors are sanitized and incomplete batches are rejected without retries", async (t) => {
 	const calls = t.mock.method(globalThis, "fetch");
 	for (const [upstream, status] of [
@@ -285,6 +406,7 @@ test("upstream errors are sanitized and incomplete batches are rejected without 
 		],
 		[new Response("secret error detail", { status: 401 }), 502],
 		[new Response("secret error detail", { status: 429 }), 429],
+		[new Response("secret error detail", { status: 503 }), 503],
 		[new Response("not JSON"), 502],
 		[completion('["你好"]'), 502],
 		[completion('["你好",""]'), 502],
@@ -294,13 +416,14 @@ test("upstream errors are sanitized and incomplete batches are rejected without 
 		calls.mock.mockImplementation(async () => upstream);
 		const response = await app.request(endpoint, request(), env);
 		assert.equal(response.status, status);
+		if (status === 503) assert.equal(response.headers.get("Retry-After"), "10");
 		const text = await response.text();
 		assert.ok(
 			!text.includes("secret error detail") &&
 				!text.includes(env.DEEPSEEK_API_KEY),
 		);
 	}
-	assert.equal(calls.mock.callCount(), 8);
+	assert.equal(calls.mock.callCount(), 9);
 	calls.mock.mockImplementation(async () => {
 		throw new Error("network failure");
 	});

@@ -26,6 +26,8 @@ Both the secret and the `SUBTITLE_RATE_LIMITER` binding in `wrangler.toml` are r
 
 The server fixes the model to `deepseek-flash`, disables thinking and streaming, and rebuilds the translation prompt. Caller instructions/tools are not forwarded. Upstream error details are hidden; application code does not log or cache subtitles or keys. The plain Bun/Docker server does not enable this endpoint because it requires Workers bindings.
 
+New clients may include a `names` glossary in batch input (up to 32 pairs, each source/translation up to 80 UTF-16 code units). The same response returns translations and explicit person names from that batch, without an extra API request. Clients retain up to 64 pairs in memory for the current subtitle track; seeks preserve them, while movie, track, language or service changes clear them. The server does not persist this memory. Older clients retain their array response format.
+
 Validate with `node --import tsx --test src/subtitles/deepseek.test.ts` and `npm run test:ts`.
 
 ## 🔑 Get TMDB API Token

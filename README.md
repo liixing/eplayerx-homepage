@@ -61,6 +61,7 @@ npm run deploy:cf
 每个 IP 每分钟最多 60 次（Cloudflare 按节点近似计数，同一出口共享额度，并非全局费用上限）。
 请求最多 64 KiB / 30 行字幕；固定 `deepseek-flash`、非流式、关闭思考、最多 4096 输出 token，18 秒超时，不自动重试。
 客户端指令和工具参数不会直接透传；错误响应隐藏上游详情，字幕和密钥不写入应用日志或缓存。
+新客户端的批量请求可携带 `names` 人物译名表（最多 32 对，每个原名/译名最多 80 个 UTF-16 单元），同一次响应返回译文及本批明确出现的人名，无须额外翻译请求。客户端仅在当前字幕轨的内存中保留最多 64 对译名，跳转保留，换影片、字幕轨、语言或服务时清空；服务端不保存这份记忆。旧客户端的数组响应格式保持兼容。
 该接口依赖 Workers 的限流绑定，普通 Bun/Docker 入口不启用此功能。
 
 验证：`node --import tsx --test src/subtitles/deepseek.test.ts` 和 `npm run test:ts`。
@@ -108,6 +109,12 @@ bun run dev:cf
 | `R2_ACCOUNT_ID`         | ❌   | Cloudflare 账户 ID                              |
 | `R2_CUSTOM_DOMAIN`      | ❌   | R2 自定义域名                                   |
 | `BLOCKS_ADMIN_PASSWORD` | ❌   | EplayerX Blocks 审核后台密码（`/admin`）        |
+
+### 播放标记后台登录
+
+在 Cloudflare Access 中为 `api.eplayerx.com/admin/episode-timings` 及其子路径创建同一个自托管应用，登录方式选 One-time PIN，Allow 策略的 Include 选该登录方式。Access 验证邮箱，Worker 再验证该应用的签名和成员权限。配置 Worker 的 `TIMING_ACCESS_ISSUER`（Zero Trust 团队 URL）、`TIMING_ACCESS_AUDIENCE`（应用的 AUD）和 `TIMING_OWNER_EMAIL`（所有者邮箱），并在部署前应用 D1 迁移 `0017_playback_timing_members.sql`。
+
+所有者登录后可在「成员管理」输入编辑者邮箱，再复制登录链接给对方。编辑者可修改任意单集的片头、片尾和广告设置。所有者可以设置整季和整剧默认值，单集设置优先于整季，整季优先于整剧。启用整季标记前需应用 D1 迁移 `0018_playback_timing_seasons.sql`。
 
 ## 🧩 EplayerX Blocks（社区自定义首页）
 

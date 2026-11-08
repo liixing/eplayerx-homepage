@@ -12,7 +12,12 @@ async function fetchWithTimeout(
 	const controller = new AbortController();
 	const timeout = setTimeout(() => controller.abort(), TMDB_REQUEST_TIMEOUT_MS);
 	try {
-		return await fetch(input, { ...init, signal: controller.signal });
+		const caller =
+			init?.signal ?? (input instanceof Request ? input.signal : null);
+		const signal = caller
+			? AbortSignal.any([caller, controller.signal])
+			: controller.signal;
+		return await fetch(input, { ...init, signal });
 	} finally {
 		clearTimeout(timeout);
 	}

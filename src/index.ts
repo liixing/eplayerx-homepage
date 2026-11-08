@@ -1,3 +1,4 @@
+import { adRequestsApp, adRequestsWorkerApp } from "./ad-scan-requests.js";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import adminApp from "./blocks/admin.js";
@@ -6,6 +7,9 @@ import crawlerApp from "./crawler/index.js";
 import homeApp from "./home/index.js";
 import baiduOAuthApp from "./oauth/baidu.js";
 import ratingsApp, { ratingsCacheMiddleware } from "./ratings/index.js";
+import timingAdminApp from "./episode-timing-admin.js";
+import { timingAdminPath } from "./episode-timing-admin-view.js";
+import episodeTimingsApp from "./episode-timings.js";
 import deepSeekApp from "./subtitles/deepseek.js";
 import tmdbApp, { tmdbCacheMiddleware } from "./tmdb/index.js";
 import tvdbApp, { tvdbCacheMiddleware } from "./tvdb/index.js";
@@ -60,6 +64,9 @@ app.route("/tvdb", tvdbApp);
 
 // Mount multi-source ratings (MDBList)
 app.route("/ratings", ratingsApp);
+app.route("/episode-timings", episodeTimingsApp);
+app.route("/ad-requests", adRequestsApp);
+app.route("/admin/api/ad-requests", adRequestsWorkerApp);
 
 // Mount Crawler routes
 app.route("/crawler", crawlerApp);
@@ -74,6 +81,7 @@ app.route("/blocks", blocksApp);
 app.route("/import", importLandingApp);
 
 // Mount EplayerX Blocks admin console (password gated)
+app.route(timingAdminPath, timingAdminApp);
 app.route("/admin", adminApp);
 
 export default app;

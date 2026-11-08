@@ -1,12 +1,11 @@
 /// <reference types="@cloudflare/workers-types" />
 /** Shared runtime helpers for the blocks public + admin apps. */
 
-import type { Context } from "hono";
 import type { BlocksBindings } from "./types.js";
 
 export class ServiceUnavailable extends Error {}
 
-export function getDb(c: Context<{ Bindings: BlocksBindings }>): D1Database {
+export function getDb(c: { env?: BlocksBindings }): D1Database {
 	const binding = c.env?.DB;
 	if (!binding) {
 		throw new ServiceUnavailable("Database not available in this environment.");

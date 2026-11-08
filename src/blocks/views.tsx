@@ -1520,6 +1520,7 @@ const PendingCollectionCard = ({ s }: { s: SubmissionRow }) => (
 export const AdminPage = ({ pending, collections }: AdminPageProps) => (
 	<Layout title="审核" active="none" noI18n>
 		<h1 class="gradtext">管理后台</h1>
+		<a class="btn" href="/admin/episode-timings">播放标记</a>
 		<div class="tabs" id="adminTabs">
 			<button class="tab on" type="button" data-tab="pending">
 				待审投稿（{pending.length}）
