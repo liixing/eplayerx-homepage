@@ -467,8 +467,6 @@ app.post("/save", bodyLimit({ maxSize: 4096 }), async (c) => {
 	const id = idFrom(input.tmdbId);
 	const series = input.scope === "series";
 	const seasonDefault = input.scope === "season";
-	if ((series || seasonDefault) && actor.role !== "owner")
-		return c.json({ error: "只有所有者可以修改整季和整剧默认值。" }, 403);
 	const seasonNumber = integer(input.season, 0, 1000);
 	const scope =
 		series && id !== undefined

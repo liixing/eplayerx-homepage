@@ -256,13 +256,7 @@ function MarkerCard({
 	);
 }
 
-function Editor({
-	workspace,
-	owner,
-}: {
-	workspace: Workspace;
-	owner: boolean;
-}) {
+function Editor({ workspace }: { workspace: Workspace }) {
 	const {
 		id,
 		season,
@@ -276,7 +270,6 @@ function Editor({
 	} = workspace;
 	const series = editingScope === "series";
 	const seasonDefault = editingScope === "season";
-	const readOnly = editingScope !== "episode" && !owner;
 	const parents: InheritedRules = [];
 	if (editingScope === "episode")
 		parents.push({ label: "整季默认", rule: seasonRule });
@@ -362,13 +355,11 @@ function Editor({
 				</div>
 			</div>
 			<p class="editor-note">
-				{readOnly
-					? "整季和整剧默认值由所有者管理。"
-					: series
-						? "整季和单集设置优先。"
-						: seasonDefault
-							? "单集设置优先。留空的区间沿用整剧默认。"
-							: "留空时依次沿用整季、整剧或已收集的区间。"}
+				{series
+					? "整季和单集设置优先。"
+					: seasonDefault
+						? "单集设置优先。留空的区间沿用整剧默认。"
+						: "留空时依次沿用整季、整剧或已收集的区间。"}
 			</p>
 			<div class="editor-tools">
 				<nav class="marker-links" aria-label="跳转到播放区间">
@@ -387,7 +378,7 @@ function Editor({
 				</nav>
 				<span class="time-format">例如 1:25 或 85 秒</span>
 			</div>
-			<fieldset class="editor-fields" disabled={readOnly}>
+			<fieldset class="editor-fields">
 				<legend class="sr-only">播放区间</legend>
 				<div class="markers">
 					<MarkerCard
@@ -459,25 +450,17 @@ function Editor({
 					{collectedAd ? <p class="source">已收集 {collectedAd}</p> : null}
 				</fieldset>
 			</fieldset>
-			{readOnly ? null : (
-				<div class="savebar">
-					<p id="save-result" role="status" aria-live="polite"></p>
-					<button class="button primary save" type="submit">
-						保存{scopeLabel}设置 <Icon name="arrow" />
-					</button>
-				</div>
-			)}
+			<div class="savebar">
+				<p id="save-result" role="status" aria-live="polite"></p>
+				<button class="button primary save" type="submit">
+					保存{scopeLabel}设置 <Icon name="arrow" />
+				</button>
+			</div>
 		</form>
 	);
 }
 
-function EpisodeList({
-	workspace,
-	owner,
-}: {
-	workspace: Workspace;
-	owner: boolean;
-}) {
+function EpisodeList({ workspace }: { workspace: Workspace }) {
 	const { id, season, episode, editingScope, series, episodes } = workspace;
 	const seasons =
 		series?.seasons?.filter(
@@ -501,7 +484,7 @@ function EpisodeList({
 					<input
 						type="hidden"
 						name="scope"
-						value={owner && editingScope === "season" ? "season" : "episode"}
+						value={editingScope === "season" ? "season" : "episode"}
 					/>
 					<label class="sr-only" for="season-picker">
 						选择季
@@ -735,7 +718,7 @@ export function TimingAdminPage({
 			) : null}
 			{workspace ? (
 				<div class="work-grid">
-					<EpisodeList workspace={workspace} owner={actor.role === "owner"} />
+					<EpisodeList workspace={workspace} />
 					<div class="series-hero">
 						<Backdrop title={workspace.series} />
 						<Poster title={workspace.series} />
@@ -765,7 +748,7 @@ export function TimingAdminPage({
 							</a>
 						</section>
 					) : (
-						<Editor workspace={workspace} owner={actor.role === "owner"} />
+						<Editor workspace={workspace} />
 					)}
 				</div>
 			) : query ? (
@@ -1345,7 +1328,6 @@ h1{font-size:clamp(1.6rem,3.3vw,2.2rem);letter-spacing:-.04em;line-height:1.16}
  .button,.quiet,.time-pair input,.choices label,.marker-links a,.series-link{min-height:44px}
 }
 .editor-fields{min-width:0;margin:0;padding:0;border:0}
-.editor-fields:disabled .clear{display:none}
 .members-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:14px;align-items:start}
 .member-card h2{font-size:1rem;margin-bottom:12px}
 .member-card h2 .source{font-weight:normal;margin-left:6px}

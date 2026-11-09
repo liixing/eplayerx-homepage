@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { test } from "node:test";
 import { sign } from "hono/jwt";
 import app from "./index.js";
+
+const { test } = require("bun:test");
 
 test("one episode endpoint shares ads and markers without crossing episodes", async () => {
 	const { Database } = require("bun:sqlite");
@@ -812,6 +813,7 @@ test("one episode endpoint shares ads and markers without crossing episodes", as
 			401,
 		);
 		assert.equal((await admin("", editorToken)).status, 403);
+		assert.equal((await save(series, editorToken)).status, 403);
 		assert.match(
 			(await memberChange("invite", editor.toUpperCase())).headers.get(
 				"location",
@@ -842,8 +844,26 @@ test("one episode endpoint shares ads and markers without crossing episodes", as
 			(await memberChange("invite", "other@example.com", editorToken)).status,
 			403,
 		);
-		assert.equal((await save(series, editorToken)).status, 403);
-		assert.equal((await save(season, editorToken)).status, 403);
+		const seriesEditor = await (await admin("?tmdbId=10", editorToken)).text();
+		assert.match(seriesEditor, /<fieldset class="editor-fields">/);
+		assert.match(seriesEditor, /保存整剧设置/);
+		const seasonEditor = await (
+			await admin("?tmdbId=94&season=0&scope=season", editorToken)
+		).text();
+		assert.match(seasonEditor, /<fieldset class="editor-fields">/);
+		assert.match(seasonEditor, /保存整季设置/);
+		assert.match(seasonEditor, /name="scope" value="season"/);
+		assert.doesNotMatch(seasonEditor, /name="scope" value="episode"/);
+		assert.equal((await save(series, editorToken)).status, 200);
+		assert.equal((await save(season, editorToken)).status, 200);
+		assert.deepEqual(await (await get(seasonSibling)).json(), {
+			markers: seasonMarkers,
+			ads: { eligible: true, segments: [{ startMs: 120_000, endMs: 140_000 }] },
+		});
+		assert.deepEqual(
+			await (await get("tmdbId=10&season=2&episode=1&ranges=1")).json(),
+			{ markers: defaults, ads: confirmedNoAds },
+		);
 		assert.equal(
 			(
 				await save(
@@ -877,16 +897,20 @@ test("one episode endpoint shares ads and markers without crossing episodes", as
 			/status=remove$/,
 		);
 		assert.equal((await admin("", editorToken)).status, 403);
-		assert.equal((await save(override, editorToken)).status, 403);
+		for (const fields of [series, season, override]) {
+			assert.equal((await save(fields, editorToken)).status, 403);
+		}
 		const audit = sqlite
 			.query(
-				"SELECT actor_email, action FROM timing_admin_audit ORDER BY id DESC LIMIT 3",
+				"SELECT actor_email, action, subject FROM timing_admin_audit ORDER BY id DESC LIMIT 5",
 			)
 			.values();
 		assert.deepEqual(audit, [
-			[owner, "remove"],
-			[editor, "save"],
-			[owner, "invite"],
+			[owner, "remove", editor],
+			[editor, "save", "TMDB 11 · S2 E6"],
+			[editor, "save", "TMDB 10 · 第 1 季"],
+			[editor, "save", "TMDB 10 · 整剧"],
+			[owner, "invite", editor],
 		]);
 	} finally {
 		globalThis.fetch = originalFetch;

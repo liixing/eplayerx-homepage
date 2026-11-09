@@ -114,7 +114,7 @@ bun run dev:cf
 
 在 Cloudflare Access 中为 `api.eplayerx.com/admin/episode-timings` 及其子路径创建同一个自托管应用，登录方式选 One-time PIN，Allow 策略的 Include 选该登录方式。Access 验证邮箱，Worker 再验证该应用的签名和成员权限。配置 Worker 的 `TIMING_ACCESS_ISSUER`（Zero Trust 团队 URL）、`TIMING_ACCESS_AUDIENCE`（应用的 AUD）和 `TIMING_OWNER_EMAIL`（所有者邮箱），并在部署前应用 D1 迁移 `0017_playback_timing_members.sql`。
 
-所有者登录后可在「成员管理」输入编辑者邮箱，再复制登录链接给对方。编辑者可修改任意单集的片头、片尾和广告设置。所有者可以设置整季和整剧默认值，单集设置优先于整季，整季优先于整剧。启用整季标记前需应用 D1 迁移 `0018_playback_timing_seasons.sql`。
+所有者登录后可在「成员管理」输入编辑者邮箱，再复制登录链接给对方。所有者和受邀编辑者都可以修改单集、整季和整剧的片头、片尾和广告设置。单集设置优先于整季，整季优先于整剧。启用整季标记前需应用 D1 迁移 `0018_playback_timing_seasons.sql`。
 
 ## 🧩 EplayerX Blocks（社区自定义首页）
 
