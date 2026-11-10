@@ -20,6 +20,9 @@ test("ad requests deduplicate by series, keep legacy IDs and finish once", async
 		readFileSync(new URL("0023_ad_scan_by_series.sql", directory), "utf8"),
 	);
 	sqlite.exec(
+		readFileSync(new URL("0025_episode_rule_duration.sql", directory), "utf8"),
+	);
+	sqlite.exec(
 		"UPDATE ad_scan_requests SET next_check_at = 4102444800 WHERE tmdb_id = 777",
 	);
 	const db = {

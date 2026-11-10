@@ -235,8 +235,8 @@ adRequestsWorkerApp.get("/:id/data", async (c) => {
 				.bind(row.tmdb_id)
 				.all(),
 			db
-				.prepare(`SELECT season, episode, ad_start_ms AS startMs, ad_end_ms AS endMs, no_ads AS noAds
-				FROM playback_timing_rules WHERE tmdb_id = ? ORDER BY season, episode`)
+				.prepare(`SELECT season, episode, ad_start_ms AS startMs, ad_end_ms AS endMs, no_ads AS noAds, duration_ms AS durationMs
+				FROM playback_timing_rules WHERE tmdb_id = ? ORDER BY season, episode, duration_ms`)
 				.bind(row.tmdb_id)
 				.all(),
 			db

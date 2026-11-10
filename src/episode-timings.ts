@@ -33,6 +33,7 @@ const app = new Hono<Env>();
 const scope = "tmdb_id = ? AND season = ? AND episode = ?";
 const maxTime = 28_800_000;
 const durationTolerance = 5000;
+const markerDurationTolerance = 10_000; // Same as TODB's runtime match tolerance.
 const markerColumns = `
 	CASE WHEN e.intro_end_ms IS NOT NULL THEN e.intro_start_ms
 		WHEN t.intro_end_ms IS NOT NULL THEN t.intro_start_ms
@@ -46,11 +47,23 @@ const markerColumns = `
 		WHEN d.intro_end_ms IS NOT NULL THEN 1 ELSE 0 END AS introRank,
 	CASE WHEN e.outro_start_ms IS NOT NULL THEN 3 WHEN t.outro_start_ms IS NOT NULL THEN 2
 		WHEN d.outro_start_ms IS NOT NULL THEN 1 ELSE 0 END AS outroRank`;
-const markerSelect = `WITH requested(tmdb_id, season, episode) AS (VALUES (?, ?, ?))
+const markerSelect = `WITH requested(tmdb_id, season, episode, duration_ms) AS (VALUES (?, ?, ?, ?)),
+	matched_markers AS (
+		SELECT m.* FROM episode_intro_outro_versions m JOIN requested r USING (tmdb_id, season, episode)
+		WHERE r.duration_ms > 0
+			AND m.duration_ms BETWEEN r.duration_ms - ${markerDurationTolerance} AND r.duration_ms + ${markerDurationTolerance}
+		ORDER BY abs(m.duration_ms - r.duration_ms), m.duration_ms LIMIT 1
+	),
+	matched_rule AS (
+		SELECT p.* FROM playback_timing_rules p JOIN requested r USING (tmdb_id, season, episode)
+		WHERE p.duration_ms = 0 OR (r.duration_ms > 0
+			AND p.duration_ms BETWEEN r.duration_ms - ${markerDurationTolerance} AND r.duration_ms + ${markerDurationTolerance})
+		ORDER BY p.duration_ms = 0, abs(p.duration_ms - r.duration_ms) LIMIT 1
+	)
 	SELECT ${markerColumns}`;
 const markerSource = `FROM requested r
-	LEFT JOIN episode_intro_outro m USING (tmdb_id, season, episode)
-	LEFT JOIN playback_timing_rules e USING (tmdb_id, season, episode)
+	LEFT JOIN matched_markers m USING (tmdb_id, season, episode)
+	LEFT JOIN matched_rule e USING (tmdb_id, season, episode)
 	LEFT JOIN playback_timing_rules t ON t.tmdb_id = r.tmdb_id AND t.season = r.season AND t.episode = 0
 	LEFT JOIN playback_timing_rules d ON d.tmdb_id = r.tmdb_id AND d.season = -1 AND d.episode = 0`;
 
@@ -211,7 +224,7 @@ app.get("/", async (c) => {
 		if (c.req.query("ads") === "0") {
 			const markers = await db
 				.prepare(`${markerSelect} ${markerSource}`)
-				.bind(...key)
+				.bind(...key, duration ?? 0)
 				.first<TimingRow>();
 			return c.json({
 				markers: markerPayload(markers, supportsRanges),
@@ -242,6 +255,7 @@ app.get("/", async (c) => {
 				) ORDER BY a.start_ms`)
 			.bind(
 				...key,
+				duration ?? 0,
 				now,
 				duration ?? 0,
 				(duration ?? 0) - durationTolerance,
@@ -312,13 +326,10 @@ app.post(
 			if (input.kind === "ad") {
 				const start = integer(input.startMs, 0, maxTime);
 				const end = integer(input.endMs, 0, maxTime);
-				const duration =
-					input.durationMs === undefined
-						? 0
-						: integer(input.durationMs, 1, maxTime);
+				const duration = integer(input.durationMs, 1, maxTime);
 				if (
 					duration === undefined ||
-					(duration > 0 && end !== undefined && end > duration) ||
+					(end !== undefined && end > duration) ||
 					start === undefined ||
 					end === undefined ||
 					start >= end
@@ -341,8 +352,8 @@ app.post(
 					)`)
 					.bind(
 						...key,
-						duration === 0 ? 0 : Math.max(1, duration - durationTolerance),
-						duration === 0 ? 0 : duration + durationTolerance,
+						Math.max(1, duration - durationTolerance),
+						duration + durationTolerance,
 						end,
 						duration,
 						duration,
@@ -376,23 +387,32 @@ app.post(
 					: integer(input.timeMs, 1, limit);
 				if (point === undefined)
 					return c.json({ error: "Invalid marker" }, 400);
+				const duration = integer(input.durationMs, 1, maxTime);
+				if (
+					duration === undefined ||
+					point >= duration ||
+					(end !== undefined && end > duration)
+				) {
+					return c.json({ error: "Invalid marker duration" }, 400);
+				}
 				const edge = range ? (intro ? start : end) : null;
 				const pointColumn = intro ? "intro_end_ms" : "outro_start_ms";
 				const edgeColumn = intro ? "intro_start_ms" : "outro_end_ms";
 				const otherColumn = intro ? "outro_start_ms" : "intro_end_ms";
-				// Legacy single-point reports leave a saved explicit range intact.
-				const updatedPoint = `CASE WHEN excluded.${edgeColumn} IS NULL AND episode_intro_outro.${edgeColumn} IS NOT NULL
-					THEN episode_intro_outro.${pointColumn} ELSE excluded.${pointColumn} END`;
+				const table = "episode_intro_outro_versions";
+				// Single-point reports leave a saved explicit range intact.
+				const updatedPoint = `CASE WHEN excluded.${edgeColumn} IS NULL AND ${table}.${edgeColumn} IS NOT NULL
+					THEN ${table}.${pointColumn} ELSE excluded.${pointColumn} END`;
 				const saved = await db
-					.prepare(`INSERT INTO episode_intro_outro
-				(tmdb_id, season, episode, ${pointColumn}, ${edgeColumn}) VALUES (?, ?, ?, ?, ?)
-				ON CONFLICT (tmdb_id, season, episode) DO UPDATE SET
+					.prepare(`INSERT INTO ${table}
+				(tmdb_id, season, episode, ${pointColumn}, ${edgeColumn}, duration_ms) VALUES (?, ?, ?, ?, ?, ?)
+				ON CONFLICT (tmdb_id, season, episode, duration_ms) DO UPDATE SET
 					${pointColumn} = ${updatedPoint},
-					${edgeColumn} = coalesce(excluded.${edgeColumn}, episode_intro_outro.${edgeColumn})
-				WHERE episode_intro_outro.${otherColumn} IS NULL
-					OR (${updatedPoint}) ${intro ? "<" : ">"} episode_intro_outro.${otherColumn}
+					${edgeColumn} = coalesce(excluded.${edgeColumn}, ${table}.${edgeColumn})
+				WHERE ${table}.${otherColumn} IS NULL
+					OR (${updatedPoint}) ${intro ? "<" : ">"} ${table}.${otherColumn}
 				RETURNING tmdb_id`)
-					.bind(...key, point, edge ?? null)
+					.bind(...key, point, edge ?? null, duration)
 					.first<number>("tmdb_id");
 				if (saved === null)
 					return c.json({ error: "Intro must end before outro starts" }, 409);

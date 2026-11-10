@@ -6,6 +6,7 @@ import type { BlocksBindings } from "./blocks/types.js";
 import {
 	type EditorValues,
 	formatTime,
+	type MarkerReport,
 	TimingAdminPage,
 	TimingAdRequestsPage,
 	TimingDeniedPage,
@@ -52,6 +53,7 @@ type Rule = {
 	adStart: number | null;
 	adEnd: number | null;
 	noAds: number;
+	duration: number;
 };
 
 const timingFields = [
@@ -61,6 +63,7 @@ const timingFields = [
 	"outroEnd",
 	"adStart",
 	"adEnd",
+	"duration",
 ] as const;
 type TimingField = (typeof timingFields)[number];
 
@@ -75,12 +78,18 @@ class InvalidTiming extends RangeError {
 
 const ruleScope = "tmdb_id = ? AND season = ? AND episode = ?";
 
-function readRule(db: D1Database, scope: Scope) {
+function readRule(
+	db: D1Database,
+	scope: Scope,
+	duration: number | null = null,
+) {
 	return db
 		.prepare(`SELECT intro_start_ms AS introStart, intro_end_ms AS introEnd,
 		outro_start_ms AS outroStart, outro_end_ms AS outroEnd, ad_start_ms AS adStart,
-		ad_end_ms AS adEnd, no_ads AS noAds FROM playback_timing_rules WHERE ${ruleScope}`)
-		.bind(...scope)
+		ad_end_ms AS adEnd, no_ads AS noAds, duration_ms AS duration
+		FROM playback_timing_rules WHERE ${ruleScope} AND (? IS NULL OR duration_ms = ?)
+		ORDER BY duration_ms = 0, duration_ms LIMIT 1`)
+		.bind(...scope, duration, duration)
 		.first<Rule>();
 }
 
@@ -92,6 +101,7 @@ function editorValues(rule: Rule | null, oldNoAds: boolean): EditorValues {
 		outroEnd: formatTime(rule?.outroEnd),
 		adStart: formatTime(rule?.adStart),
 		adEnd: formatTime(rule?.adEnd),
+		duration: rule?.duration ? formatTime(rule.duration) : "",
 		adMode:
 			rule?.noAds === 1 || oldNoAds
 				? "none"
@@ -355,6 +365,11 @@ app.get("/", async (c) => {
 		const requestedScope = c.req.query("scope");
 		let season = requestedSeason ?? 1;
 		let episode = integer(c.req.query("episode"), 1, 100_000);
+		const requestedDuration = c.req.query("duration");
+		const durationVersion =
+			requestedDuration === "new"
+				? "new"
+				: (integer(requestedDuration, 1, 28_800_000) ?? null);
 		const catalog = catalogTitle(id);
 		let catalogSeason = catalogEpisodes(id, season);
 		if (requestedScope === "episode" && episode === undefined) {
@@ -393,8 +408,9 @@ app.get("/", async (c) => {
 			seriesRule,
 			seasonRule,
 			episodeRule,
+			versions,
 			oldNoAds,
-			report,
+			reports,
 			ad,
 		] = await Promise.all([
 			catalog,
@@ -403,7 +419,16 @@ app.get("/", async (c) => {
 			editingScope === "season" || editingScope === "episode"
 				? readRule(db, seasonScope)
 				: null,
-			episode === undefined ? null : readRule(db, scope),
+			episode === undefined || durationVersion === "new"
+				? null
+				: readRule(db, scope, durationVersion),
+			episode === undefined
+				? null
+				: db
+						.prepare(`SELECT duration_ms AS duration FROM playback_timing_rules
+				WHERE ${ruleScope} AND duration_ms > 0 ORDER BY duration_ms`)
+						.bind(...scope)
+						.all<{ duration: number }>(),
 			episode === undefined
 				? null
 				: db
@@ -414,9 +439,13 @@ app.get("/", async (c) => {
 				? null
 				: db
 						.prepare(`SELECT intro_start_ms AS introStart, intro_end_ms AS introEnd,
-				outro_start_ms AS outroStart, outro_end_ms AS outroEnd FROM episode_intro_outro WHERE ${ruleScope}`)
-						.bind(...scope)
-						.first<Rule>(),
+				outro_start_ms AS outroStart, outro_end_ms AS outroEnd, duration_ms AS duration
+				FROM episode_intro_outro_versions WHERE ${ruleScope}
+				UNION ALL SELECT intro_start_ms, intro_end_ms, outro_start_ms, outro_end_ms, NULL
+				FROM episode_intro_outro WHERE ${ruleScope}
+				ORDER BY duration NULLS LAST LIMIT 20`)
+						.bind(...scope, ...scope)
+						.all<MarkerReport>(),
 			episode === undefined
 				? null
 				: db
@@ -437,8 +466,10 @@ app.get("/", async (c) => {
 					episodes,
 					seriesRule,
 					seasonRule,
-					report,
+					reports: reports?.results ?? [],
 					ad,
+					durations: versions?.results.map(({ duration }) => duration) ?? [],
+					originalDuration: episodeRule?.duration ?? null,
 					values: editorValues(
 						editingScope === "series"
 							? seriesRule
@@ -484,33 +515,33 @@ app.post("/save", bodyLimit({ maxSize: 4096 }), async (c) => {
 	const values = (key: TimingField) =>
 		typeof input[key] === "string" ? input[key].trim() : "";
 	try {
+		const duration = scope[2] > 0 ? milliseconds(values("duration")) : 0;
+		if (scope[2] > 0 && !(duration > 0 && duration <= 28_800_000)) {
+			throw new InvalidTiming("请填写视频时长，例如 45:00。", "duration");
+		}
+		const maxEnd = duration || 28_800_000;
+		const originalDuration =
+			scope[2] > 0 ? integer(input.originalDuration, 0, 28_800_000) : undefined;
 		const [introStart, introEnd] = timeRange(
 			"intro",
 			values("introStart"),
 			values("introEnd"),
 			0,
-			600_000,
+			Math.min(600_000, maxEnd),
 		);
 		const [outroStart, outroEnd] = timeRange(
 			"outro",
 			values("outroStart"),
 			values("outroEnd"),
 			1,
-			28_800_000,
+			maxEnd,
 		);
 		if (introEnd !== null && outroStart !== null && introEnd >= outroStart) {
 			throw new InvalidTiming("片尾开始时间须晚于片头结束时间。", "outroStart");
 		}
 		const [adStart, adEnd] =
 			adMode === "range"
-				? timeRange(
-						"ad",
-						values("adStart"),
-						values("adEnd"),
-						0,
-						28_800_000,
-						true,
-					)
+				? timeRange("ad", values("adStart"), values("adEnd"), 0, maxEnd, true)
 				: [null, null];
 		const db = getDb(c);
 		const editorEmail = actor.role === "editor" ? actor.email : null;
@@ -520,19 +551,20 @@ app.post("/save", bodyLimit({ maxSize: 4096 }), async (c) => {
 			introStart === null && outroStart === null && adMode === "inherit"
 				? db
 						.prepare(
-							`DELETE FROM playback_timing_rules WHERE ${ruleScope} AND ${canWrite}`,
+							`DELETE FROM playback_timing_rules WHERE ${ruleScope} AND duration_ms = ? AND ${canWrite}`,
 						)
-						.bind(...scope, editorEmail, editorEmail)
+						.bind(...scope, duration, editorEmail, editorEmail)
 				: db
 						.prepare(`INSERT INTO playback_timing_rules
-				(tmdb_id, season, episode, intro_start_ms, intro_end_ms, outro_start_ms, outro_end_ms, ad_start_ms, ad_end_ms, no_ads)
-				SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ? WHERE ${canWrite}
-				ON CONFLICT (tmdb_id, season, episode) DO UPDATE SET
+				(tmdb_id, season, episode, duration_ms, intro_start_ms, intro_end_ms, outro_start_ms, outro_end_ms, ad_start_ms, ad_end_ms, no_ads)
+				SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? WHERE ${canWrite}
+				ON CONFLICT (tmdb_id, season, episode, duration_ms) DO UPDATE SET
 				intro_start_ms = excluded.intro_start_ms, intro_end_ms = excluded.intro_end_ms,
 				outro_start_ms = excluded.outro_start_ms, outro_end_ms = excluded.outro_end_ms,
 				ad_start_ms = excluded.ad_start_ms, ad_end_ms = excluded.ad_end_ms, no_ads = excluded.no_ads`)
 						.bind(
 							...scope,
+							duration,
 							introStart,
 							introEnd,
 							outroStart,
@@ -556,6 +588,7 @@ app.post("/save", bodyLimit({ maxSize: 4096 }), async (c) => {
 					introEnd,
 					outroStart,
 					outroEnd,
+					duration,
 					adMode,
 					adStart,
 					adEnd,
@@ -564,6 +597,15 @@ app.post("/save", bodyLimit({ maxSize: 4096 }), async (c) => {
 				editorEmail,
 			);
 		const changes = [audit, rule];
+		if (originalDuration !== undefined && originalDuration !== duration) {
+			changes.push(
+				db
+					.prepare(
+						`DELETE FROM playback_timing_rules WHERE ${ruleScope} AND duration_ms = ? AND ${canWrite}`,
+					)
+					.bind(...scope, originalDuration, editorEmail, editorEmail),
+			);
+		}
 		if (episode > 0) {
 			changes.push(
 				db
@@ -576,7 +618,7 @@ app.post("/save", bodyLimit({ maxSize: 4096 }), async (c) => {
 		const [recorded] = await db.batch(changes);
 		if (recorded.meta.changes !== 1)
 			return c.json({ error: "你的编辑权限已被移除。" }, 403);
-		return c.json({ saved: true });
+		return c.json({ saved: true, duration });
 	} catch (error) {
 		if (error instanceof InvalidTiming)
 			return c.json({ error: error.message, field: error.field }, 400);
