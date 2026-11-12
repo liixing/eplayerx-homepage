@@ -60,6 +60,8 @@ test("submission sources preserve filters, paginate lists, and retain Douban yea
 			const params = new URL((input as Request).url).searchParams;
 			assert.equal(params.get("with_origin_country"), "HK");
 			assert.equal(params.get("primary_release_date.gte"), "2023-01-01");
+			assert.equal(params.get("certification_country"), "US");
+			assert.equal(params.get("certification.lte"), "PG");
 			return Response.json({
 				results: [{ id: 5, title: "Film", poster_path: "/p.jpg" }],
 			});
@@ -71,6 +73,8 @@ test("submission sources preserve filters, paginate lists, and retain Douban yea
 				{
 					withOriginCountry: "HK",
 					primaryReleaseDateGte: "2023-01-01",
+					certificationCountry: "US",
+					certificationLte: "PG",
 				},
 				"zh-CN",
 			),

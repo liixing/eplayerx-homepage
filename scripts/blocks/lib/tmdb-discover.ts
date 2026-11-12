@@ -40,6 +40,7 @@ export interface DiscoverFilter {
 	/** US-style certs such as `TV-PG|TV-14|TV-MA`. */
 	certificationCountry?: string;
 	certification?: string;
+	certificationLte?: string;
 	watchRegion?: string;
 	/** Pipe-joined provider ids for `watchRegion`. */
 	withWatchProviders?: string;
@@ -86,6 +87,7 @@ export async function fetchTmdbDiscoverItems(
 			"first_air_date.lte": filter.firstAirDateLte,
 			certification_country: filter.certificationCountry,
 			certification: filter.certification,
+			"certification.lte": filter.certificationLte,
 			watch_region: filter.watchRegion,
 			with_watch_providers: filter.withWatchProviders,
 			with_watch_monetization_types: filter.withWatchMonetizationTypes,
