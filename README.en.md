@@ -10,21 +10,24 @@ A media content API service built with [Hono](https://hono.dev/) framework, prov
 
 > ⚠️ **Important**: During deployment, Vercel will prompt you to enter the `TMDB_API_TOKEN` environment variable. This is required. Please obtain your Token first by following the instructions below.
 
-## tvOS DeepSeek subtitle translation
+## tvOS managed subtitle translation (DeepSeek / OpenAI)
 
 `POST https://api.eplayerx.com/subtitles/deepseek/v1/chat/completions` accepts EPlayerX / KSPlayer single-line and batch subtitle requests.
-tvOS defaults to the built-in service without client credentials. Selecting **DeepSeek** instead allows users to enter their own key for the official API. Existing custom configurations are preserved; the translation toggle remains user-controlled. Subtitle text is sent through this service to DeepSeek.
+tvOS defaults to the built-in service without client credentials. Selecting **DeepSeek** or **OpenAI** instead uses the user's own key with that provider's official API. Existing custom configurations are preserved; the translation toggle remains user-controlled. The built-in service sends subtitles to the provider selected by the server.
 
 Configure the server secret and deploy to Cloudflare Workers:
 
 ```bash
 npx wrangler secret put DEEPSEEK_API_KEY
+npx wrangler secret put OPENAI_API_KEY
 npm run deploy:cf
 ```
 
-Both the secret and the `SUBTITLE_RATE_LIMITER` binding in `wrangler.toml` are required; missing configuration returns 503 without contacting DeepSeek. Limits: 60 requests/minute/IP, 64 KiB request body, 30 subtitles, 4096 output tokens, 18-second upstream timeout, no automatic retries. Cloudflare limits are approximate per location and shared by users behind the same IP; they are not a global spending cap.
+The existing endpoint, client `model: "deepseek-flash"`, single/batch payloads and responses stay unchanged. Set the Worker variable `SUBTITLE_TRANSLATION_PROVIDER` to `deepseek` (default when absent) or `openai` in Cloudflare's Variables and Secrets and deploy that variable to switch providers. `npm run deploy:cf` uses `--keep-vars` to preserve this remote setting; keep it out of `[vars]` in `wrangler.toml`.
 
-The server fixes the model to `deepseek-flash`, disables thinking and streaming, and rebuilds the translation prompt. Caller instructions/tools are not forwarded. Upstream error details are hidden; application code does not log or cache subtitles or keys. The plain Bun/Docker server does not enable this endpoint because it requires Workers bindings.
+The selected provider's secret and the `SUBTITLE_RATE_LIMITER` binding in `wrangler.toml` are required; unknown providers or missing configuration return 503 without a paid request or fallback. Both providers share the same 60 requests/minute/IP quota. Other limits: 64 KiB request body, 30 subtitles, 4096 output tokens, 18-second upstream timeout, no automatic retries. Cloudflare limits are approximate per location and shared by users behind the same IP; they are not a global spending cap.
+
+The server uses `deepseek-flash` for DeepSeek or [`gpt-6-luna`](https://developers.openai.com/api/docs/models/gpt-6-luna) for OpenAI (`reasoning_effort: "none"` for lower latency, `store: false`). Both disable thinking and streaming and rebuild the translation prompt. Caller instructions/tools are not forwarded. Upstream error details are hidden; application code does not log or cache subtitles or keys. The plain Bun/Docker server does not enable this endpoint because it requires Workers bindings.
 
 New clients may include a `names` glossary in batch input (up to 32 pairs, each source/translation up to 80 UTF-16 code units). The same response returns translations and explicit person names from that batch, without an extra API request. Clients retain up to 64 pairs in memory for the current subtitle track; seeks preserve them, while movie, track, language or service changes clear them. The server does not persist this memory. Older clients retain their array response format.
 

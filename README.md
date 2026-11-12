@@ -44,22 +44,26 @@ docker compose up -d
 npm run deploy:cf
 ```
 
-## tvOS DeepSeek 字幕翻译
+## tvOS 内置字幕翻译（DeepSeek / OpenAI）
 
 `POST https://api.eplayerx.com/subtitles/deepseek/v1/chat/completions` 接收 EPlayerX / KSPlayer 的单句或批量字幕翻译请求。
 tvOS 默认选择「内置」，不需要用户填写地址或 Key；选择「DeepSeek」仍可填写自己的 Key 直连官方接口。
-翻译开关由用户控制，已有自定义服务配置保留。用户字幕会经本服务发送给 DeepSeek。
+翻译开关由用户控制，已有自定义服务配置保留。内置服务按服务端配置将字幕发送给 DeepSeek 或 OpenAI；客户端自行选择的「DeepSeek」「OpenAI」则仍直连各自官方接口。
 
 Cloudflare Workers 上配置服务端密钥后部署（不把 Key 写入代码或客户端）：
 
 ```bash
 npx wrangler secret put DEEPSEEK_API_KEY
+npx wrangler secret put OPENAI_API_KEY
 npm run deploy:cf
 ```
 
+同一个旧接口兼容两个上游，客户端地址、`model: "deepseek-flash"`、单句/批量请求和响应格式不变。Worker 环境变量 `SUBTITLE_TRANSLATION_PROVIDER` 选择 `deepseek`（未配置时默认）或 `openai`。在 Cloudflare Worker 的 Variables and Secrets 中修改并部署该变量即可切换，后续 `npm run deploy:cf` 的 `--keep-vars` 会保留它。该变量不写入 `wrangler.toml` 的 `[vars]`，避免覆盖线上选择。
+DeepSeek 固定使用 `deepseek-flash`；OpenAI 固定使用 [`gpt-6-luna`](https://developers.openai.com/api/docs/models/gpt-6-luna)，设置 `reasoning_effort: "none"` 以减少翻译延迟，`store: false`。只要求所选上游的 Key；配置错误或缺少该 Key 时返回 503，不自动切到另一家。
+
 接口需要 `wrangler.toml` 中的 `SUBTITLE_RATE_LIMITER` 绑定；Key 或绑定缺失时返回 503，不调用上游。
 每个 IP 每分钟最多 60 次（Cloudflare 按节点近似计数，同一出口共享额度，并非全局费用上限）。
-请求最多 64 KiB / 30 行字幕；固定 `deepseek-flash`、非流式、关闭思考、最多 4096 输出 token，18 秒超时，不自动重试。
+请求最多 64 KiB / 30 行字幕；两个上游均非流式、关闭思考、最多 4096 输出 token，18 秒超时，不自动重试，共用同一 IP 限流额度。
 客户端指令和工具参数不会直接透传；错误响应隐藏上游详情，字幕和密钥不写入应用日志或缓存。
 新客户端的批量请求可携带 `names` 人物译名表（最多 32 对，每个原名/译名最多 80 个 UTF-16 单元），同一次响应返回译文及本批明确出现的人名，无须额外翻译请求。客户端仅在当前字幕轨的内存中保留最多 64 对译名，跳转保留，换影片、字幕轨、语言或服务时清空；服务端不保存这份记忆。旧客户端的数组响应格式保持兼容。
 该接口依赖 Workers 的限流绑定，普通 Bun/Docker 入口不启用此功能。

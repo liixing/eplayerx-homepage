@@ -21,7 +21,9 @@ mode = "smart"
 [observability]
 enabled = true
 
-# Public tvOS subtitle translation. Store DEEPSEEK_API_KEY with wrangler secret put.
+# Public tvOS subtitle translation. Store DEEPSEEK_API_KEY / OPENAI_API_KEY as secrets.
+# SUBTITLE_TRANSLATION_PROVIDER (deepseek by default, or openai) selects the upstream.
+# Keep the selector in remote Worker configuration so --keep-vars preserves later switches.
 # All devices behind the same public IP share this quota.
 # shortcut: per-IP limits are approximate per Cloudflare location, not a global spending cap.
 [[ratelimits]]

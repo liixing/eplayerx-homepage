@@ -2,13 +2,34 @@ import { Hono } from "hono";
 
 type Bindings = {
 	DEEPSEEK_API_KEY?: string;
+	OPENAI_API_KEY?: string;
+	SUBTITLE_TRANSLATION_PROVIDER?: string;
 	SUBTITLE_RATE_LIMITER?: {
 		limit(options: { key: string }): Promise<{ success: boolean }>;
 	};
 };
 
 const app = new Hono<{ Bindings: Bindings }>();
-const model = "deepseek-flash";
+// This is the existing client contract, independent of the selected upstream model.
+const clientModel = "deepseek-flash";
+const providers = {
+	deepseek: {
+		key: "DEEPSEEK_API_KEY",
+		url: "https://api.deepseek.com/chat/completions",
+		model: "deepseek-flash",
+		options: { thinking: { type: "disabled" }, max_tokens: 4096 },
+	},
+	openai: {
+		key: "OPENAI_API_KEY",
+		url: "https://api.openai.com/v1/chat/completions",
+		model: "gpt-6-luna",
+		options: {
+			reasoning_effort: "none",
+			max_completion_tokens: 4096,
+			store: false,
+		},
+	},
+} as const;
 
 function record(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -57,9 +78,14 @@ async function boundedJSON(
 
 app.post("/v1/chat/completions", async (c) => {
 	c.header("Cache-Control", "no-store");
-	const key = c.env?.DEEPSEEK_API_KEY;
+	const providerName = c.env?.SUBTITLE_TRANSLATION_PROVIDER ?? "deepseek";
+	const provider =
+		providerName === "deepseek" || providerName === "openai"
+			? providers[providerName]
+			: undefined;
+	const key = provider && c.env?.[provider.key];
 	const limiter = c.env?.SUBTITLE_RATE_LIMITER;
-	if (!key || !limiter)
+	if (!provider || !key || !limiter)
 		return c.json(
 			{ error: { message: "Subtitle translation is not configured" } },
 			503,
@@ -92,7 +118,7 @@ app.post("/v1/chat/completions", async (c) => {
 	}
 	if (
 		!record(input) ||
-		input.model !== model ||
+		input.model !== clientModel ||
 		(input.stream !== undefined && input.stream !== false) ||
 		!Array.isArray(input.messages) ||
 		input.messages.length !== 2
@@ -196,7 +222,7 @@ app.post("/v1/chat/completions", async (c) => {
 		AbortSignal.timeout(18_000),
 	]);
 	try {
-		const response = await fetch("https://api.deepseek.com/chat/completions", {
+		const response = await fetch(provider.url, {
 			method: "POST",
 			// Workers supports manual redirects; reject 3xx below without forwarding the key.
 			redirect: "manual",
@@ -206,14 +232,13 @@ app.post("/v1/chat/completions", async (c) => {
 				"Content-Type": "application/json",
 			},
 			body: JSON.stringify({
-				model,
+				model: provider.model,
 				messages: [
 					{ role: "system", content: prompt },
 					{ role: "user", content },
 				],
 				stream: false,
-				thinking: { type: "disabled" },
-				max_tokens: 4096,
+				...provider.options,
 				...(nameMemory ? { response_format: { type: "json_object" } } : {}),
 			}),
 		});

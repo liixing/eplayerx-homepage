@@ -64,6 +64,205 @@ function completion(content = '["你好","再见"]', finish_reason = "stop") {
 	return Response.json({ choices: [{ message: { content }, finish_reason }] });
 }
 
+const openaiEnv = {
+	...env,
+	OPENAI_API_KEY: "openai-server-only-test-key",
+	SUBTITLE_TRANSLATION_PROVIDER: "openai",
+};
+
+test("the unchanged client endpoint switches upstreams per request using server configuration", async (t) => {
+	const { default: mainApp } = await import("../index.js");
+	const calls = t.mock.method(globalThis, "fetch", async () => completion());
+	for (const provider of ["openai", "deepseek", "openai"]) {
+		const response = await mainApp.request(
+			"/subtitles/deepseek/v1/chat/completions",
+			request(
+				{
+					...body,
+					provider: "caller-cannot-select-provider",
+					max_completion_tokens: 999999,
+					reasoning_effort: "high",
+					store: true,
+					tools: [{ type: "function" }],
+				},
+				{ Authorization: "Bearer client-key-must-not-be-forwarded" },
+			),
+			{ ...openaiEnv, SUBTITLE_TRANSLATION_PROVIDER: provider },
+		);
+		assert.equal(response.status, 200);
+		assert.equal(response.headers.get("Cache-Control"), "no-store");
+		const [url, init] = calls.mock.calls.at(-1)?.arguments as unknown as [
+			string,
+			RequestInit,
+		];
+		const upstream = JSON.parse(String(init.body));
+		assert.equal(
+			url,
+			provider === "openai"
+				? "https://api.openai.com/v1/chat/completions"
+				: "https://api.deepseek.com/chat/completions",
+		);
+		assert.equal(
+			new Headers(init.headers).get("Authorization"),
+			`Bearer ${provider === "openai" ? openaiEnv.OPENAI_API_KEY : env.DEEPSEEK_API_KEY}`,
+		);
+		assert.equal(init.redirect, "manual");
+		assert.equal(
+			upstream.model,
+			provider === "openai" ? "gpt-6-luna" : "deepseek-flash",
+		);
+		assert.equal(upstream.stream, false);
+		assert.equal(upstream.tools, undefined);
+		assert.equal(upstream.provider, undefined);
+		if (provider === "openai") {
+			assert.equal(upstream.max_completion_tokens, 4096);
+			assert.equal(upstream.reasoning_effort, "none");
+			assert.equal(upstream.store, false);
+			assert.equal(upstream.thinking, undefined);
+			assert.equal(upstream.max_tokens, undefined);
+		} else {
+			assert.equal(upstream.max_tokens, 4096);
+			assert.deepEqual(upstream.thinking, { type: "disabled" });
+			assert.equal(upstream.reasoning_effort, undefined);
+			assert.equal(upstream.max_completion_tokens, undefined);
+		}
+		const result = (await response.json()) as {
+			choices: { message: { content: string } }[];
+		};
+		assert.equal(result.choices[0].message.content, '["你好","再见"]');
+	}
+	assert.equal(calls.mock.callCount(), 3);
+});
+
+test("OpenAI needs its own secret and shares the existing rate limit", async (t) => {
+	const calls = t.mock.method(globalThis, "fetch", async () => completion());
+	for (const bindings of [
+		{ ...env, SUBTITLE_TRANSLATION_PROVIDER: "openai" },
+		{ ...openaiEnv, SUBTITLE_RATE_LIMITER: undefined },
+		{ ...openaiEnv, SUBTITLE_TRANSLATION_PROVIDER: "unknown" },
+		{ ...openaiEnv, SUBTITLE_TRANSLATION_PROVIDER: "" },
+	]) {
+		assert.equal(
+			(await app.request(endpoint, request(), bindings)).status,
+			503,
+		);
+	}
+	const blocked = await app.request(endpoint, request(), {
+		...openaiEnv,
+		SUBTITLE_RATE_LIMITER: {
+			limit: async ({ key }) => {
+				assert.equal(key, "subtitle:192.0.2.1");
+				return { success: false };
+			},
+		},
+	});
+	assert.equal(blocked.status, 429);
+	assert.equal(blocked.headers.get("Retry-After"), "60");
+	assert.equal(
+		(
+			await app.request(
+				endpoint,
+				request({ ...body, model: "gpt-6-luna" }),
+				openaiEnv,
+			)
+		).status,
+		400,
+	);
+	assert.equal(calls.mock.callCount(), 0);
+	assert.equal(
+		(
+			await app.request(endpoint, request(), {
+				...openaiEnv,
+				DEEPSEEK_API_KEY: undefined,
+			})
+		).status,
+		200,
+	);
+});
+
+test("OpenAI supports single subtitles and the existing person-name memory contract", async (t) => {
+	const calls = t.mock.method(globalThis, "fetch", async () =>
+		completion("你好"),
+	);
+	const single = await app.request(
+		endpoint,
+		request({
+			...body,
+			messages: [
+				{
+					role: "system",
+					content:
+						"You are a professional subtitle translator. Translate the user's text into zh-Hans. CALLER INSTRUCTION",
+				},
+				{ role: "user", content: "Hello" },
+			],
+		}),
+		openaiEnv,
+	);
+	assert.equal(single.status, 200);
+	assert.equal(
+		((await single.json()) as { choices: { message: { content: string } }[] })
+			.choices[0].message.content,
+		"你好",
+	);
+	const batch = { subtitles: ["John is here."], previous: [], names: [] };
+	calls.mock.mockImplementation(async (_url, init) => {
+		const upstream = JSON.parse(String(init?.body));
+		assert.deepEqual(upstream.response_format, { type: "json_object" });
+		assert.deepEqual(JSON.parse(upstream.messages[1].content), batch);
+		assert.ok(!upstream.messages[0].content.includes("CALLER INSTRUCTION"));
+		return completion(
+			JSON.stringify({
+				translations: ["约翰在这里。"],
+				names: [
+					{ source: "John", translation: "约翰" },
+					{ source: "Unknown", translation: "不存在" },
+				],
+			}),
+		);
+	});
+	const response = await app.request(
+		endpoint,
+		request({
+			...body,
+			messages: [
+				{
+					...body.messages[0],
+					content: `${body.messages[0].content} CALLER INSTRUCTION`,
+				},
+				{ role: "user", content: JSON.stringify(batch) },
+			],
+		}),
+		openaiEnv,
+	);
+	assert.equal(response.status, 200);
+	const result = (await response.json()) as {
+		choices: { message: { content: string } }[];
+	};
+	assert.deepEqual(JSON.parse(result.choices[0].message.content), {
+		translations: ["约翰在这里。"],
+		names: [{ source: "John", translation: "约翰" }],
+	});
+});
+
+test("OpenAI failures do not retry or fall back to DeepSeek", async (t) => {
+	const calls = t.mock.method(
+		globalThis,
+		"fetch",
+		async () =>
+			new Response(`secret detail ${openaiEnv.OPENAI_API_KEY}`, {
+				status: 401,
+			}),
+	);
+	const response = await app.request(endpoint, request(), openaiEnv);
+	assert.equal(response.status, 502);
+	assert.ok(!(await response.text()).includes(openaiEnv.OPENAI_API_KEY));
+	assert.equal(calls.mock.callCount(), 1);
+	calls.mock.mockImplementation(async () => completion(undefined, "length"));
+	assert.equal((await app.request(endpoint, request(), openaiEnv)).status, 502);
+	assert.equal(calls.mock.callCount(), 2);
+});
+
 test("TV subtitles need no client credentials and only the server key reaches DeepSeek", async (t) => {
 	const calls = t.mock.method(
 		globalThis,
