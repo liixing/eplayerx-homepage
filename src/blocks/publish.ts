@@ -231,9 +231,11 @@ async function resolveTmdbId(
 }
 
 function dedupeByTmdbId(items: SnapshotItem[]): SnapshotItem[] {
-	const map = new Map<number, SnapshotItem>();
+	// Movie and TV ids occupy separate TMDB namespaces.
+	const map = new Map<string, SnapshotItem>();
 	for (const item of items) {
-		if (!map.has(item.tmdbId)) map.set(item.tmdbId, item);
+		const key = `${item.media_type}:${item.tmdbId}`;
+		if (!map.has(key)) map.set(key, item);
 	}
 	return Array.from(map.values());
 }
