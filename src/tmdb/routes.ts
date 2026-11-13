@@ -182,7 +182,7 @@ export async function tmdbCacheMiddleware(c: Context, next: () => Promise<void>)
   const epoch = cacheControl === CACHE.artwork
     ? "20261019-artwork-6h"
     : /^\/(movie|tv)\/reviews$/.test(path)
-    ? "20261113-reviews-parallel-10s-v3"
+    ? "20261113-reviews-newest-v4"
     : path === "/trending/tv" || path === "/trending/movie"
     ? `${TMDB_CACHE_EPOCH}-ratings-v2`
     : path === "/search/scrape"

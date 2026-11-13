@@ -8,8 +8,8 @@ Trakt 仍由 App 原有调用加载。省略 `sources=all` 时保持旧行为，
 
 新增评论字段：`source`（`douban` / `bahamut`）、`likes`、`url`；评分在
 `author_details.rating`，统一为 0–10。原有 TMDB 评论没有 `source`，客户端默认 TMDB。
-全部来源合并后按 `likes` 从高到低排列，赞数相同按 `created_at` 从新到旧排列；
-没有赞数按 0 处理。App 合并 Trakt 评论后继续使用相同排序。
+全部来源合并后按 `created_at` 从新到旧排列，不使用评分或点赞数排序；
+缺失或无效时间的评论排在最后。App 合并 Trakt 评论后继续使用相同排序。
 
 ## 响应速度与缓存
 
