@@ -194,3 +194,64 @@ test("empty in-memory snapshots reload after 30 seconds when another isolate fil
 	]);
 	await Promise.all(jobs);
 });
+
+test("a cold foreground request includes both sources when their shared refresh finishes promptly", async () => {
+	const cache = createReviewCache({
+		resolveTitle: async () => title,
+		fetchers: {
+			douban: async () => ({ sourceId: "12", results: [review] }),
+			bahamut: async () => ({
+				sourceId: "13",
+				results: [{ ...review, source: "bahamut" }],
+			}),
+		},
+	});
+	const jobs: Promise<void>[] = [];
+	const results = await cache(
+		"tv",
+		1,
+		{ read: async () => null, write: async () => {} },
+		(job) => jobs.push(job),
+		1000,
+	);
+	assert.deepEqual(
+		results.map((item) => item.source),
+		["douban", "bahamut"],
+	);
+	await Promise.all(jobs);
+});
+
+test("a slow provider cannot hide the source that finished before the foreground deadline", async () => {
+	let release!: () => void;
+	const pending = new Promise<void>((resolve) => {
+		release = resolve;
+	});
+	const cache = createReviewCache({
+		resolveTitle: async () => title,
+		fetchers: {
+			douban: async () => {
+				await pending;
+				return { sourceId: "12", results: [review] };
+			},
+			bahamut: async () => ({
+				sourceId: "13",
+				results: [{ ...review, source: "bahamut" }],
+			}),
+		},
+	});
+	const jobs: Promise<void>[] = [];
+	const storage = { read: async () => null, write: async () => {} };
+	const start = performance.now();
+	const results = await cache("tv", 1, storage, (job) => jobs.push(job), 40);
+	assert.deepEqual(
+		results.map((item) => item.source),
+		["bahamut"],
+	);
+	assert.ok(performance.now() - start < 500);
+	release();
+	await Promise.all(jobs);
+	assert.equal(
+		(await cache("tv", 1, storage, (job) => jobs.push(job))).length,
+		2,
+	);
+});

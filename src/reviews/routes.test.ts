@@ -94,3 +94,67 @@ test("combined reviews preserve the legacy contract, source identity and short c
 	);
 	await Promise.all(jobs);
 });
+
+test(
+	"supplemental cache reads run alongside TMDB rather than waiting for its response",
+	{ timeout: 1000 },
+	async (t) => {
+		const token = process.env.TMDB_API_TOKEN;
+		process.env.TMDB_API_TOKEN = "test-token";
+		t.after(() => {
+			if (token === undefined) delete process.env.TMDB_API_TOKEN;
+			else process.env.TMDB_API_TOKEN = token;
+		});
+		let release!: (value: Response) => void;
+		const pending = new Promise<Response>((resolve) => {
+			release = resolve;
+		});
+		t.mock.method(globalThis, "fetch", async () => pending);
+		const env = {
+			ASSETS: {
+				get: async () => {
+					release(
+						Response.json({
+							results: [{ id: "1", content: "TMDB" }],
+							total_results: 1,
+						}),
+					);
+					return {
+						json: async () => ({
+							version: 1,
+							sources: {
+								douban: {
+									sourceId: "2",
+									retryAt: Date.now() + 86400000,
+									results: [{ id: "2", source: "douban", content: "短评" }],
+								},
+								bahamut: {
+									sourceId: null,
+									retryAt: Date.now() + 86400000,
+									results: [],
+								},
+							},
+						}),
+					};
+				},
+			},
+		};
+		const app = new Hono();
+		app.route("/tmdb", routes);
+		const jobs: Promise<unknown>[] = [];
+		const context = {
+			waitUntil: (job: Promise<unknown>) => {
+				jobs.push(job);
+			},
+			passThroughOnException() {},
+		};
+		const response = await app.request(
+			"/tmdb/movie/reviews?id=901&language=en-US&sources=all",
+			{},
+			env,
+			context as ExecutionContext,
+		);
+		assert.equal(((await response.json()) as ReviewResponse).results.length, 2);
+		await Promise.all(jobs);
+	},
+);

@@ -98,7 +98,7 @@ async function resolveTitle(type: MediaType, id: number): Promise<ReviewTitle> {
 const DAY = 86_400_000;
 const SOURCES = ["douban", "bahamut"] as const;
 
-/** Each request waits at most 150ms for storage; all source I/O runs in waitUntil. */
+/** Fast cached reads; cold callers may briefly join the shared background crawl. */
 export function createReviewCache(
 	dependencies = {
 		resolveTitle,
@@ -187,6 +187,7 @@ export function createReviewCache(
 							};
 							console.warn(`Reviews refresh failed: ${source} ${type}/${id}`);
 						}
+						remember(key, next);
 					}),
 				);
 			} catch {
@@ -213,23 +214,41 @@ export function createReviewCache(
 		id: number,
 		storage: ReviewStorage | null,
 		waitUntil: (job: Promise<void>) => void,
+		waitForRefreshMs = 0,
 	): Promise<ExtraReview[]> => {
 		if (!storage) return [];
+		const startedAt = performance.now();
 		const key = `reviews/v1/${type}/${id}.json`;
 		const loading = read(key, storage);
-		waitUntil(
-			loading.then((snapshot) =>
-				snapshot ? refresh(key, type, id, storage, snapshot) : undefined,
-			),
+		const background = loading.then((snapshot) =>
+			snapshot ? refresh(key, type, id, storage, snapshot) : undefined,
 		);
+		waitUntil(background);
 		let timer: ReturnType<typeof setTimeout> | undefined;
 		try {
-			const snapshot = await Promise.race([
+			let snapshot = await Promise.race([
 				loading,
 				new Promise<null>((resolve) => {
 					timer = setTimeout(() => resolve(null), 150);
 				}),
 			]);
+			clearTimeout(timer);
+			if (
+				waitForRefreshMs > 0 &&
+				!SOURCES.some((source) => snapshot?.sources[source]?.results.length)
+			) {
+				const remaining = Math.max(
+					0,
+					waitForRefreshMs - (performance.now() - startedAt),
+				);
+				await Promise.race([
+					background,
+					new Promise<void>((resolve) => {
+						timer = setTimeout(resolve, remaining);
+					}),
+				]);
+				snapshot = memory.get(key)?.snapshot ?? snapshot;
+			}
 			return SOURCES.flatMap(
 				(source) => snapshot?.sources[source]?.results ?? [],
 			);

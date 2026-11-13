@@ -182,7 +182,7 @@ export async function tmdbCacheMiddleware(c: Context, next: () => Promise<void>)
   const epoch = cacheControl === CACHE.artwork
     ? "20261019-artwork-6h"
     : /^\/(movie|tv)\/reviews$/.test(path)
-    ? "20261113-reviews-sorted-v1"
+    ? "20261113-reviews-parallel-v2"
     : path === "/trending/tv" || path === "/trending/movie"
     ? `${TMDB_CACHE_EPOCH}-ratings-v2`
     : path === "/search/scrape"
@@ -669,17 +669,22 @@ for (const type of ["movie", "tv"] as const) {
       type === "movie"
         ? tmdb.GET(`/3/movie/${id}/reviews`, { params: { query: { language: lang }, path: { movie_id: id } } })
         : tmdb.GET(`/3/tv/${id}/reviews`, { params: { query: { language: lang }, path: { series_id: id } } });
-    let result = await fetchReviews(language);
-    if (result.response.status === 200 && !result.data?.results?.length && !language.startsWith("en")) {
-      result = await fetchReviews("en-US");
-    }
+    const tmdbReviews = (async () => {
+      let result = await fetchReviews(language);
+      if (result.response.status === 200 && !result.data?.results?.length && !language.startsWith("en")) {
+        result = await fetchReviews("en-US");
+      }
+      return result;
+    })();
+    const allSources = c.req.query("sources") === "all";
+    const extraReviews = allSources ? getExtraReviews(type, id, reviewStorage((c.env as { ASSETS?: R2Bucket })?.ASSETS), job => {
+      try { c.executionCtx.waitUntil(job); } catch { void job; }
+    }, 3000) : Promise.resolve([]);
+    const [result, extra] = await Promise.all([tmdbReviews, extraReviews]);
     if (result.response.status !== 200) {
       return c.json({ error: result.error }, 500);
     }
-    if (c.req.query("sources") === "all") {
-      const extra = await getExtraReviews(type, id, reviewStorage((c.env as { ASSETS?: R2Bucket })?.ASSETS), job => {
-        try { c.executionCtx.waitUntil(job); } catch { void job; }
-      });
+    if (allSources) {
       const results = sortReviews([...(result.data?.results ?? []), ...extra]);
       // Cold snapshots retry soon; never cache the initial empty add-on for a day.
       c.header("Cache-Control", cacheHeader(extra.length ? 300 : 30, 60));
