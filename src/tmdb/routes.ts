@@ -1,6 +1,8 @@
 import { metadataLanguage, hasMediaLanguages, localizeMediaPayload, enrichWithImages } from "../media-languages.js";
 import { Hono, type Context } from "hono";
 import { tmdb } from "./client.js";
+import { getExtraReviews, reviewStorage } from "../reviews/cache.js";
+import { sortReviews } from "../reviews/sort.js";
 
 import trailerRoutes from "./trailers.js";
 import trailerPlayback from "./trailer-playback.js";
@@ -49,6 +51,7 @@ const CACHE = {
   videos: cacheHeader(259_200, 43_200),
   /** user reviews trickle in */
   reviews: cacheHeader(86_400, 21_600),
+  combinedReviews: cacheHeader(300, 60),
   /** episode lists for airing shows */
   season: cacheHeader(43_200, 10_800),
   /** filmography pages */
@@ -123,7 +126,7 @@ function cacheControlForRequest(c: Context): string | null {
   }
 
   if (/^\/(movie|tv)\/reviews$/.test(path)) {
-    return CACHE.reviews;
+    return c.req.query("sources") === "all" ? CACHE.combinedReviews : CACHE.reviews;
   }
 
   if (path === "/tv/season/details" || path === "/tv/episode_groups" || path === "/tv/episode_group") {
@@ -178,6 +181,8 @@ export async function tmdbCacheMiddleware(c: Context, next: () => Promise<void>)
   const path = tmdbApiPath(c.req.path);
   const epoch = cacheControl === CACHE.artwork
     ? "20261019-artwork-6h"
+    : /^\/(movie|tv)\/reviews$/.test(path)
+    ? "20261113-reviews-sorted-v1"
     : path === "/trending/tv" || path === "/trending/movie"
     ? `${TMDB_CACHE_EPOCH}-ratings-v2`
     : path === "/search/scrape"
@@ -656,7 +661,7 @@ function preferClientLanguageVideos<T extends { iso_639_1?: string }>(
 for (const type of ["movie", "tv"] as const) {
   tmdbApp.get(`/${type}/reviews`, async (c) => {
     const id = Number(c.req.query("id") || "");
-    if (!Number.isInteger(id) || id <= 0) {
+    if (!Number.isSafeInteger(id) || id <= 0) {
       return c.json({ error: "invalid id" }, 400);
     }
     const language = metadataLanguage(c, "en-US");
@@ -671,7 +676,16 @@ for (const type of ["movie", "tv"] as const) {
     if (result.response.status !== 200) {
       return c.json({ error: result.error }, 500);
     }
-    return c.json(result.data);
+    if (c.req.query("sources") === "all") {
+      const extra = await getExtraReviews(type, id, reviewStorage((c.env as { ASSETS?: R2Bucket })?.ASSETS), job => {
+        try { c.executionCtx.waitUntil(job); } catch { void job; }
+      });
+      const results = sortReviews([...(result.data?.results ?? []), ...extra]);
+      // Cold snapshots retry soon; never cache the initial empty add-on for a day.
+      c.header("Cache-Control", cacheHeader(extra.length ? 300 : 30, 60));
+      return c.json({ ...result.data, results, total_results: (result.data?.total_results ?? 0) + extra.length });
+    }
+    return c.json({ ...result.data, results: sortReviews(result.data?.results ?? []) });
   });
 }
 
