@@ -182,7 +182,7 @@ export async function tmdbCacheMiddleware(c: Context, next: () => Promise<void>)
   const epoch = cacheControl === CACHE.artwork
     ? "20261019-artwork-6h"
     : /^\/(movie|tv)\/reviews$/.test(path)
-    ? "20261113-reviews-parallel-v2"
+    ? "20261113-reviews-parallel-10s-v3"
     : path === "/trending/tv" || path === "/trending/movie"
     ? `${TMDB_CACHE_EPOCH}-ratings-v2`
     : path === "/search/scrape"
@@ -665,24 +665,29 @@ for (const type of ["movie", "tv"] as const) {
       return c.json({ error: "invalid id" }, 400);
     }
     const language = metadataLanguage(c, "en-US");
+    const allSources = c.req.query("sources") === "all";
+    const deadline = allSources ? AbortSignal.timeout(10_000) : undefined;
     const fetchReviews = (lang: string) =>
       type === "movie"
-        ? tmdb.GET(`/3/movie/${id}/reviews`, { params: { query: { language: lang }, path: { movie_id: id } } })
-        : tmdb.GET(`/3/tv/${id}/reviews`, { params: { query: { language: lang }, path: { series_id: id } } });
+        ? tmdb.GET(`/3/movie/${id}/reviews`, { params: { query: { language: lang }, path: { movie_id: id } }, signal: deadline })
+        : tmdb.GET(`/3/tv/${id}/reviews`, { params: { query: { language: lang }, path: { series_id: id } }, signal: deadline });
     const tmdbReviews = (async () => {
       let result = await fetchReviews(language);
       if (result.response.status === 200 && !result.data?.results?.length && !language.startsWith("en")) {
         result = await fetchReviews("en-US");
       }
       return result;
-    })();
-    const allSources = c.req.query("sources") === "all";
+    })().catch(() => null);
     const extraReviews = allSources ? getExtraReviews(type, id, reviewStorage((c.env as { ASSETS?: R2Bucket })?.ASSETS), job => {
       try { c.executionCtx.waitUntil(job); } catch { void job; }
-    }, 3000) : Promise.resolve([]);
+    }, 10_000) : Promise.resolve([]);
     const [result, extra] = await Promise.all([tmdbReviews, extraReviews]);
-    if (result.response.status !== 200) {
-      return c.json({ error: result.error }, 500);
+    if (!result || result.response.status !== 200) {
+      if (extra.length) {
+        c.header("Cache-Control", cacheHeader(30, 60));
+        return c.json({ id, page: 1, total_pages: 1, total_results: extra.length, results: sortReviews(extra) });
+      }
+      return c.json({ error: result?.error ?? "Reviews temporarily unavailable" }, deadline?.aborted ? 504 : 500);
     }
     if (allSources) {
       const results = sortReviews([...(result.data?.results ?? []), ...extra]);

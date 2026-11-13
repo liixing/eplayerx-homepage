@@ -158,3 +158,74 @@ test(
 		await Promise.all(jobs);
 	},
 );
+
+test("the ten-second TMDB deadline returns cached comments instead of discarding them", async (t) => {
+	const token = process.env.TMDB_API_TOKEN;
+	process.env.TMDB_API_TOKEN = "test-token";
+	t.after(() => {
+		if (token === undefined) delete process.env.TMDB_API_TOKEN;
+		else process.env.TMDB_API_TOKEN = token;
+	});
+	const controller = new AbortController();
+	t.mock.method(AbortSignal, "timeout", (milliseconds: number) => {
+		assert.equal(milliseconds, 10_000);
+		return controller.signal;
+	});
+	t.mock.method(globalThis, "fetch", async (input: RequestInfo | URL) => {
+		const signal = (input as Request).signal;
+		return new Promise<Response>((_resolve, reject) => {
+			if (signal.aborted) return reject(new Error("Timed out"));
+			signal.addEventListener("abort", () => reject(new Error("Timed out")), {
+				once: true,
+			});
+		});
+	});
+	const app = new Hono();
+	app.route("/tmdb", routes);
+	const jobs: Promise<unknown>[] = [];
+	const context = {
+		waitUntil: (job: Promise<unknown>) => {
+			jobs.push(job);
+		},
+		passThroughOnException() {},
+	};
+	const env = (results: unknown[]) => ({
+		ASSETS: {
+			get: async () => ({
+				json: async () => ({
+					version: 1,
+					sources: {
+						douban: { sourceId: "2", retryAt: Date.now() + 86400000, results },
+						bahamut: {
+							sourceId: null,
+							retryAt: Date.now() + 86400000,
+							results: [],
+						},
+					},
+				}),
+			}),
+		},
+	});
+	const pending = app.request(
+		"/tmdb/movie/reviews?id=902&language=en-US&sources=all",
+		{},
+		env([{ id: "2", source: "douban", content: "短评", likes: 8 }]),
+		context as ExecutionContext,
+	);
+	controller.abort();
+	const response = await pending;
+	assert.equal(response.status, 200);
+	assert.equal(
+		((await response.json()) as ReviewResponse).results[0].source,
+		"douban",
+	);
+	assert.ok(response.headers.get("Cache-Control")?.includes("max-age=30"));
+	const empty = await app.request(
+		"/tmdb/movie/reviews?id=903&language=en-US&sources=all",
+		{},
+		env([]),
+		context as ExecutionContext,
+	);
+	assert.equal(empty.status, 504);
+	await Promise.all(jobs);
+});
