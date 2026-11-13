@@ -113,7 +113,13 @@ export function createReviewCache(
 		memory.delete(key);
 		const oldest = memory.keys().next().value;
 		if (memory.size >= 128 && oldest) memory.delete(oldest);
-		memory.set(key, { snapshot, expires: Date.now() + 300_000 });
+		// Other isolates may finish the initial crawl while this one holds an empty snapshot.
+		const ttl = SOURCES.some(
+			(source) => snapshot.sources[source]?.results.length,
+		)
+			? 300_000
+			: 30_000;
+		memory.set(key, { snapshot, expires: Date.now() + ttl });
 	}
 
 	function read(key: string, storage: ReviewStorage): Promise<Snapshot | null> {

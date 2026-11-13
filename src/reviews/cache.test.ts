@@ -163,3 +163,34 @@ test("slow or unavailable storage does not hold the response or start unpersista
 	);
 	await Promise.all(jobs);
 });
+
+test("empty in-memory snapshots reload after 30 seconds when another isolate fills R2", async (t) => {
+	let now = 1_000_000;
+	t.mock.method(Date, "now", () => now);
+	let snapshot: unknown = {
+		version: 1,
+		sources: {
+			douban: { sourceId: null, results: [], retryAt: now + 86_400_000 },
+			bahamut: { sourceId: null, results: [], retryAt: now + 86_400_000 },
+		},
+	};
+	const cache = createReviewCache();
+	const jobs: Promise<void>[] = [];
+	const storage = { read: async () => snapshot, write: async () => {} };
+	assert.deepEqual(
+		await cache("movie", 1, storage, (job) => jobs.push(job)),
+		[],
+	);
+	snapshot = {
+		version: 1,
+		sources: {
+			douban: { sourceId: "12", results: [review], retryAt: now + 86_400_000 },
+			bahamut: { sourceId: null, results: [], retryAt: now + 86_400_000 },
+		},
+	};
+	now += 30_001;
+	assert.deepEqual(await cache("movie", 1, storage, (job) => jobs.push(job)), [
+		review,
+	]);
+	await Promise.all(jobs);
+});
