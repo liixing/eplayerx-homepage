@@ -105,7 +105,11 @@ function date(value: unknown): string | null {
 	return Number.isFinite(timestamp) ? new Date(timestamp).toISOString() : null;
 }
 
-async function get(url: string, referer: string): Promise<Response> {
+async function get(
+	url: string,
+	referer: string,
+	deadline?: AbortSignal,
+): Promise<Response> {
 	const response = await fetch(url, {
 		headers: {
 			// Bahamut redirects mobile search to a different page layout.
@@ -114,7 +118,9 @@ async function get(url: string, referer: string): Promise<Response> {
 				: "Mozilla/5.0",
 			Referer: referer,
 		},
-		signal: AbortSignal.timeout(6000),
+		signal: deadline
+			? AbortSignal.any([deadline, AbortSignal.timeout(6000)])
+			: AbortSignal.timeout(6000),
 	});
 	if (!response.ok) throw new Error(`Review source HTTP ${response.status}`);
 	return response;
@@ -239,6 +245,87 @@ export function bahamutFanpage(
 	return html.match(/navAllReviews\((\d+),\s*4\)/)?.[1] ?? null;
 }
 
+async function findBahamutFanpageJson(
+	title: ReviewTitle,
+	deadline: AbortSignal,
+): Promise<string | null> {
+	const query = title.titles[1] || title.titles[0];
+	const search = row(
+		await (
+			await get(
+				`https://api.gamer.com.tw/mobile_app/anime/v1/search.php?kw=${encodeURIComponent(query)}`,
+				"https://ani.gamer.com.tw/",
+				deadline,
+			)
+		).json(),
+	);
+	if (!Array.isArray(search.anime))
+		throw new Error("Unexpected Bahamut anime search response");
+	const candidates = new Map<string, string>();
+	for (const value of search.anime) {
+		const item = row(value),
+			acgId = id(item.acg_sn),
+			videoId = id(item.video_sn);
+		const year = text(item.info).match(/年份[：:]\s*(\d{4})/)?.[1];
+		if (
+			acgId &&
+			videoId &&
+			Number(year) === title.year &&
+			matches(text(item.title), title.titles) &&
+			!candidates.has(acgId)
+		) {
+			candidates.set(acgId, videoId);
+		}
+	}
+	if (candidates.size !== 1) return null;
+	const [acgId, videoId] = [...candidates][0];
+	const details = row(
+		row(
+			await (
+				await get(
+					`https://api.gamer.com.tw/anime/v1/video.php?videoSn=${videoId}`,
+					"https://ani.gamer.com.tw/",
+					deadline,
+				)
+			).json(),
+		).data,
+	);
+	const anime = row(details.anime);
+	const name = text(anime.title).replace(/\s*\[\d+(?:\.\d+)?\]\s*$/, "");
+	if (
+		id(anime.acgSn) !== acgId ||
+		id(row(details.video).videoSn) !== videoId ||
+		Number(text(anime.seasonStart).slice(0, 4)) !== title.year ||
+		!matches(name, title.titles)
+	)
+		return null;
+	return id(anime.fanId);
+}
+
+async function findBahamutFanpageHtml(
+	title: ReviewTitle,
+	deadline: AbortSignal,
+): Promise<string | null> {
+	const query = title.titles[1] || title.titles[0];
+	const html = await (
+		await get(
+			`https://acg.gamer.com.tw/search.php?kw=${encodeURIComponent(query)}`,
+			"https://acg.gamer.com.tw/",
+			deadline,
+		)
+	).text();
+	const candidates = bahamutCandidates(html, title.titles);
+	if (candidates.length !== 1) return null;
+	const detail = await (
+		await get(
+			`https://acg.gamer.com.tw/acgDetail.php?s=${candidates[0]}`,
+			"https://acg.gamer.com.tw/",
+			deadline,
+		)
+	).text();
+	return bahamutFanpage(detail, title);
+}
+
 export function parseBahamutReviews(
 	data: unknown,
 	fanpage: string,
@@ -290,30 +377,20 @@ export async function fetchBahamutReviews(
 	sourceId?: string | null,
 ): Promise<SourceReviews> {
 	if (!title.animated) return { sourceId: null, results: [] };
+	// Leave room for metadata resolution and R2 persistence within waitUntil's lifetime.
+	const deadline = AbortSignal.timeout(22_000);
 	let resolved = sourceId;
 	if (!resolved) {
-		const query = title.titles[1] || title.titles[0];
-		const html = await (
-			await get(
-				`https://acg.gamer.com.tw/search.php?kw=${encodeURIComponent(query)}`,
-				"https://acg.gamer.com.tw/",
-			)
-		).text();
-		const candidates = bahamutCandidates(html, title.titles);
-		if (candidates.length !== 1) return { sourceId: null, results: [] };
-		const detail = await (
-			await get(
-				`https://acg.gamer.com.tw/acgDetail.php?s=${candidates[0]}`,
-				"https://acg.gamer.com.tw/",
-			)
-		).text();
-		resolved = bahamutFanpage(detail, title);
+		// AniGamer JSON avoids HTML parsing; its catalog does not cover every ACG entry.
+		resolved = await findBahamutFanpageJson(title, deadline).catch(() => null);
+		if (!resolved) resolved = await findBahamutFanpageHtml(title, deadline);
 		if (!resolved) return { sourceId: null, results: [] };
 	}
 	const data = await (
 		await get(
 			`https://api.gamer.com.tw/acg/v1/reviews_list.php?sn=${resolved}&t=4&sort=1`,
 			"https://wall.gamer.com.tw/",
+			deadline,
 		)
 	).json();
 	return { sourceId: resolved, results: parseBahamutReviews(data, resolved) };

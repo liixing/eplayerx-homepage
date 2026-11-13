@@ -133,13 +133,15 @@ test("live-action titles never trigger Bahamut requests", async (t) => {
 	assert.equal(fetch.mock.callCount(), 0);
 });
 
-test("Bahamut uses desktop search and carries only the verified fanpage into the reviews API", async (t) => {
+test("Bahamut falls back to verified desktop pages when the JSON catalog is unavailable", async (t) => {
 	t.mock.method(
 		globalThis,
 		"fetch",
 		async (input: RequestInfo | URL, init?: RequestInit) => {
 			const url = String(input);
 			assert.equal(new Headers(init?.headers).get("User-Agent"), "Mozilla/5.0");
+			if (url.includes("/mobile_app/"))
+				return new Response("Unavailable", { status: 503 });
 			if (url.includes("/search.php?"))
 				return new Response(
 					'<p class="search_title">[ 動畫 ]<a href="//acg.gamer.com.tw/acgDetail.php?s=2">測試作品</a></p>',
@@ -159,4 +161,132 @@ test("Bahamut uses desktop search and carries only the verified fanpage into the
 		sourceId: "99",
 		results: [],
 	});
+});
+
+test("Bahamut resolves first-time reviews entirely through JSON and deduplicates video editions", async (t) => {
+	const requested: string[] = [];
+	t.mock.method(globalThis, "fetch", async (input: RequestInfo | URL) => {
+		const url = String(input);
+		requested.push(url);
+		if (url.includes("/mobile_app/anime/v1/search.php?"))
+			return Response.json({
+				anime: [
+					{
+						acg_sn: 2,
+						video_sn: 3,
+						title: "測試作品",
+						info: "年份：2023/10 共 12 集",
+					},
+					{
+						acg_sn: 2,
+						video_sn: 4,
+						title: "測試作品",
+						info: "年份：2023/10 共 12 集",
+					},
+					{
+						acg_sn: 5,
+						video_sn: 6,
+						title: "測試作品 第二季",
+						info: "年份：2024/10 共 12 集",
+					},
+				],
+			});
+		if (url === "https://api.gamer.com.tw/anime/v1/video.php?videoSn=3")
+			return Response.json({
+				data: {
+					video: { videoSn: 3 },
+					anime: {
+						title: "測試作品 [1]",
+						acgSn: 2,
+						fanId: 99,
+						seasonStart: "2023/10/01",
+					},
+				},
+			});
+		assert.equal(
+			url,
+			"https://api.gamer.com.tw/acg/v1/reviews_list.php?sn=99&t=4&sort=1",
+		);
+		return Response.json({
+			data: {
+				list: [
+					[
+						{
+							id: "1",
+							content: "推薦",
+							privacy: "1",
+							reviews: { id: 99, rating: 4, dc_type: { id: 4 } },
+						},
+					],
+				],
+			},
+		});
+	});
+	const result = await fetchBahamutReviews(title);
+	assert.equal(result.sourceId, "99");
+	assert.equal(result.results[0].content, "推薦");
+	assert.equal(requested.length, 3);
+	assert.ok(
+		requested.every((url) => new URL(url).hostname === "api.gamer.com.tw"),
+	);
+	requested.length = 0;
+	await fetchBahamutReviews(title, "99");
+	assert.equal(requested.length, 1, "known IDs still go straight to reviews");
+});
+
+test("Bahamut rejects conflicting JSON identities and falls back for uncatalogued titles", async (t) => {
+	const anime = {
+		title: "測試作品 [1]",
+		acgSn: 2,
+		fanId: 99,
+		seasonStart: "2023/10/01",
+	};
+	let returnedAnime = { ...anime };
+	let returnedVideo = 3;
+	let candidates: unknown[] = [
+		{ acg_sn: 2, video_sn: 3, title: "測試作品", info: "年份：2023/10" },
+	];
+	let reviewCalls = 0,
+		htmlCalls = 0;
+	t.mock.method(globalThis, "fetch", async (input: RequestInfo | URL) => {
+		const url = String(input);
+		if (url.includes("/mobile_app/"))
+			return Response.json({ anime: candidates });
+		if (url.includes("/anime/v1/video.php"))
+			return Response.json({
+				data: { anime: returnedAnime, video: { videoSn: returnedVideo } },
+			});
+		if (url.includes("/acg/v1/reviews_list.php")) {
+			reviewCalls++;
+			throw new Error("must not accept conflicting identity");
+		}
+		htmlCalls++;
+		return new Response("查無資料");
+	});
+	for (const change of [
+		{ acgSn: 8 },
+		{ title: "別的作品 [1]" },
+		{ seasonStart: "2024/10/01" },
+		{ fanId: 0 },
+	]) {
+		returnedAnime = { ...anime, ...change };
+		assert.deepEqual(await fetchBahamutReviews(title), {
+			sourceId: null,
+			results: [],
+		});
+	}
+	returnedAnime = anime;
+	returnedVideo = 8;
+	assert.deepEqual(await fetchBahamutReviews(title), {
+		sourceId: null,
+		results: [],
+	});
+	returnedVideo = 3;
+	candidates = [];
+	assert.deepEqual(await fetchBahamutReviews(title), {
+		sourceId: null,
+		results: [],
+	});
+	assert.equal(reviewCalls, 0);
+	assert.equal(htmlCalls, 6);
 });
