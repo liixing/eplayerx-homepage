@@ -47,6 +47,8 @@ const CACHE = {
   similar: cacheHeader(86_400, 21_600),
   /** trailers/clips occasionally added */
   videos: cacheHeader(259_200, 43_200),
+  /** user reviews trickle in */
+  reviews: cacheHeader(86_400, 21_600),
   /** episode lists for airing shows */
   season: cacheHeader(43_200, 10_800),
   /** filmography pages */
@@ -118,6 +120,10 @@ function cacheControlForRequest(c: Context): string | null {
 
   if (/^\/(movie|tv)\/videos$/.test(path)) {
     return CACHE.videos;
+  }
+
+  if (/^\/(movie|tv)\/reviews$/.test(path)) {
+    return CACHE.reviews;
   }
 
   if (path === "/tv/season/details" || path === "/tv/episode_groups" || path === "/tv/episode_group") {
@@ -644,6 +650,29 @@ function preferClientLanguageVideos<T extends { iso_639_1?: string }>(
     }
   }
   return matched.length === 0 ? results : [...matched, ...rest];
+}
+
+/** Most TMDB reviews are English; fall back when the client language has none. */
+for (const type of ["movie", "tv"] as const) {
+  tmdbApp.get(`/${type}/reviews`, async (c) => {
+    const id = Number(c.req.query("id") || "");
+    if (!Number.isInteger(id) || id <= 0) {
+      return c.json({ error: "invalid id" }, 400);
+    }
+    const language = metadataLanguage(c, "en-US");
+    const fetchReviews = (lang: string) =>
+      type === "movie"
+        ? tmdb.GET(`/3/movie/${id}/reviews`, { params: { query: { language: lang }, path: { movie_id: id } } })
+        : tmdb.GET(`/3/tv/${id}/reviews`, { params: { query: { language: lang }, path: { series_id: id } } });
+    let result = await fetchReviews(language);
+    if (result.response.status === 200 && !result.data?.results?.length && !language.startsWith("en")) {
+      result = await fetchReviews("en-US");
+    }
+    if (result.response.status !== 200) {
+      return c.json({ error: result.error }, 500);
+    }
+    return c.json(result.data);
+  });
 }
 
 tmdbApp.get("/movie/videos", async (c) => {
