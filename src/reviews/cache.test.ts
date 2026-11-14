@@ -178,6 +178,63 @@ test("incomplete or unmatched client metadata falls back to one shared lookup wi
 	await Promise.all(jobs);
 });
 
+test("late canonical cache results survive an empty client-context snapshot", async () => {
+	const context = parseReviewContext(
+		JSON.stringify({ titles: ["已有作品"], year: 2023, animated: false }),
+		"movie",
+		undefined,
+		"zh-CN",
+	)!;
+	const cache = createReviewCache({
+		resolveTitle: async () => {
+			throw new Error("Fresh cache needs no lookup");
+		},
+		fetchers: {
+			douban: async () => {
+				throw new Error("Fresh cache needs no crawl");
+			},
+			bahamut: async () => {
+				throw new Error("Fresh cache needs no crawl");
+			},
+		},
+	});
+	const jobs: Promise<void>[] = [];
+	const result = await cache(
+		"movie",
+		9914,
+		{
+			read: async (key) => {
+				if (key.includes("/context/")) return null;
+				await new Promise((resolve) => setTimeout(resolve, 180));
+				return {
+					version: 1,
+					sources: {
+						douban: {
+							sourceId: "1",
+							results: [review],
+							retryAt: Date.now() + 86400000,
+						},
+						bahamut: {
+							sourceId: null,
+							results: [],
+							retryAt: Date.now() + 86400000,
+						},
+					},
+				};
+			},
+			write: async () => {},
+		},
+		(job) => {
+			jobs.push(job);
+		},
+		1000,
+		undefined,
+		context,
+	);
+	assert.deepEqual(result, [review]);
+	await Promise.all(jobs);
+});
+
 test("season mappings use that season's premiere year and keep later seasons distinct", async (t) => {
 	const token = process.env.TMDB_API_TOKEN;
 	process.env.TMDB_API_TOKEN = "test-token";

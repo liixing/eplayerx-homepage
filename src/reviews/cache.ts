@@ -294,21 +294,31 @@ export function createReviewCache(
 			: "";
 		const key = context ? `${baseKey}/context/${fingerprint}` : baseKey;
 		const own = read(key, storage);
-		const hasResults = (snapshot: Snapshot | null) =>
+		const hasResults = (
+			snapshot: Snapshot | null | undefined,
+		): snapshot is Snapshot =>
 			SOURCES.some((source) => snapshot?.sources[source]?.results.length);
 		const canonical = context ? read(baseKey, storage) : own;
-		const loading = context
-			? Promise.race([
-					own.then((snapshot) =>
-						hasResults(snapshot)
-							? snapshot
-							: canonical.then((fallback) =>
-									hasResults(fallback) ? fallback : snapshot,
-								),
-					),
-					canonical.then((snapshot) => (hasResults(snapshot) ? snapshot : own)),
-				])
-			: own;
+		let loadedSnapshot: Snapshot | null = null;
+		const loading = (
+			context
+				? Promise.race([
+						own.then((snapshot) =>
+							hasResults(snapshot)
+								? snapshot
+								: canonical.then((fallback) =>
+										hasResults(fallback) ? fallback : snapshot,
+									),
+						),
+						canonical.then((snapshot) =>
+							hasResults(snapshot) ? snapshot : own,
+						),
+					])
+				: own
+		).then((snapshot) => {
+			loadedSnapshot = snapshot;
+			return snapshot;
+		});
 		const background = loading.then((snapshot) =>
 			snapshot
 				? refresh(key, type, id, storage, snapshot, season, context)
@@ -338,7 +348,12 @@ export function createReviewCache(
 						timer = setTimeout(resolve, remaining);
 					}),
 				]);
-				snapshot = memory.get(key)?.snapshot ?? snapshot;
+				const latest = memory.get(key)?.snapshot;
+				snapshot = hasResults(latest)
+					? latest
+					: hasResults(loadedSnapshot)
+						? loadedSnapshot
+						: (latest ?? loadedSnapshot ?? snapshot);
 			}
 			return SOURCES.flatMap(
 				(source) => snapshot?.sources[source]?.results ?? [],
