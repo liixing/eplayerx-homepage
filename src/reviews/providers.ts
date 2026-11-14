@@ -21,8 +21,104 @@ export interface ReviewTitle {
 	type: MediaType;
 	titles: string[];
 	searchTitles?: string[];
+	doubanQuery?: string;
 	year: number;
 	animated: boolean;
+}
+
+export interface ReviewContext {
+	title: ReviewTitle;
+	language: string;
+}
+
+export function scopedReviewTitle(
+	base: ReviewTitle,
+	season?: number,
+	seasonNames: string[] = [],
+): ReviewTitle {
+	if (season === undefined) return base;
+	const names = new Set(
+		base.titles.flatMap((name) => [
+			...(season === 1 ? [name] : []),
+			`${name} 第${season}季`,
+			`${name} Season ${season}`,
+		]),
+	);
+	for (const name of seasonNames) {
+		if (
+			!name ||
+			normalizedTitle(name) === normalizedTitle(`Season ${season}`) ||
+			base.titles.some(
+				(title) => normalizedTitle(title) === normalizedTitle(name),
+			)
+		)
+			continue;
+		names.add(name);
+		for (const title of base.titles) names.add(`${title} ${name}`);
+	}
+	const digits = "零一二三四五六七八九";
+	const number =
+		season < 10
+			? digits[season]
+			: season < 100
+				? `${season < 20 ? "" : digits[Math.floor(season / 10)]}十${season % 10 ? digits[season % 10] : ""}`
+				: String(season);
+	return {
+		...base,
+		titles: [...names],
+		searchTitles: base.titles,
+		doubanQuery:
+			season > 1 ? `${base.titles[0]} 第${number}季` : base.titles[0],
+	};
+}
+
+export function parseReviewContext(
+	raw: string | undefined,
+	type: MediaType,
+	season: number | undefined,
+	language: string,
+): ReviewContext | undefined {
+	if (!raw || raw.length > 2048) return;
+	try {
+		const data = JSON.parse(raw);
+		const strings = (value: unknown): value is string[] =>
+			Array.isArray(value) &&
+			value.length <= 4 &&
+			value.every(
+				(item) =>
+					typeof item === "string" &&
+					item.trim().length > 0 &&
+					item.length <= 200,
+			);
+		if (
+			!strings(data.titles) ||
+			!data.titles.length ||
+			!Number.isInteger(data.year) ||
+			data.year < 1800 ||
+			data.year > 2200 ||
+			typeof data.animated !== "boolean" ||
+			(data.season ?? undefined) !== season ||
+			(data.seasonNames !== undefined && !strings(data.seasonNames))
+		)
+			return;
+		return {
+			title: scopedReviewTitle(
+				{
+					type,
+					titles: [
+						...new Set<string>(data.titles.map((name: string) => name.trim())),
+					],
+					year: data.year,
+					animated: data.animated,
+				},
+				season,
+				data.seasonNames,
+			),
+			language,
+		};
+	} catch {
+		return;
+	}
 }
 
 export interface SourceReviews {
@@ -194,7 +290,7 @@ export async function fetchDoubanReviews(
 	let resolved = sourceId;
 	if (!resolved) {
 		const data = await doubanJson(
-			`search?q=${encodeURIComponent((title.searchTitles ?? title.titles)[0])}&type=${title.type}`,
+			`search?q=${encodeURIComponent(title.doubanQuery ?? (title.searchTitles ?? title.titles)[0])}&type=${title.type}`,
 		);
 		if (!Array.isArray(row(data.subjects).items))
 			throw new Error("Unexpected Douban search response");

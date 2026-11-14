@@ -4,10 +4,11 @@ import {
 	type ExtraReview,
 	fetchBahamutReviews,
 	fetchDoubanReviews,
-	normalizedTitle,
+	scopedReviewTitle,
 	type MediaType,
 	type ReviewSource,
 	type ReviewTitle,
+	type ReviewContext,
 	type SourceReviews,
 } from "./providers.js";
 
@@ -16,6 +17,7 @@ interface SourceSnapshot extends SourceReviews {
 }
 interface Snapshot {
 	version: 1;
+	title?: ReviewTitle;
 	sources: Partial<Record<ReviewSource, SourceSnapshot>>;
 }
 export interface ReviewStorage {
@@ -104,41 +106,18 @@ export async function resolveTitle(
 	];
 	if (!titles.length || !year)
 		throw new Error("Review title lacks a title or year");
-	if (season !== undefined) {
-		if (season < 1)
-			throw new Error("Specials have no unambiguous review mapping");
-		const names = new Set(
-			titles.flatMap((name) => [
-				...(season === 1 ? [name] : []),
-				`${name} 第${season}季`,
-				`${name} Season ${season}`,
-			]),
-		);
-		for (const entry of seasons) {
-			const name = entry?.name?.trim();
-			if (
-				!name ||
-				normalizedTitle(name) === normalizedTitle(`Season ${season}`) ||
-				titles.some((base) => normalizedTitle(base) === normalizedTitle(name))
-			)
-				continue;
-			names.add(name);
-			for (const base of titles) names.add(`${base} ${name}`);
-		}
-		return {
+	return scopedReviewTitle(
+		{
 			type,
-			titles: [...names],
-			searchTitles: titles,
+			titles,
 			year,
 			animated: first.genres?.some((genre) => genre.id === 16) ?? false,
-		};
-	}
-	return {
-		type,
-		titles,
-		year,
-		animated: first.genres?.some((genre) => genre.id === 16) ?? false,
-	};
+		},
+		season,
+		seasons.flatMap((entry) =>
+			entry?.name?.trim() ? [entry.name.trim()] : [],
+		),
+	);
 }
 
 const DAY = 86_400_000;
@@ -200,6 +179,7 @@ export function createReviewCache(
 		storage: ReviewStorage,
 		snapshot: Snapshot,
 		season?: number,
+		context?: ReviewContext,
 	): Promise<void> {
 		const existing = refreshes.get(key);
 		if (existing) return existing;
@@ -210,17 +190,49 @@ export function createReviewCache(
 		);
 		if (!due.length) return Promise.resolve();
 		const job = (async () => {
-			const next: Snapshot = { version: 1, sources: { ...snapshot.sources } };
+			const next: Snapshot = {
+				version: 1,
+				title: snapshot.title,
+				sources: { ...snapshot.sources },
+			};
+			let titleJob: Promise<ReviewTitle> | undefined;
+			const verifiedTitle = () =>
+				(titleJob ??= (
+					snapshot.title
+						? Promise.resolve(snapshot.title)
+						: dependencies.resolveTitle(type, id, season)
+				).then((title) => {
+					next.title = title;
+					return title;
+				}));
 			try {
-				const title = await dependencies.resolveTitle(type, id, season);
 				await Promise.all(
 					due.map(async (source) => {
 						const previous = snapshot.sources[source];
 						try {
-							const result = await dependencies.fetchers[source](
+							const language = context?.language.toLowerCase() ?? "";
+							const useContext =
+								context &&
+								(previous?.sourceId ||
+									(source === "bahamut" && !context.title.animated) ||
+									(source === "douban"
+										? /^zh(?:-cn|-hans)?$/.test(language)
+										: /^zh-(?:tw|hant)$/.test(language)));
+							const title = useContext ? context.title : await verifiedTitle();
+							let result = await dependencies.fetchers[source](
 								title,
 								previous?.sourceId,
 							);
+							if (
+								useContext &&
+								!previous?.sourceId &&
+								!result.sourceId &&
+								!(source === "bahamut" && !title.animated)
+							) {
+								result = await dependencies.fetchers[source](
+									await verifiedTitle(),
+								);
+							}
 							next.sources[source] = {
 								...result,
 								retryAt: Date.now() + (result.sourceId ? DAY : DAY / 4),
@@ -263,13 +275,44 @@ export function createReviewCache(
 		waitUntil: (job: Promise<void>) => void,
 		waitForRefreshMs = 0,
 		season?: number,
+		context?: ReviewContext,
 	): Promise<ExtraReview[]> => {
 		if (!storage || season === 0) return [];
 		const startedAt = performance.now();
-		const key = `reviews/v2/${type}/${id}${season === undefined ? "" : `/season/${season}`}.json`;
-		const loading = read(key, storage);
+		const baseKey = `reviews/v2/${type}/${id}${season === undefined ? "" : `/season/${season}`}.json`;
+		// Client hints cannot overwrite the canonical TMDB-verified mapping.
+		const digest = context
+			? await crypto.subtle.digest(
+					"SHA-256",
+					new TextEncoder().encode(JSON.stringify(context)),
+				)
+			: null;
+		const fingerprint = digest
+			? [...new Uint8Array(digest)]
+					.map((byte) => byte.toString(16).padStart(2, "0"))
+					.join("")
+			: "";
+		const key = context ? `${baseKey}/context/${fingerprint}` : baseKey;
+		const own = read(key, storage);
+		const hasResults = (snapshot: Snapshot | null) =>
+			SOURCES.some((source) => snapshot?.sources[source]?.results.length);
+		const canonical = context ? read(baseKey, storage) : own;
+		const loading = context
+			? Promise.race([
+					own.then((snapshot) =>
+						hasResults(snapshot)
+							? snapshot
+							: canonical.then((fallback) =>
+									hasResults(fallback) ? fallback : snapshot,
+								),
+					),
+					canonical.then((snapshot) => (hasResults(snapshot) ? snapshot : own)),
+				])
+			: own;
 		const background = loading.then((snapshot) =>
-			snapshot ? refresh(key, type, id, storage, snapshot, season) : undefined,
+			snapshot
+				? refresh(key, type, id, storage, snapshot, season, context)
+				: undefined,
 		);
 		waitUntil(background);
 		let timer: ReturnType<typeof setTimeout> | undefined;

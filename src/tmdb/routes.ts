@@ -3,6 +3,7 @@ import { Hono, type Context } from "hono";
 import { tmdb } from "./client.js";
 import { getExtraReviews, reviewStorage } from "../reviews/cache.js";
 import { sortReviews } from "../reviews/sort.js";
+import { parseReviewContext } from "../reviews/providers.js";
 
 import trailerRoutes from "./trailers.js";
 import trailerPlayback from "./trailer-playback.js";
@@ -671,6 +672,7 @@ for (const type of ["movie", "tv"] as const) {
     if (rawSeason !== undefined && (type !== "tv" || !/^\d+$/.test(rawSeason) || !Number.isSafeInteger(season) || season! > 1000)) {
       return c.json({ error: "invalid season" }, 400);
     }
+    const context = parseReviewContext(c.req.query("context"), type, season, language);
     const deadline = allSources ? AbortSignal.timeout(10_000) : undefined;
     const fetchReviews = (lang: string) =>
       type === "movie"
@@ -685,7 +687,7 @@ for (const type of ["movie", "tv"] as const) {
     })().catch(() => null);
     const extraReviews = allSources ? getExtraReviews(type, id, reviewStorage((c.env as { ASSETS?: R2Bucket })?.ASSETS), job => {
       try { c.executionCtx.waitUntil(job); } catch { void job; }
-    }, 10_000, season) : Promise.resolve([]);
+    }, 10_000, season, context) : Promise.resolve([]);
     const [result, extra] = await Promise.all([tmdbReviews, extraReviews]);
     if (!result || result.response.status !== 200) {
       if (extra.length) {

@@ -5,7 +5,7 @@ import {
 	resolveTitle,
 	type ReviewStorage,
 } from "./cache.js";
-import type { ExtraReview } from "./providers.js";
+import { parseReviewContext, type ExtraReview } from "./providers.js";
 
 const review: ExtraReview = {
 	id: "1",
@@ -23,6 +23,160 @@ const title = {
 	year: 2023,
 	animated: true,
 };
+
+test("client metadata bypasses TMDB lookup, scopes hints and keeps canonical cache usable", async () => {
+	let lookups = 0;
+	const writes = new Map<string, unknown>();
+	const cache = createReviewCache({
+		resolveTitle: async () => {
+			lookups++;
+			return title;
+		},
+		fetchers: {
+			douban: async (current) => ({
+				sourceId: current.titles[0],
+				results: [{ ...review, content: current.titles[0] }],
+			}),
+			bahamut: async () => ({ sourceId: null, results: [] }),
+		},
+	});
+	const storage: ReviewStorage = {
+		read: async () => null,
+		write: async (key, value) => {
+			writes.set(key, value);
+		},
+	};
+	const jobs: Promise<void>[] = [];
+	for (const name of ["正确片名", "不同片名"]) {
+		const context = parseReviewContext(
+			JSON.stringify({ titles: [name], year: 2023, animated: false }),
+			"movie",
+			undefined,
+			"zh-CN",
+		)!;
+		const result = await cache(
+			"movie",
+			9911,
+			storage,
+			(job) => {
+				jobs.push(job);
+			},
+			1000,
+			undefined,
+			context,
+		);
+		assert.equal(result[0]?.content, name);
+	}
+	await Promise.all(jobs);
+	assert.equal(lookups, 0, "no redundant title or year query");
+	assert.equal(writes.size, 2);
+	assert.ok([...writes.keys()].every((key) => key.includes("/context/")));
+	assert.equal(writes.has("reviews/v2/movie/9911.json"), false);
+	let finish!: (value: unknown) => void;
+	const blocked = new Promise((resolve) => {
+		finish = resolve;
+	});
+	const context = parseReviewContext(
+		JSON.stringify({ titles: ["已有缓存"], year: 2023, animated: false }),
+		"movie",
+		undefined,
+		"zh-CN",
+	)!;
+	const cached: ReviewStorage = {
+		read: async (key) =>
+			key.includes("/context/")
+				? blocked
+				: {
+						version: 1,
+						sources: {
+							douban: {
+								sourceId: "1",
+								results: [review],
+								retryAt: Date.now() + 86400000,
+							},
+							bahamut: {
+								sourceId: null,
+								results: [],
+								retryAt: Date.now() + 86400000,
+							},
+						},
+					},
+		write: async () => {},
+	};
+	assert.deepEqual(
+		await cache(
+			"movie",
+			9912,
+			cached,
+			(job) => {
+				jobs.push(job);
+			},
+			1000,
+			undefined,
+			context,
+		),
+		[review],
+	);
+	finish(null);
+	await Promise.all(jobs);
+});
+
+test("incomplete or unmatched client metadata falls back to one shared lookup without mixing seasons", async () => {
+	for (const raw of [
+		"bad json",
+		"null",
+		JSON.stringify({ titles: ["x"], year: 2023, animated: true, season: 1 }),
+		JSON.stringify({
+			titles: ["x".repeat(201)],
+			year: 2023,
+			animated: false,
+			season: 2,
+		}),
+	]) {
+		assert.equal(parseReviewContext(raw, "tv", 2, "zh-CN"), undefined);
+	}
+	let lookups = 0;
+	const context = parseReviewContext(
+		JSON.stringify({
+			titles: ["未匹配"],
+			year: 2023,
+			animated: true,
+			season: 2,
+			seasonNames: ["第2季"],
+		}),
+		"tv",
+		2,
+		"zh-CN",
+	)!;
+	const cache = createReviewCache({
+		resolveTitle: async () => {
+			lookups++;
+			return title;
+		},
+		fetchers: {
+			douban: async (value) =>
+				value === title
+					? { sourceId: "1", results: [review] }
+					: { sourceId: null, results: [] },
+			bahamut: async () => ({ sourceId: null, results: [] }),
+		},
+	});
+	const jobs: Promise<void>[] = [];
+	const result = await cache(
+		"tv",
+		9913,
+		{ read: async () => null, write: async () => {} },
+		(job) => {
+			jobs.push(job);
+		},
+		1000,
+		2,
+		context,
+	);
+	assert.deepEqual(result, [review]);
+	assert.equal(lookups, 1);
+	await Promise.all(jobs);
+});
 
 test("season mappings use that season's premiere year and keep later seasons distinct", async (t) => {
 	const token = process.env.TMDB_API_TOKEN;
@@ -55,6 +209,7 @@ test("season mappings use that season's premiere year and keep later seasons dis
 	assert.ok(second.titles.includes("测试 第2季"));
 	assert.ok(second.titles.includes("Test Season 2"));
 	assert.deepEqual(second.searchTitles, ["测试", "Test"]);
+	assert.equal(second.doubanQuery, "测试 第二季");
 	assert.deepEqual(
 		requests,
 		["/3/tv/1", "/3/tv/1", "/3/tv/1", "/3/tv/1"],

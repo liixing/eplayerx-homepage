@@ -8,6 +8,65 @@ type ReviewResponse = {
 	total_results: number;
 };
 
+test("client detail context obtains reviews without a redundant TMDB details request", async (t) => {
+	process.env.TMDB_API_TOKEN ||= "test-token";
+	const requested: string[] = [];
+	t.mock.method(globalThis, "fetch", async (input: RequestInfo | URL) => {
+		const url = new URL(input instanceof Request ? input.url : String(input));
+		requested.push(url.pathname);
+		if (url.pathname.endsWith("/reviews"))
+			return Response.json({
+				results: [{ id: "tmdb", content: "Review" }],
+				total_results: 1,
+			});
+		if (url.pathname.endsWith("/search"))
+			return Response.json({
+				subjects: {
+					items: [
+						{
+							target_type: "movie",
+							target: { id: "1234", title: "客户端片名", year: "2023" },
+						},
+					],
+				},
+			});
+		assert.equal(url.pathname, "/rexxar/api/v2/movie/1234/interests");
+		return Response.json({ interests: [{ id: "1", comment: "短评" }] });
+	});
+	const app = new Hono();
+	app.route("/tmdb", routes);
+	const query = new URLSearchParams({
+		id: "9924",
+		sources: "all",
+		language: "zh-CN",
+		context: JSON.stringify({
+			titles: ["客户端片名"],
+			year: 2023,
+			animated: false,
+		}),
+	});
+	const jobs: Promise<unknown>[] = [];
+	const response = await app.request(
+		`/tmdb/movie/reviews?${query}`,
+		{},
+		{ ASSETS: { get: async () => null, put: async () => {} } },
+		{
+			waitUntil: (job: Promise<unknown>) => {
+				jobs.push(job);
+			},
+			passThroughOnException() {},
+		} as ExecutionContext,
+	);
+	assert.equal(response.status, 200);
+	assert.equal(((await response.json()) as ReviewResponse).results.length, 2);
+	assert.equal(
+		requested.length,
+		3,
+		"one review request, one search and one comments request",
+	);
+	await Promise.all(jobs);
+});
+
 test("season requests isolate supplementary comments but retain TMDB whole-show reviews", async (t) => {
 	process.env.TMDB_API_TOKEN ||= "test-token";
 	const requested: string[] = [],
