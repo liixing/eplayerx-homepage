@@ -8,6 +8,79 @@ type ReviewResponse = {
 	total_results: number;
 };
 
+test("season requests isolate supplementary comments but retain TMDB whole-show reviews", async (t) => {
+	process.env.TMDB_API_TOKEN ||= "test-token";
+	const requested: string[] = [],
+		keys: string[] = [];
+	t.mock.method(globalThis, "fetch", async (input: RequestInfo | URL) => {
+		const url = new URL(input instanceof Request ? input.url : String(input));
+		requested.push(url.pathname);
+		return Response.json({
+			results: [{ id: "whole-show", content: "TMDB" }],
+			total_results: 1,
+		});
+	});
+	const env = {
+		ASSETS: {
+			get: async (key: string) => {
+				keys.push(key);
+				return {
+					json: async () => ({
+						version: 1,
+						sources: {
+							douban: {
+								sourceId: "season-two",
+								retryAt: Date.now() + 86400000,
+								results: [{ id: "s2", source: "douban", content: "第二季" }],
+							},
+							bahamut: {
+								sourceId: null,
+								retryAt: Date.now() + 86400000,
+								results: [],
+							},
+						},
+					}),
+				};
+			},
+		},
+	};
+	const jobs: Promise<unknown>[] = [];
+	const context = {
+		waitUntil: (job: Promise<unknown>) => {
+			jobs.push(job);
+		},
+		passThroughOnException() {},
+	};
+	const app = new Hono();
+	app.route("/tmdb", routes);
+	const response = await app.request(
+		"/tmdb/tv/reviews?id=9901&season=2&sources=all&language=en-US",
+		{},
+		env,
+		context as ExecutionContext,
+	);
+	assert.equal(response.status, 200);
+	assert.deepEqual(
+		((await response.json()) as ReviewResponse).results.map((item) => item.id),
+		["whole-show", "s2"],
+	);
+	assert.deepEqual(keys, ["reviews/v2/tv/9901/season/2.json"]);
+	assert.deepEqual(requested, ["/3/tv/9901/reviews"]);
+	for (const query of ["season=-1", "season=1.2", "season=", "season=1001"]) {
+		assert.equal(
+			(await app.request(`/tmdb/tv/reviews?id=9901&${query}&sources=all`))
+				.status,
+			400,
+		);
+	}
+	assert.equal(
+		(await app.request("/tmdb/movie/reviews?id=9901&season=1&sources=all"))
+			.status,
+		400,
+	);
+	await Promise.all(jobs);
+});
+
 test("combined reviews preserve the legacy contract, source identity and short cold-cache TTL", async (t) => {
 	const token = process.env.TMDB_API_TOKEN;
 	process.env.TMDB_API_TOKEN = "test-token";

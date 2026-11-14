@@ -20,6 +20,7 @@ export interface ExtraReview {
 export interface ReviewTitle {
 	type: MediaType;
 	titles: string[];
+	searchTitles?: string[];
 	year: number;
 	animated: boolean;
 }
@@ -43,11 +44,24 @@ const id = (value: unknown): string | null =>
 	/^(?:[1-9]\d*)$/.test(String(value)) ? String(value) : null;
 
 export function normalizedTitle(value: string): string {
-	// Only season one is interchangeable with an unsuffixed series title.
 	return value
 		.normalize("NFKC")
 		.toLowerCase()
-		.replace(/(?:第[一1]季|season\s*1)$/i, "")
+		.replace(
+			/(?:第([\d一二三四五六七八九十百]+)[季期]|season\s*(\d+))$/i,
+			(_, chinese, arabic) => {
+				const digits = "零一二三四五六七八九";
+				const number = arabic
+					? Number(arabic)
+					: /^\d+$/.test(chinese)
+						? Number(chinese)
+						: chinese.includes("十")
+							? (digits.indexOf(chinese.split("十")[0]) || 1) * 10 +
+								Math.max(0, digits.indexOf(chinese.split("十")[1] ?? "零"))
+							: digits.indexOf(chinese);
+				return number === 1 ? "" : `season${number > 0 ? number : chinese}`;
+			},
+		)
 		.replace(/[^\p{L}\p{N}]/gu, "");
 }
 
@@ -170,7 +184,7 @@ export function parseDoubanReviews(data: unknown): ExtraReview[] {
 				},
 			];
 		})
-		.slice(0, 20);
+		.slice(0, 50);
 }
 
 export async function fetchDoubanReviews(
@@ -180,7 +194,7 @@ export async function fetchDoubanReviews(
 	let resolved = sourceId;
 	if (!resolved) {
 		const data = await doubanJson(
-			`search?q=${encodeURIComponent(title.titles[0])}&type=${title.type}`,
+			`search?q=${encodeURIComponent((title.searchTitles ?? title.titles)[0])}&type=${title.type}`,
 		);
 		if (!Array.isArray(row(data.subjects).items))
 			throw new Error("Unexpected Douban search response");
@@ -205,7 +219,7 @@ export async function fetchDoubanReviews(
 		resolved = ids[0];
 	}
 	const data = await doubanJson(
-		`${title.type}/${resolved}/interests?count=20&start=0&status=done`,
+		`${title.type}/${resolved}/interests?count=50&start=0&status=done`,
 	);
 	return { sourceId: resolved, results: parseDoubanReviews(data) };
 }
@@ -249,7 +263,8 @@ async function findBahamutFanpageJson(
 	title: ReviewTitle,
 	deadline: AbortSignal,
 ): Promise<string | null> {
-	const query = title.titles[1] || title.titles[0];
+	const queries = title.searchTitles ?? title.titles;
+	const query = queries[1] || queries[0];
 	const search = row(
 		await (
 			await get(
@@ -306,7 +321,8 @@ async function findBahamutFanpageHtml(
 	title: ReviewTitle,
 	deadline: AbortSignal,
 ): Promise<string | null> {
-	const query = title.titles[1] || title.titles[0];
+	const queries = title.searchTitles ?? title.titles;
+	const query = queries[1] || queries[0];
 	const html = await (
 		await get(
 			`https://acg.gamer.com.tw/search.php?kw=${encodeURIComponent(query)}`,
@@ -369,7 +385,7 @@ export function parseBahamutReviews(
 				},
 			];
 		})
-		.slice(0, 20);
+		.slice(0, 50);
 }
 
 export async function fetchBahamutReviews(
@@ -388,7 +404,7 @@ export async function fetchBahamutReviews(
 	}
 	const data = await (
 		await get(
-			`https://api.gamer.com.tw/acg/v1/reviews_list.php?sn=${resolved}&t=4&sort=1`,
+			`https://api.gamer.com.tw/acg/v1/reviews_list.php?sn=${resolved}&t=4&sort=4`,
 			"https://wall.gamer.com.tw/",
 			deadline,
 		)

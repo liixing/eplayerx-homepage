@@ -76,6 +76,69 @@ test("Douban requires an unambiguous title, media type and release year", async 
 	);
 });
 
+test("later season matching accepts Chinese/Arabic season numbers, without borrowing season one", async (t) => {
+	assert.equal(
+		normalizedTitle("测试作品 第二季"),
+		normalizedTitle("测试作品 Season 2"),
+	);
+	assert.equal(
+		normalizedTitle("测试作品 第十二季"),
+		normalizedTitle("测试作品 Season 12"),
+	);
+	assert.notEqual(
+		normalizedTitle("测试作品 第二季"),
+		normalizedTitle("测试作品"),
+	);
+	const requests: string[] = [];
+	t.mock.method(globalThis, "fetch", async (input: RequestInfo | URL) => {
+		const url = String(input);
+		requests.push(url);
+		if (url.includes("/search?"))
+			return Response.json({
+				subjects: {
+					items: [
+						{
+							target_type: "tv",
+							target: { id: "1", title: "测试作品 第一季", year: "2023" },
+						},
+						{
+							target_type: "tv",
+							target: { id: "2", title: "测试作品 第二季", year: "2023" },
+						},
+					],
+				},
+			});
+		assert.ok(url.includes("/tv/2/interests?count=50&start=0"));
+		return Response.json({
+			interests: Array.from({ length: 50 }, (_, index) => ({
+				id: String(index + 1),
+				comment: "短评",
+			})),
+		});
+	});
+	const result = await fetchDoubanReviews({
+		...title,
+		titles: ["测试作品 第2季"],
+		searchTitles: ["测试作品"],
+	});
+	assert.equal(result.sourceId, "2");
+	assert.equal(result.results.length, 50);
+	assert.equal(requests.length, 2, "search + one larger batch, no pagination");
+});
+
+test("Bahamut keeps the full first batch instead of truncating it to twenty", () => {
+	const items = Array.from({ length: 30 }, (_, index) => ({
+		id: String(index + 1),
+		privacy: 1,
+		content: "评价",
+		reviews: { id: 99, dc_type: { id: 4 } },
+	}));
+	assert.equal(
+		parseBahamutReviews({ data: { list: [items] } }, "99").length,
+		30,
+	);
+});
+
 test("Bahamut separates animation from manga and verifies the original premiere year", () => {
 	const html = `<p class="search_title">[ 漫畫 ]<a href="//acg.gamer.com.tw/acgDetail.php?s=1">測試作品</a></p>
 	<p class="search_title">[ 動畫 ]<a href="//acg.gamer.com.tw/acgDetail.php?s=2">測試作品</a></p>
@@ -152,7 +215,7 @@ test("Bahamut falls back to verified desktop pages when the JSON catalog is unav
 				);
 			assert.equal(
 				url,
-				"https://api.gamer.com.tw/acg/v1/reviews_list.php?sn=99&t=4&sort=1",
+				"https://api.gamer.com.tw/acg/v1/reviews_list.php?sn=99&t=4&sort=4",
 			);
 			return Response.json({ data: { list: [] } });
 		},
@@ -205,7 +268,7 @@ test("Bahamut resolves first-time reviews entirely through JSON and deduplicates
 			});
 		assert.equal(
 			url,
-			"https://api.gamer.com.tw/acg/v1/reviews_list.php?sn=99&t=4&sort=1",
+			"https://api.gamer.com.tw/acg/v1/reviews_list.php?sn=99&t=4&sort=4",
 		);
 		return Response.json({
 			data: {

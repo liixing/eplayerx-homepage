@@ -182,7 +182,7 @@ export async function tmdbCacheMiddleware(c: Context, next: () => Promise<void>)
   const epoch = cacheControl === CACHE.artwork
     ? "20261019-artwork-6h"
     : /^\/(movie|tv)\/reviews$/.test(path)
-    ? "20261113-reviews-newest-v4"
+    ? "20261113-reviews-seasons-v5"
     : path === "/trending/tv" || path === "/trending/movie"
     ? `${TMDB_CACHE_EPOCH}-ratings-v2`
     : path === "/search/scrape"
@@ -666,6 +666,11 @@ for (const type of ["movie", "tv"] as const) {
     }
     const language = metadataLanguage(c, "en-US");
     const allSources = c.req.query("sources") === "all";
+    const rawSeason = c.req.query("season");
+    const season = rawSeason === undefined ? undefined : Number(rawSeason);
+    if (rawSeason !== undefined && (type !== "tv" || !/^\d+$/.test(rawSeason) || !Number.isSafeInteger(season) || season! > 1000)) {
+      return c.json({ error: "invalid season" }, 400);
+    }
     const deadline = allSources ? AbortSignal.timeout(10_000) : undefined;
     const fetchReviews = (lang: string) =>
       type === "movie"
@@ -680,7 +685,7 @@ for (const type of ["movie", "tv"] as const) {
     })().catch(() => null);
     const extraReviews = allSources ? getExtraReviews(type, id, reviewStorage((c.env as { ASSETS?: R2Bucket })?.ASSETS), job => {
       try { c.executionCtx.waitUntil(job); } catch { void job; }
-    }, 10_000) : Promise.resolve([]);
+    }, 10_000, season) : Promise.resolve([]);
     const [result, extra] = await Promise.all([tmdbReviews, extraReviews]);
     if (!result || result.response.status !== 200) {
       if (extra.length) {

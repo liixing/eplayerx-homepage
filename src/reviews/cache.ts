@@ -4,6 +4,7 @@ import {
 	type ExtraReview,
 	fetchBahamutReviews,
 	fetchDoubanReviews,
+	normalizedTitle,
 	type MediaType,
 	type ReviewSource,
 	type ReviewTitle,
@@ -49,7 +50,11 @@ export function reviewStorage(bucket?: R2Bucket): ReviewStorage | null {
 	};
 }
 
-async function resolveTitle(type: MediaType, id: number): Promise<ReviewTitle> {
+export async function resolveTitle(
+	type: MediaType,
+	id: number,
+	season?: number,
+): Promise<ReviewTitle> {
 	const details = await Promise.all(
 		["zh-CN", "zh-TW"].map(async (language) => {
 			const options = {
@@ -70,12 +75,24 @@ async function resolveTitle(type: MediaType, id: number): Promise<ReviewTitle> {
 				release_date?: string;
 				first_air_date?: string;
 				genres?: { id?: number }[];
+				seasons?: {
+					season_number?: number;
+					name?: string;
+					air_date?: string | null;
+				}[];
 			};
 		}),
 	);
+	// Series metadata already contains localized season names and premiere dates.
+	const seasons = details.map((detail) =>
+		detail.seasons?.find((entry) => entry.season_number === season),
+	);
 	const first = details[0];
 	const year = Number(
-		(first.release_date ?? first.first_air_date ?? "").slice(0, 4),
+		(season === undefined
+			? (first.release_date ?? first.first_air_date ?? "")
+			: (seasons[0]?.air_date ?? "")
+		).slice(0, 4),
 	);
 	const titles = [
 		...new Set(
@@ -87,6 +104,35 @@ async function resolveTitle(type: MediaType, id: number): Promise<ReviewTitle> {
 	];
 	if (!titles.length || !year)
 		throw new Error("Review title lacks a title or year");
+	if (season !== undefined) {
+		if (season < 1)
+			throw new Error("Specials have no unambiguous review mapping");
+		const names = new Set(
+			titles.flatMap((name) => [
+				...(season === 1 ? [name] : []),
+				`${name} 第${season}季`,
+				`${name} Season ${season}`,
+			]),
+		);
+		for (const entry of seasons) {
+			const name = entry?.name?.trim();
+			if (
+				!name ||
+				normalizedTitle(name) === normalizedTitle(`Season ${season}`) ||
+				titles.some((base) => normalizedTitle(base) === normalizedTitle(name))
+			)
+				continue;
+			names.add(name);
+			for (const base of titles) names.add(`${base} ${name}`);
+		}
+		return {
+			type,
+			titles: [...names],
+			searchTitles: titles,
+			year,
+			animated: first.genres?.some((genre) => genre.id === 16) ?? false,
+		};
+	}
 	return {
 		type,
 		titles,
@@ -153,6 +199,7 @@ export function createReviewCache(
 		id: number,
 		storage: ReviewStorage,
 		snapshot: Snapshot,
+		season?: number,
 	): Promise<void> {
 		const existing = refreshes.get(key);
 		if (existing) return existing;
@@ -165,7 +212,7 @@ export function createReviewCache(
 		const job = (async () => {
 			const next: Snapshot = { version: 1, sources: { ...snapshot.sources } };
 			try {
-				const title = await dependencies.resolveTitle(type, id);
+				const title = await dependencies.resolveTitle(type, id, season);
 				await Promise.all(
 					due.map(async (source) => {
 						const previous = snapshot.sources[source];
@@ -215,13 +262,14 @@ export function createReviewCache(
 		storage: ReviewStorage | null,
 		waitUntil: (job: Promise<void>) => void,
 		waitForRefreshMs = 0,
+		season?: number,
 	): Promise<ExtraReview[]> => {
-		if (!storage) return [];
+		if (!storage || season === 0) return [];
 		const startedAt = performance.now();
-		const key = `reviews/v1/${type}/${id}.json`;
+		const key = `reviews/v2/${type}/${id}${season === undefined ? "" : `/season/${season}`}.json`;
 		const loading = read(key, storage);
 		const background = loading.then((snapshot) =>
-			snapshot ? refresh(key, type, id, storage, snapshot) : undefined,
+			snapshot ? refresh(key, type, id, storage, snapshot, season) : undefined,
 		);
 		waitUntil(background);
 		let timer: ReturnType<typeof setTimeout> | undefined;

@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { createReviewCache, type ReviewStorage } from "./cache.js";
+import {
+	createReviewCache,
+	resolveTitle,
+	type ReviewStorage,
+} from "./cache.js";
 import type { ExtraReview } from "./providers.js";
 
 const review: ExtraReview = {
@@ -19,6 +23,98 @@ const title = {
 	year: 2023,
 	animated: true,
 };
+
+test("season mappings use that season's premiere year and keep later seasons distinct", async (t) => {
+	const token = process.env.TMDB_API_TOKEN;
+	process.env.TMDB_API_TOKEN = "test-token";
+	t.after(() => {
+		if (token === undefined) delete process.env.TMDB_API_TOKEN;
+		else process.env.TMDB_API_TOKEN = token;
+	});
+	const requests: string[] = [];
+	t.mock.method(globalThis, "fetch", async (input: RequestInfo | URL) => {
+		const url = new URL(input instanceof Request ? input.url : String(input));
+		requests.push(url.pathname);
+		return Response.json({
+			name: "测试",
+			original_name: "Test",
+			first_air_date: "2020-01-01",
+			genres: [{ id: 16 }],
+			seasons: [
+				{ season_number: 1, name: "第1季", air_date: "2020-01-01" },
+				{ season_number: 2, name: "第2季", air_date: "2023-01-01" },
+			],
+		});
+	});
+	const first = await resolveTitle("tv", 1, 1);
+	const second = await resolveTitle("tv", 1, 2);
+	assert.equal(first.year, 2020);
+	assert.equal(second.year, 2023);
+	assert.ok(first.titles.includes("测试"));
+	assert.ok(!second.titles.includes("测试"));
+	assert.ok(second.titles.includes("测试 第2季"));
+	assert.ok(second.titles.includes("Test Season 2"));
+	assert.deepEqual(second.searchTitles, ["测试", "Test"]);
+	assert.deepEqual(
+		requests,
+		["/3/tv/1", "/3/tv/1", "/3/tv/1", "/3/tv/1"],
+		"season metadata adds no requests",
+	);
+});
+
+test("each season has isolated storage, source IDs and coalesced refreshes", async () => {
+	const reads: string[] = [],
+		writes = new Map<string, unknown>();
+	const resolved: (number | undefined)[] = [];
+	const cache = createReviewCache({
+		resolveTitle: async (_type, _id, season) => {
+			resolved.push(season);
+			return { ...title, year: season === 1 ? 2020 : 2023 };
+		},
+		fetchers: {
+			douban: async (title, previous) => {
+				assert.equal(previous, undefined);
+				return {
+					sourceId: String(title.year),
+					results: [{ ...review, id: String(title.year) }],
+				};
+			},
+			bahamut: async () => ({ sourceId: null, results: [] }),
+		},
+	});
+	const storage: ReviewStorage = {
+		read: async (key) => {
+			reads.push(key);
+			return null;
+		},
+		write: async (key, value) => {
+			writes.set(key, value);
+		},
+	};
+	const jobs: Promise<void>[] = [];
+	const load = (season: number) =>
+		cache("tv", 1, storage, (job) => jobs.push(job), 1000, season);
+	const [first, second, sameSecond] = await Promise.all([
+		load(1),
+		load(2),
+		load(2),
+	]);
+	assert.equal(first[0]?.id, "2020");
+	assert.equal(second[0]?.id, "2023");
+	assert.deepEqual(second, sameSecond);
+	assert.deepEqual(resolved.sort(), [1, 2]);
+	assert.equal(reads.length, 2);
+	await Promise.all(jobs);
+	assert.deepEqual([...writes.keys()].sort(), [
+		"reviews/v2/tv/1/season/1.json",
+		"reviews/v2/tv/1/season/2.json",
+	]);
+	assert.deepEqual(
+		await load(0),
+		[],
+		"specials never borrow a regular season mapping",
+	);
+});
 
 test("cold requests return without crawling; concurrent requests share the refresh and warm reads reuse it", async () => {
 	let release!: () => void;
