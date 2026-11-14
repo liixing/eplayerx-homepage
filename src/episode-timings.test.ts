@@ -116,6 +116,13 @@ test("one episode endpoint shares ads and markers without crossing episodes", as
 		),
 	);
 	sqlite.exec(
+		readFileSync(
+			new URL("../migrations/0026_ad_scan_completions.sql", import.meta.url),
+			"utf8",
+		),
+	);
+
+	sqlite.exec(
 		`UPDATE ad_scan_requests SET catalog_json = '{"posterPath":"/poster.jpg","year":"2023"}'`,
 	);
 	sqlite.exec(
@@ -234,12 +241,18 @@ test("one episode endpoint shares ads and markers without crossing episodes", as
 			env,
 		);
 	const query = "tmdbId=10&season=1&episode=2&durationMs=2000000";
-	const getAdSegments = async (query: string) => {
+	const getAdState = async (query: string) => {
 		const payload = (await (await get(query)).json()) as {
-			ads: { segments: { startMs: number; endMs: number }[] };
+			ads: {
+				eligible: boolean;
+				scanComplete: boolean;
+				segments: { startMs: number; endMs: number }[];
+			};
 		};
-		return payload.ads.segments;
+		return payload.ads;
 	};
+	const getAdSegments = async (query: string) =>
+		(await getAdState(query)).segments;
 	const empty = { introEndMs: null, outroStartMs: null };
 	const adminURL = "http://localhost/admin/episode-timings";
 	const admin = (path = "", assertion = ownerToken) =>
@@ -313,7 +326,7 @@ test("one episode endpoint shares ads and markers without crossing episodes", as
 		}
 		assert.deepEqual(await (await get(query)).json(), {
 			markers: empty,
-			ads: { eligible: true, segments: [] },
+			ads: { eligible: true, scanComplete: false, segments: [] },
 		});
 		assert.equal(
 			(await post({ kind: "ad", startMs: 100_000, endMs: 125_000 })).status,
@@ -342,7 +355,11 @@ test("one episode endpoint shares ads and markers without crossing episodes", as
 		statements = 0;
 		assert.deepEqual(await (await get(query)).json(), {
 			markers: { introEndMs: 55_000, outroStartMs: 1_950_000 },
-			ads: { eligible: true, segments: [{ startMs: 100_000, endMs: 125_000 }] },
+			ads: {
+				eligible: true,
+				scanComplete: false,
+				segments: [{ startMs: 100_000, endMs: 125_000 }],
+			},
 		});
 		assert.equal(statements, 1);
 		statements = 0;
@@ -378,11 +395,11 @@ test("one episode endpoint shares ads and markers without crossing episodes", as
 		}
 		assert.deepEqual(await (await get("tmdbId=10&season=1&episode=3")).json(), {
 			markers: empty,
-			ads: { eligible: true, segments: [] },
+			ads: { eligible: true, scanComplete: false, segments: [] },
 		});
 		assert.deepEqual(await (await get("tmdbId=11&season=1&episode=2")).json(), {
 			markers: empty,
-			ads: { eligible: false, segments: [] },
+			ads: { eligible: false, scanComplete: false, segments: [] },
 		});
 		assert.equal(
 			(await post({ kind: "intro", startMs: 10_000, endMs: 55_000 })).status,
@@ -421,7 +438,11 @@ test("one episode endpoint shares ads and markers without crossing episodes", as
 		};
 		assert.deepEqual(await (await get(`${query}&ranges=1`)).json(), {
 			markers: ranges,
-			ads: { eligible: true, segments: [{ startMs: 100_000, endMs: 125_000 }] },
+			ads: {
+				eligible: true,
+				scanComplete: false,
+				segments: [{ startMs: 100_000, endMs: 125_000 }],
+			},
 		});
 		assert.deepEqual(await (await get(`${query}&ranges=1&ads=0`)).json(), {
 			markers: ranges,
@@ -437,7 +458,11 @@ test("one episode endpoint shares ads and markers without crossing episodes", as
 		);
 		assert.deepEqual(await (await get(query)).json(), {
 			markers: { introEndMs: 55_000, outroStartMs: null },
-			ads: { eligible: true, segments: [{ startMs: 100_000, endMs: 125_000 }] },
+			ads: {
+				eligible: true,
+				scanComplete: false,
+				segments: [{ startMs: 100_000, endMs: 125_000 }],
+			},
 		});
 		// Legacy reports stay stored, but only known, matching durations can be reused.
 		assert.deepEqual(
@@ -637,6 +662,148 @@ test("one episode endpoint shares ads and markers without crossing episodes", as
 			[],
 		);
 
+		// Positive reports never imply completion, and a shorter report cannot replace a fuller set.
+		const threeAds = [
+			{ startMs: 100_000, endMs: 125_000 },
+			{ startMs: 200_000, endMs: 225_000 },
+			{ startMs: 300_000, endMs: 325_000 },
+		];
+		for (const [episode, reports] of [
+			[81, [threeAds[0], ...threeAds]],
+			[82, [...threeAds, threeAds[0]]],
+		] as const) {
+			const q = `tmdbId=10&season=1&episode=${episode}&durationMs=2000000`;
+			for (const ad of reports)
+				assert.equal((await post({ kind: "ad", episode, ...ad })).status, 204);
+			assert.deepEqual(await getAdState(q), {
+				eligible: true,
+				scanComplete: false,
+				segments: threeAds,
+			});
+			for (const durationMs of [2_001_000, 2_000_000])
+				assert.equal(
+					(await post({ kind: "ad_scan_complete", episode, durationMs }))
+						.status,
+					204,
+				);
+			assert.deepEqual(await getAdState(q), {
+				eligible: true,
+				scanComplete: true,
+				segments: threeAds,
+			});
+			assert.equal(
+				(await post({ kind: "ad", episode, ...threeAds[0] })).status,
+				204,
+			);
+			assert.deepEqual(await getAdState(q), {
+				eligible: true,
+				scanComplete: true,
+				segments: threeAds,
+			});
+			for (const runtime of [1_995_000, 2_005_000])
+				assert.equal(
+					(await getAdState(q.replace("2000000", String(runtime))))
+						.scanComplete,
+					true,
+				);
+			for (const runtime of [1_994_999, 2_005_001])
+				assert.deepEqual(
+					await getAdState(q.replace("2000000", String(runtime))),
+					{ eligible: true, scanComplete: false, segments: [] },
+				);
+		}
+		// Completion from a less comprehensive scan never freezes its advertisement list.
+		assert.equal(
+			(await post({ kind: "ad", episode: 84, ...threeAds[0] })).status,
+			204,
+		);
+		assert.equal(
+			(await post({ kind: "ad_scan_complete", episode: 84 })).status,
+			204,
+		);
+		for (const ad of threeAds)
+			assert.equal(
+				(await post({ kind: "ad", episode: 84, ...ad })).status,
+				204,
+			);
+		assert.equal(
+			(await post({ kind: "ad_scan_complete", episode: 84 })).status,
+			204,
+		);
+		assert.deepEqual(
+			await getAdState("tmdbId=10&season=1&episode=84&durationMs=2000000"),
+			{ eligible: true, scanComplete: true, segments: threeAds },
+		);
+
+		// A completed scan with no matches is versioned, not a global no-ad verdict.
+		assert.equal(
+			(await post({ kind: "ad_scan_complete", episode: 83 })).status,
+			204,
+		);
+		assert.deepEqual(
+			await getAdState("tmdbId=10&season=1&episode=83&durationMs=2000000"),
+			{ eligible: true, scanComplete: true, segments: [] },
+		);
+		assert.equal(
+			(
+				await post({
+					kind: "ad",
+					episode: 83,
+					durationMs: 2_001_000,
+					...threeAds[0],
+				})
+			).status,
+			204,
+		);
+		assert.deepEqual(
+			await getAdState("tmdbId=10&season=1&episode=83&durationMs=2001000"),
+			{ eligible: true, scanComplete: true, segments: [threeAds[0]] },
+		);
+		// A nearer incomplete version must not inherit a neighbouring version's completion.
+		assert.equal(
+			(
+				await post({
+					kind: "ad",
+					episode: 83,
+					durationMs: 2_007_500,
+					...threeAds[1],
+				})
+			).status,
+			204,
+		);
+		assert.deepEqual(
+			await getAdState("tmdbId=10&season=1&episode=83&durationMs=2004500"),
+			{ eligible: true, scanComplete: false, segments: [threeAds[1]] },
+		);
+		sqlite.exec("DELETE FROM screen_ad_series WHERE tmdb_id = 13");
+		assert.equal(
+			(await post({ kind: "ad_scan_complete", tmdbId: 13, episode: 2 })).status,
+			204,
+		);
+		sqlite.exec("DELETE FROM screen_ad_series WHERE tmdb_id = 13");
+		assert.equal(
+			(await getAdState("tmdbId=13&season=1&episode=2&durationMs=2000000"))
+				.scanComplete,
+			true,
+		);
+		for (const durationMs of [
+			undefined,
+			null,
+			0,
+			-1,
+			1.5,
+			28_800_001,
+			"invalid",
+		])
+			assert.equal(
+				(await post({ kind: "ad_scan_complete", durationMs })).status,
+				400,
+			);
+		assert.equal(
+			(await post({ kind: "ad_scan_complete", tmdbId: 11 })).status,
+			403,
+		);
+
 		assert.equal((await post({ kind: "no_ads" })).status, 400);
 		sqlite.exec(
 			"INSERT INTO screen_ad_free_episodes VALUES (10, 1, 2), (12, 1, 1)",
@@ -645,6 +812,7 @@ test("one episode endpoint shares ads and markers without crossing episodes", as
 		const confirmedNoAds = {
 			confirmedNoAds: true,
 			eligible: false,
+			scanComplete: true,
 			segments: [],
 		};
 		assert.deepEqual(await (await get(`${query}&ranges=1`)).json(), {
@@ -662,7 +830,7 @@ test("one episode endpoint shares ads and markers without crossing episodes", as
 		]) {
 			assert.deepEqual(await (await get(other)).json(), {
 				markers: empty,
-				ads: { eligible: true, segments: [] },
+				ads: { eligible: true, scanComplete: false, segments: [] },
 			});
 		}
 		sqlite.exec(
@@ -670,7 +838,11 @@ test("one episode endpoint shares ads and markers without crossing episodes", as
 		);
 		assert.deepEqual(await (await get(query)).json(), {
 			markers: { introEndMs: 55_000, outroStartMs: null },
-			ads: { eligible: true, segments: [{ startMs: 100_000, endMs: 125_000 }] },
+			ads: {
+				eligible: true,
+				scanComplete: false,
+				segments: [{ startMs: 100_000, endMs: 125_000 }],
+			},
 		});
 		assert.equal((await app.request(adminURL, undefined, env)).status, 401);
 		const adminPage = await admin();
@@ -734,7 +906,11 @@ test("one episode endpoint shares ads and markers without crossing episodes", as
 		);
 		assert.deepEqual(await (await get(`${query}&ranges=1`)).json(), {
 			markers: { ...defaults, introStartMs: 0, introEndMs: 24_000 },
-			ads: { eligible: true, segments: [{ startMs: 150_250, endMs: 162_000 }] },
+			ads: {
+				eligible: true,
+				scanComplete: false,
+				segments: [{ startMs: 150_250, endMs: 162_000 }],
+			},
 		});
 		const season = {
 			scope: "season",
@@ -760,7 +936,11 @@ test("one episode endpoint shares ads and markers without crossing episodes", as
 		assert.match(await (await admin(seasonPage)).text(), /整季默认/);
 		assert.deepEqual(await (await get(seasonSibling)).json(), {
 			markers: seasonMarkers,
-			ads: { eligible: true, segments: [{ startMs: 120_000, endMs: 140_000 }] },
+			ads: {
+				eligible: true,
+				scanComplete: false,
+				segments: [{ startMs: 120_000, endMs: 140_000 }],
+			},
 		});
 		assert.deepEqual(
 			await (await get("tmdbId=10&season=2&episode=1&ranges=1")).json(),
@@ -773,7 +953,11 @@ test("one episode endpoint shares ads and markers without crossing episodes", as
 		});
 		assert.deepEqual(await (await get(`${query}&ranges=1`)).json(), {
 			markers: { ...seasonMarkers, introStartMs: 0, introEndMs: 24_000 },
-			ads: { eligible: true, segments: [{ startMs: 150_250, endMs: 162_000 }] },
+			ads: {
+				eligible: true,
+				scanComplete: false,
+				segments: [{ startMs: 150_250, endMs: 162_000 }],
+			},
 		});
 		assert.equal(
 			(await save({ scope: "season", adMode: "inherit" })).status,
@@ -800,13 +984,18 @@ test("one episode endpoint shares ads and markers without crossing episodes", as
 				markers: defaults,
 				ads: {
 					eligible: true,
+					scanComplete: false,
 					segments: [{ startMs: 120_000, endMs: 140_000 }],
 				},
 			},
 		);
 		assert.deepEqual(await (await get(`${query}&ranges=1`)).json(), {
 			markers: { ...defaults, introStartMs: 0, introEndMs: 24_000 },
-			ads: { eligible: true, segments: [{ startMs: 150_250, endMs: 162_000 }] },
+			ads: {
+				eligible: true,
+				scanComplete: false,
+				segments: [{ startMs: 150_250, endMs: 162_000 }],
+			},
 		});
 		assert.equal(
 			(await save({ scope: "episode", adMode: "none" })).status,
@@ -830,7 +1019,11 @@ test("one episode endpoint shares ads and markers without crossing episodes", as
 		);
 		assert.deepEqual(await (await get(query)).json(), {
 			markers: { introEndMs: 55_000, outroStartMs: null },
-			ads: { eligible: true, segments: [{ startMs: 100_000, endMs: 125_000 }] },
+			ads: {
+				eligible: true,
+				scanComplete: false,
+				segments: [{ startMs: 100_000, endMs: 125_000 }],
+			},
 		});
 		assert.equal(
 			(await admin("", await token(owner, "different-audience"))).status,
@@ -906,7 +1099,11 @@ test("one episode endpoint shares ads and markers without crossing episodes", as
 		assert.equal((await save(season, editorToken)).status, 200);
 		assert.deepEqual(await (await get(seasonSibling)).json(), {
 			markers: seasonMarkers,
-			ads: { eligible: true, segments: [{ startMs: 120_000, endMs: 140_000 }] },
+			ads: {
+				eligible: true,
+				scanComplete: false,
+				segments: [{ startMs: 120_000, endMs: 140_000 }],
+			},
 		});
 		assert.deepEqual(
 			await (await get("tmdbId=10&season=2&episode=1&ranges=1")).json(),
@@ -939,7 +1136,11 @@ test("one episode endpoint shares ads and markers without crossing episodes", as
 					outroStartMs: 1200000,
 					outroEndMs: 1260000,
 				},
-				ads: { eligible: true, segments: [{ startMs: 150250, endMs: 162000 }] },
+				ads: {
+					eligible: true,
+					scanComplete: false,
+					segments: [{ startMs: 150250, endMs: 162000 }],
+				},
 			},
 		);
 		const otherCut = (await (

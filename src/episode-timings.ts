@@ -11,7 +11,6 @@ type Env = {
 	};
 };
 
-type Ad = { startMs: number; endMs: number };
 type Markers = {
 	introStartMs: number | null;
 	introEndMs: number | null;
@@ -23,6 +22,7 @@ type TimingRow = Markers & {
 	outroRank: number;
 	eligible: number | null;
 	confirmedNoAds: number;
+	scanComplete: number;
 	manualAdStartMs: number | null;
 	manualAdEndMs: number | null;
 	startMs: number | null;
@@ -47,6 +47,18 @@ const markerColumns = `
 		WHEN d.intro_end_ms IS NOT NULL THEN 1 ELSE 0 END AS introRank,
 	CASE WHEN e.outro_start_ms IS NOT NULL THEN 3 WHEN t.outro_start_ms IS NOT NULL THEN 2
 		WHEN d.outro_start_ms IS NOT NULL THEN 1 ELSE 0 END AS outroRank`;
+// Pick one runtime version for both its advertisements and completion status.
+const adVersionCTE = `matched_ad_version AS (
+	SELECT duration_ms FROM (
+		SELECT a.duration_ms FROM screen_ad_segments a JOIN requested r USING (tmdb_id, season, episode)
+		WHERE r.duration_ms > 0 AND a.duration_ms > 0
+			AND a.duration_ms BETWEEN r.duration_ms - ${durationTolerance} AND r.duration_ms + ${durationTolerance}
+		UNION
+		SELECT a.duration_ms FROM screen_ad_scan_completions a JOIN requested r USING (tmdb_id, season, episode)
+		WHERE r.duration_ms > 0
+			AND a.duration_ms BETWEEN r.duration_ms - ${durationTolerance} AND r.duration_ms + ${durationTolerance}
+	) ORDER BY abs(duration_ms - (SELECT duration_ms FROM requested)), duration_ms LIMIT 1
+)`;
 const markerSelect = `WITH requested(tmdb_id, season, episode, duration_ms) AS (VALUES (?, ?, ?, ?)),
 	matched_markers AS (
 		SELECT m.* FROM episode_intro_outro_versions m JOIN requested r USING (tmdb_id, season, episode)
@@ -59,7 +71,7 @@ const markerSelect = `WITH requested(tmdb_id, season, episode, duration_ms) AS (
 		WHERE p.duration_ms = 0 OR (r.duration_ms > 0
 			AND p.duration_ms BETWEEN r.duration_ms - ${markerDurationTolerance} AND r.duration_ms + ${markerDurationTolerance})
 		ORDER BY p.duration_ms = 0, abs(p.duration_ms - r.duration_ms) LIMIT 1
-	)
+	), ${adVersionCTE}
 	SELECT ${markerColumns}`;
 const markerSource = `FROM requested r
 	LEFT JOIN matched_markers m USING (tmdb_id, season, episode)
@@ -187,28 +199,29 @@ app.use("*", async (c, next) => {
 	await next();
 });
 
-async function readAdSegments(
+async function readAdState(
 	db: D1Database,
 	key: NonNullable<ReturnType<typeof parseEpisode>>,
 	duration: number,
 ) {
 	const { results } = await db
-		.prepare(`SELECT start_ms AS startMs, end_ms AS endMs
-		FROM screen_ad_segments WHERE ${scope} AND duration_ms = (
-			SELECT duration_ms FROM screen_ad_segments
-			WHERE ${scope} AND ? > 0 AND duration_ms > 0 AND duration_ms BETWEEN ? AND ?
-			ORDER BY abs(duration_ms - ?), duration_ms LIMIT 1
-		) ORDER BY start_ms`)
-		.bind(
-			...key,
-			...key,
-			duration,
-			duration - durationTolerance,
-			duration + durationTolerance,
-			duration,
-		)
-		.all<Ad>();
-	return results;
+		.prepare(`WITH requested(tmdb_id, season, episode, duration_ms) AS (VALUES (?, ?, ?, ?)),
+		${adVersionCTE}
+		SELECT a.start_ms AS startMs, a.end_ms AS endMs, c.duration_ms IS NOT NULL AS scanComplete
+		FROM requested r
+		LEFT JOIN screen_ad_segments a ON a.tmdb_id = r.tmdb_id AND a.season = r.season AND a.episode = r.episode
+			AND a.duration_ms = (SELECT duration_ms FROM matched_ad_version)
+		LEFT JOIN screen_ad_scan_completions c ON c.tmdb_id = r.tmdb_id AND c.season = r.season
+			AND c.episode = r.episode AND c.duration_ms = (SELECT duration_ms FROM matched_ad_version)
+		ORDER BY a.start_ms`)
+		.bind(...key, duration)
+		.all<Pick<TimingRow, "startMs" | "endMs" | "scanComplete">>();
+	return {
+		segments: results.flatMap(({ startMs, endMs }) =>
+			startMs === null || endMs === null ? [] : [{ startMs, endMs }],
+		),
+		scanComplete: results[0].scanComplete === 1,
+	};
 }
 
 app.get("/", async (c) => {
@@ -241,27 +254,18 @@ app.get("/", async (c) => {
 					ELSE coalesce(d.no_ads, 0) END AS confirmedNoAds,
 				coalesce(e.ad_start_ms, t.ad_start_ms, d.ad_start_ms) AS manualAdStartMs,
 				coalesce(e.ad_end_ms, t.ad_end_ms, d.ad_end_ms) AS manualAdEndMs,
-				s.eligible, a.start_ms AS startMs, a.end_ms AS endMs
+				s.eligible, a.start_ms AS startMs, a.end_ms AS endMs,
+				c.duration_ms IS NOT NULL AS scanComplete
 			${markerSource}
 			LEFT JOIN screen_ad_free_episodes f ON f.tmdb_id = r.tmdb_id AND f.season = r.season AND f.episode = r.episode
 			LEFT JOIN screen_ad_series s ON s.tmdb_id = r.tmdb_id AND s.expires_at > ?
 			LEFT JOIN screen_ad_segments a ON f.tmdb_id IS NULL AND s.eligible = 1
 				AND a.tmdb_id = r.tmdb_id AND a.season = r.season AND a.episode = r.episode
-				AND a.duration_ms = (
-					SELECT duration_ms FROM screen_ad_segments
-					WHERE tmdb_id = r.tmdb_id AND season = r.season AND episode = r.episode
-						AND ? > 0 AND duration_ms > 0 AND duration_ms BETWEEN ? AND ?
-					ORDER BY abs(duration_ms - ?), duration_ms LIMIT 1
-				) ORDER BY a.start_ms`)
-			.bind(
-				...key,
-				duration ?? 0,
-				now,
-				duration ?? 0,
-				(duration ?? 0) - durationTolerance,
-				(duration ?? 0) + durationTolerance,
-				duration ?? 0,
-			)
+				AND a.duration_ms = (SELECT duration_ms FROM matched_ad_version)
+			LEFT JOIN screen_ad_scan_completions c ON c.tmdb_id = r.tmdb_id AND c.season = r.season
+				AND c.episode = r.episode AND c.duration_ms = (SELECT duration_ms FROM matched_ad_version)
+			ORDER BY a.start_ms`)
+			.bind(...key, duration ?? 0, now)
 			.all<TimingRow>();
 		const first = results[0];
 		if (!first) return unavailable(c);
@@ -269,7 +273,12 @@ app.get("/", async (c) => {
 		if (first.confirmedNoAds === 1) {
 			return c.json({
 				markers,
-				ads: { confirmedNoAds: true, eligible: false, segments: [] },
+				ads: {
+					confirmedNoAds: true,
+					eligible: false,
+					scanComplete: true,
+					segments: [],
+				},
 			});
 		}
 		if (first.manualAdStartMs !== null && first.manualAdEndMs !== null) {
@@ -277,6 +286,7 @@ app.get("/", async (c) => {
 				markers,
 				ads: {
 					eligible: true,
+					scanComplete: first.scanComplete === 1,
 					segments: [
 						{ startMs: first.manualAdStartMs, endMs: first.manualAdEndMs },
 					],
@@ -290,9 +300,9 @@ app.get("/", async (c) => {
 					markers,
 					ads: {
 						eligible,
-						segments: eligible
-							? await readAdSegments(db, key, duration ?? 0)
-							: [],
+						...(eligible
+							? await readAdState(db, key, duration ?? 0)
+							: { segments: [], scanComplete: false }),
 					},
 				});
 			} catch {
@@ -304,7 +314,11 @@ app.get("/", async (c) => {
 		);
 		return c.json({
 			markers,
-			ads: { eligible: first.eligible === 1, segments },
+			ads: {
+				eligible: first.eligible === 1,
+				scanComplete: first.scanComplete === 1,
+				segments,
+			},
 		});
 	} catch {
 		return unavailable(c);
@@ -323,7 +337,21 @@ app.post(
 		if (!key || !input) return c.json({ error: "Invalid episode" }, 400);
 		const db = c.env.DB!;
 		try {
-			if (input.kind === "ad") {
+			if (input.kind === "ad_scan_complete") {
+				const duration = integer(input.durationMs, 1, maxTime);
+				if (duration === undefined)
+					return c.json({ error: "Invalid video duration" }, 400);
+				if (!(await isChineseSeries(db, key[0])))
+					return c.json({ error: "Ineligible series" }, 403);
+				await db
+					.prepare(`WITH requested(tmdb_id, season, episode, duration_ms) AS (VALUES (?, ?, ?, ?)),
+					${adVersionCTE}
+					INSERT OR IGNORE INTO screen_ad_scan_completions (tmdb_id, season, episode, duration_ms)
+					SELECT tmdb_id, season, episode,
+						coalesce((SELECT duration_ms FROM matched_ad_version), duration_ms) FROM requested`)
+					.bind(...key, duration)
+					.run();
+			} else if (input.kind === "ad") {
 				const start = integer(input.startMs, 0, maxTime);
 				const end = integer(input.endMs, 0, maxTime);
 				const duration = integer(input.durationMs, 1, maxTime);
@@ -340,9 +368,11 @@ app.post(
 					return c.json({ error: "Ineligible series" }, 403);
 				await db
 					.prepare(`WITH version AS (
-						SELECT coalesce((SELECT duration_ms FROM screen_ad_segments
-							WHERE ${scope} AND duration_ms BETWEEN ? AND ?
-								AND (duration_ms = 0 OR duration_ms >= ?)
+						SELECT coalesce((SELECT duration_ms FROM (
+							SELECT duration_ms FROM screen_ad_segments WHERE ${scope}
+							UNION SELECT duration_ms FROM screen_ad_scan_completions WHERE ${scope})
+							WHERE duration_ms BETWEEN ? AND ?
+								AND duration_ms >= ?
 							ORDER BY abs(duration_ms - ?), duration_ms LIMIT 1), ?) AS duration
 					)
 					INSERT INTO screen_ad_segments (tmdb_id, season, episode, start_ms, end_ms, duration_ms)
@@ -351,6 +381,7 @@ app.post(
 							AND start_ms < ? AND end_ms > ?
 					)`)
 					.bind(
+						...key,
 						...key,
 						Math.max(1, duration - durationTolerance),
 						duration + durationTolerance,

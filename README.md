@@ -182,3 +182,12 @@ MIT License
 海报和 Logo 的默认语言均跟随 App 的 `language`，不会跟随独立的 `metadataLanguage`。空值表示恢复默认；`original` 按作品原始语言选择，缺少目标语言图片时依次回退原语言和无文字图片。
 
 例如 `language=en-US&metadataLanguage=zh-CN&posterLanguage=zh-TW&logoLanguage=ja-JP` 返回英文栏目、简中影片内容、繁中海报、日文 Logo。分类和语言浏览入口仍使用 App 语言。响应缓存按完整参数区分；已发布快照和已有刮削数据不会被重写。没有独立偏好的旧请求不增加上游查询，榜单已有中英文译文优先复用。
+
+### 客户端广告扫描完成状态
+
+部署此版本前先应用 D1 迁移 `0026_ad_scan_completions.sql`，再部署 Worker，最后发布客户端。
+`GET /episode-timings` 的 `ads.scanComplete` 表示对应时长版本已扫描完成；广告区间与完成状态统一选取最接近的版本，继续使用 ±5 秒容差。
+客户端滚动预扫描到片尾后，在本次广告区间全部上传成功后，以 `POST /episode-timings` 上报
+`{ "tmdbId": 10, "season": 1, "episode": 2, "kind": "ad_scan_complete", "durationMs": 2000000 }`。
+完成上报幂等，只保存扫描状态，不替换广告。不同用户上传的同版本非重叠区间继续累积；一段报告不会覆盖已有三段。
+没有广告命中的完成记录同样按时长版本保存，不写入管理员的整集“确认无广告”记录。旧广告数据默认未完成；旧客户端忽略新字段。
